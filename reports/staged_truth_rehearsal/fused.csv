@@ -1,0 +1,9 @@
+pothole_ref,pass_id,n_frames,n_frames_total,nearest_range_m,truth_depth_p95_mm,depth_p95_mm,depth_sigma_mm,truth_volume_l,volume_l,volume_sigma,reject_reason,truth_severity,measured_severity,depth_err_mm,volume_err_pct
+T20-S,P1,2,2,3,20,21.9164,3,0.509,0.466787,0.0806137,,small,small,1.91636,-8.29334
+T20-S,P2,2,2,3,20,21.6583,3,0.509,0.446534,0.0808615,,small,small,1.65832,-12.2723
+T40-M,P1,4,4,3,40,41.9023,3,6.362,5.8546,0.482655,,medium,medium,1.90226,-7.97541
+T40-M,P2,4,4,3,40,42.5158,3,6.362,5.47869,0.441947,,medium,medium,2.5158,-13.8841
+T70-L,P1,4,4,3,70,70.2435,3,11.133,9.54573,0.89287,,large,large,0.243485,-14.2574
+T70-L,P2,4,4,3,70,70.3671,3,11.133,8.49803,0.797793,,large,large,0.367128,-23.6681
+T40-W,P1,4,4,5,40,42.4908,3,20.106,19.0095,1.82687,,large,large,2.49083,-5.45355
+T40-W,P2,4,4,5,40,42.6849,3,20.106,18.1204,1.78205,,large,large,2.68487,-9.87559

@@ -1,0 +1,58 @@
+# Single source of truth for IRC-derived constants (read by measure/irc.py and repair/planner.py).
+# Every rule carries its reference. Edit values, not code.
+
+severity:   # IRC:82-2015 Cl. 7.5.3.4 (pothole severity), bins are inclusive upper bounds
+  ref: "IRC:82-2015 Cl. 7.5.3.4"
+  small:  { depth_mm_max: 25, width_mm_max: 200 }
+  medium: { depth_mm_max: 50, width_mm_max: 500 }
+  # anything above medium on either axis -> large
+  water_filled_lower_bound:      # PLAN 4.10
+    medium_if_width_mm_ge: 200
+    large_if_width_mm_gt: 500
+    large_if_imu_peak_g_gt: 0.5
+    large_if_complaints_ge: 2
+
+stretch_rating:   # IRC:82-2015 Table 5.3 (urban roads), pothole area as % of carriageway
+  ref: "IRC:82-2015 Table 5.3"
+  bin_length_m: 100
+  lane_width_m: 3.5
+  poor_if_area_pct_gt: 0.5
+  fair_if_area_pct_gt: 0.0
+
+repair:
+  ref_cut: "IRC:82-2015 Sec 10, Cl. 11.4 (cut to sound material, square/rectangular)"
+  ref_mix: "IRC:116-2014 (readymade cold mix); IRC:SP:100-2014 Sec 9 (cold maintenance mixes)"
+  ref_wet: "IRC:82-2015 Sec 10: pothole need not be dry; excess water shall be removed"
+  cut_margin_m: 0.125          # configurable 0.10-0.15
+  min_patch_depth_m: 0.050     # IRC:116 Cl. 5.2
+  max_layer_m: 0.075
+  round_depth_to_m: 0.005      # ceil to 5 mm
+  merge_within_m: 0.5          # potholes on the same lane band -> one cut
+  mix_density_kg_m3: 2200      # compacted; HINCOL rule-of-thumb 100 kg/m2 @ 50 mm = 2000
+  wastage: 0.12
+  bag_kg_options: [25, 50]
+  bag_kg_default: 25
+  tack_emulsion_kg_m2: 0.30    # SS-1 / CSS-1
+  sand_blinding_kg_m2: 1.0
+  crm_density_t_m3: 2.1        # crusher run macadam, compacted
+  labour:
+    base_h_per_pothole: 2.0
+    extra_h_per_m3: 40.0       # 1.0 h per additional 0.025 m3 of patch volume
+    supervision_frac: 0.10
+  method_selector:
+    jet_patcher_if_cluster_n_ge: 8
+    jet_patcher_cluster_radius_m: 300
+    jet_patcher_if_a_cut_m2_gt: 1.0
+    infrared_if_depth_mm_le: 40
+    hot_mix_if_plant_km_le: 10
+  spec_codes:
+    IRC116_COLDMIX: "Storable cut-back (MC-800) readymade cold mix, 4.5-5.5 % residual bitumen (IRC:116-2014)"
+    IRCSP100_EMULSION: "Emulsion (SS-2/MS) cold mix, 7-8 % by weight of aggregate (IRC:SP:100-2014)"
+    JET_PATCHER: "Spray-injection jet patcher (velocity patching)"
+    INFRARED: "Infrared recycling patch"
+    HOT_MIX: "Hot mix BC/SDBC patch (plant <= 10 km, off-season only)"
+    CC_MORTAR: "Cement concrete surface: polymer-modified mortar / engineer item"
+
+warranty:
+  patch_dlp_months: 6
+  crmp_dlp_months: 60

@@ -1,0 +1,50 @@
+{
+  "trials": 200,
+  "measured": 200,
+  "rejected": 0,
+  "k": 0.0004,
+  "mode": "mixed",
+  "scale_sigma": 0.1,
+  "mask_jitter": true,
+  "s_per_trial": 0.7441133765003178,
+  "cases": [
+    "car h=1.4 m, plane, cap @ 5 m",
+    "car h=1.4 m, crown, cap @ 8 m",
+    "bus h=2.4 m, crown, cap @ 7 m",
+    "bus h=2.4 m, plane, box @ 6 m"
+  ],
+  "metrics": {
+    "depth_p95_mm": {
+      "coverage_2sigma": 1.0,
+      "coverage_1sigma": 0.99,
+      "bias": 1.4291849855779335,
+      "rmse": 3.1176960897562545,
+      "mean_sigma": 7.259848896876613,
+      "z_rms": 0.3729959880928947
+    },
+    "volume_l": {
+      "coverage_2sigma": 1.0,
+      "coverage_1sigma": 1.0,
+      "bias": -0.076927931632462,
+      "rmse": 0.8596329543624357,
+      "mean_sigma": 3.8088483763165444,
+      "z_rms": 0.25029200317234757
+    },
+    "area_m2": {
+      "coverage_2sigma": 1.0,
+      "coverage_1sigma": 0.715,
+      "bias": 0.004871831795859646,
+      "rmse": 0.037240256603697494,
+      "mean_sigma": 0.04146870173920693,
+      "z_rms": 0.813106238801492
+    },
+    "width_m": {
+      "coverage_2sigma": 1.0,
+      "coverage_1sigma": 0.58,
+      "bias": 0.0035346347293433644,
+      "rmse": 0.013227962839932748,
+      "mean_sigma": 0.014117061426604,
+      "z_rms": 0.9158700896685065
+    }
+  }
+}

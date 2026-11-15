@@ -1,0 +1,37 @@
+# Unified class list (PLAN 3.3): the system-wide vocabulary (edge wire protocol, server, web). Index order is frozen.
+# A training dataset may keep an ordered subset (DECISIONS D15: configs/model/india_pothole_seg.yaml has 4 classes,
+# because pothole_water, speed_breaker and utility_cut have no labels yet); models are mapped to these names by name.
+names:
+  0: pothole
+  1: pothole_water
+  2: alligator_crack
+  3: crack
+  4: manhole
+  5: speed_breaker
+  6: utility_cut
+
+# Classes that create observations / potholes. 4-6 exist only to absorb false positives.
+reporting: [pothole, pothole_water]
+# Classes kept for the road-health (stretch rating) layer but not dispatched as potholes.
+distress: [alligator_crack, crack]
+ignore: [manhole, speed_breaker, utility_cut]
+
+# Source-label mapping into the unified set.
+source_maps:
+  rdd2022:            # VOC boxes
+    D40: pothole
+    D20: alligator_crack
+    D00: crack
+    D10: crack        # merged: only 68 India labels
+  eyantra:            # pixel masks
+    pothole: pothole
+    shallow: pothole_water   # refined by brightness/specularity in build_dataset.py
+  bharatpothole:
+    pothole: pothole
+  bootstrap_yolo26m:  # weights/bootstrap_pothole_yolo26m.pt (1 class)
+    Pothole: pothole
+  bootstrap_yolov8s:  # weights/bootstrap_pothole_yolov8s.pt (RDD 5 classes)
+    D00: crack
+    D10: crack
+    D20: alligator_crack
+    D40: pothole

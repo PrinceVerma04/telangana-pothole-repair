@@ -1,0 +1,12 @@
+{
+  "k_sigma": 0.0005205218307427715,
+  "n": 80,
+  "coverage_2sigma_before": 0.8875,
+  "z_rms_before": 1.2992654423943366,
+  "coverage_2sigma_after": 0.95,
+  "z_rms_after": 0.9996865144715914,
+  "floor_limited": false,
+  "depth_mae_mm": 6.33496770510947,
+  "k_true": 0.0006,
+  "rel_err": 0.13246361542871413
+}

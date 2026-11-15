@@ -1,0 +1,80 @@
+# Training profiles for ml/train_seg.py (PLAN 3.4 recipe, adjusted per machine; DECISIONS D14).
+# Any key that is not a train_seg option is passed to Ultralytics `model.train(**kwargs)` unchanged.
+# Paths are repo-relative. `batch: auto` = from free VRAM (ml.common.auto_batch); Ultralytics also halves the batch
+# by itself on CUDA OOM. `amp: auto` = fp16 only with tensor cores (cuda_half_ok(): compute >= 7.0).
+
+common: &common
+  data: configs/model/india_pothole_seg.yaml   # relative `path:` resolved at run time (ml.common)
+  imgsz: 640
+  optimizer: auto
+  mosaic: 1.0
+  close_mosaic: 10
+  hsv_v: 0.5
+  degrees: 3.0
+  fliplr: 0.5
+  scale: 0.4
+  patience: 25
+  save_period: 1          # epochN.pt every epoch (resume / rollback); last.pt is always written
+  cache: false            # RAM is shared on the laptop
+  plots: false
+  seed: 20261113
+  deterministic: false
+  india_aug: default      # ml/augment/india.py strength: off | light | default | strong
+
+profiles:
+  # Windows laptop: MX330 2 GB, sm_61 -> fp32 only, ~1.6 GB free VRAM, 15.8 GB RAM shared.
+  laptop_mx330:
+    <<: *common
+    model: weights/yolo26n-seg.pt
+    batch: 4
+    amp: false
+    workers: 2
+    epochs: 30
+    close_mosaic: 5
+    patience: 10
+
+  # Same laptop, GPU kept as busy as it can be (measured 2026-11-14: Ultralytics AutoBatch at 90 % of the 1.60 GiB
+  # free -> batch 3, 1.37 GiB). batch 0.90 = let AutoBatch size the batch to 90 % of free GPU memory at start-up (it
+  # adapts if the display takes more or less VRAM). The 4-core CPU is the real limit (JPEG decode + mosaic), so images
+  # are cached in RAM (~4-5 GB of 15.8 GB; Ultralytics checks free RAM and falls back if short) and 4 loader workers
+  # are used. Close the browser / other GPU apps while it runs.
+  laptop_mx330_max:
+    <<: *common
+    model: weights/yolo26n-seg.pt
+    batch: 0.90
+    amp: false
+    workers: 4
+    cache: ram
+    epochs: 30
+    close_mosaic: 5
+    patience: 10
+
+  # 1-epoch smoke on ~5 % of train, short validation list; proves the loop and measures s/it + VRAM.
+  smoke_mx330:
+    <<: *common
+    model: weights/yolo26n-seg.pt
+    batch: 4
+    amp: false
+    workers: 2
+    epochs: 1
+    fraction: 0.05
+    val_limit: 200
+    close_mosaic: 0
+    save_period: -1
+
+  # Linux RTX 5080 (16 GB, shared with another account: batch from free VRAM, D10).
+  rtx5080_n:
+    <<: *common
+    model: weights/yolo26n-seg.pt
+    batch: auto
+    amp: auto
+    workers: 8
+    epochs: 100
+  rtx5080_s:
+    <<: *common
+    model: weights/yolo26s-seg.pt
+    imgsz: 960
+    batch: auto
+    amp: auto
+    workers: 8
+    epochs: 80

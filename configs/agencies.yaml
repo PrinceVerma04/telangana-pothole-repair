@@ -1,0 +1,40 @@
+# Road-owning agencies and CRMP packages (seed; editable in /admin).
+# Boundaries/packages are APPROXIMATED from public descriptions and marked unofficial.
+agencies:
+  - { code: GHMC,  name_en: "Greater Hyderabad Municipal Corporation", name_te: "గ్రేటర్ హైదరాబాద్ మునిసిపల్ కార్పొరేషన్", kind: ulb }
+  - { code: CMC,   name_en: "Cyberabad Municipal Corporation",          name_te: "సైబరాబాద్ మునిసిపల్ కార్పొరేషన్",   kind: ulb }
+  - { code: MMC,   name_en: "Malkajgiri Municipal Corporation",         name_te: "మల్కాజిగిరి మునిసిపల్ కార్పొరేషన్", kind: ulb }
+  - { code: RNB,   name_en: "Roads & Buildings Department, Telangana",  name_te: "రోడ్లు & భవనాల శాఖ",               kind: state }
+  - { code: HMDA,  name_en: "Hyderabad Metropolitan Development Authority", name_te: "హెచ్‌ఎండీఏ",                    kind: authority }
+  - { code: NHAI,  name_en: "National Highways Authority of India",     name_te: "జాతీయ రహదారుల సంస్థ",              kind: central }
+  - { code: SCB,   name_en: "Secunderabad Cantonment Board",            name_te: "సికింద్రాబాద్ కంటోన్మెంట్ బోర్డు",   kind: cantonment }
+
+# Ownership rules used by geo/jurisdiction.py before polygon overrides (gis/layers/road_owner_overrides.geojson).
+owner_rules:
+  - { if_osm_ref_prefix: "NH",  owner: NHAI }
+  - { if_osm_ref_prefix: "SH",  owner: RNB }
+  - { if_highway: motorway, if_name_contains: "Outer Ring Road", owner: HMDA }
+  - { default_by_admin_unit: true }   # ULB that contains the segment
+
+escalation_ladder: [AE, DEE, EE, ZONAL_COMMISSIONER]   # PLAN 7 SLA & escalation
+escalation_at:
+  notify_ae_at_sla_frac: 0.5
+  dee_at_breach_h: 0
+  ee_at_breach_h: 24
+  zc_at_breach_h: 72
+
+# GHMC Comprehensive Road Maintenance Programme (CRMP, 2020): ~709 km of arterial roads in 7 packages,
+# 5-year maintenance contracts. Package geometries are approximations for the demo.
+crmp_packages:
+  - { code: CRMP-P1, agency: GHMC, contractor: "CRMP Package 1 contractor (demo)", zone_hint: "Charminar", dlp_months: 60 }
+  - { code: CRMP-P2, agency: GHMC, contractor: "CRMP Package 2 contractor (demo)", zone_hint: "Khairatabad", dlp_months: 60 }
+  - { code: CRMP-P3, agency: GHMC, contractor: "CRMP Package 3 contractor (demo)", zone_hint: "Secunderabad", dlp_months: 60 }
+  - { code: CRMP-P4, agency: GHMC, contractor: "CRMP Package 4 contractor (demo)", zone_hint: "Serilingampally", dlp_months: 60 }
+  - { code: CRMP-P5, agency: GHMC, contractor: "CRMP Package 5 contractor (demo)", zone_hint: "Kukatpally", dlp_months: 60 }
+  - { code: CRMP-P6, agency: GHMC, contractor: "CRMP Package 6 contractor (demo)", zone_hint: "LB Nagar", dlp_months: 60 }
+  - { code: CRMP-P7, agency: GHMC, contractor: "CRMP Package 7 contractor (demo)", zone_hint: "Khairatabad-West", dlp_months: 60 }
+
+demo_sla_rules:
+  arterial_h: 24
+  other_monsoon_h: 72
+  other_offseason_h: 168

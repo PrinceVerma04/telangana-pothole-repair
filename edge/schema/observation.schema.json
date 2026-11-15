@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gunthameter.local/schema/observation.schema.json",
+  "title": "GunthaMeter edge observation (PLAN 10 WP0)",
+  "description": "One keyframe from a vehicle (or a jolt / citizen / simulator event). Sent as a JSON batch to POST /v1/ingest/observations. Idempotent by client_uuid.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["client_uuid", "device_id", "trip_id", "seq", "captured_at", "mono_ms", "source", "calib_id", "model_version", "gps", "detections"],
+  "properties": {
+    "client_uuid": { "type": "string", "format": "uuid", "pattern": "^[0-9a-fA-F-]{36}$" },
+    "device_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "trip_id": { "type": "string", "pattern": "^[0-9a-fA-F-]{36}$" },
+    "seq": { "type": "integer", "minimum": 0 },
+    "captured_at": { "type": "string", "format": "date-time", "description": "ISO-8601 with offset, IST (+05:30) on devices" },
+    "mono_ms": { "type": "integer", "minimum": 0, "description": "device monotonic clock, shared with IMU windows" },
+    "source": { "enum": ["edge", "van", "jolt", "citizen", "sim"] },
+    "calib_id": { "type": "string", "minLength": 1 },
+    "model_version": { "type": "string", "minLength": 1 },
+    "gps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lat", "lon", "accuracy_m", "speed_mps", "heading_deg"],
+      "properties": {
+        "lat": { "type": "number", "minimum": 6.0, "maximum": 38.0, "description": "India bounding latitude" },
+        "lon": { "type": "number", "minimum": 68.0, "maximum": 98.0 },
+        "accuracy_m": { "type": "number", "minimum": 0, "maximum": 500 },
+        "speed_mps": { "type": "number", "minimum": 0, "maximum": 60 },
+        "heading_deg": { "type": "number", "minimum": 0, "maximum": 360 },
+        "fix_age_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "imu": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "az_rms_1s": { "type": "number", "minimum": 0 },
+        "az_peak_g": { "type": "number", "minimum": 0 },
+        "window_key": { "type": ["string", "null"], "description": "storage key of the +/-1 s .npz window (measure.types.ImuWindow)" }
+      }
+    },
+    "frame": {
+      "type": ["object", "null"],
+      "description": "null for jolt-only observations",
+      "additionalProperties": false,
+      "required": ["key", "w", "h"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1 },
+        "w": { "type": "integer", "minimum": 1 },
+        "h": { "type": "integer", "minimum": 1 },
+        "jpeg_q": { "type": "integer", "minimum": 1, "maximum": 100 }
+      }
+    },
+    "detections": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cls", "conf", "bbox"],
+        "properties": {
+          "track_id": { "type": ["integer", "null"] },
+          "cls": { "enum": ["pothole", "pothole_water", "alligator_crack", "crack", "manhole", "speed_breaker", "utility_cut"] },
+          "conf": { "type": "number", "minimum": 0, "maximum": 1 },
+          "bbox": { "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4, "description": "x1,y1,x2,y2 raw frame pixels" },
+          "polygon": {
+            "type": ["array", "null"],
+            "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+            "description": "mask outline [[u,v],...] in raw frame pixels"
+          }
+        }
+      }
+    },
+    "citizen": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "ticket": { "type": "string" },
+        "text": { "type": "string", "maxLength": 2000 },
+        "lang": { "enum": ["te", "hi", "en", "ur"] }
+      }
+    }
+  },
+  "allOf": [
+    { "if": { "properties": { "source": { "const": "jolt" } } },
+      "then": { "properties": { "detections": { "maxItems": 0 }, "imu": { "type": "object", "required": ["az_peak_g"] } } } },
+    { "if": { "properties": { "source": { "enum": ["edge", "van", "sim"] } } },
+      "then": { "required": ["frame"], "properties": { "frame": { "type": "object" } } } }
+  ]
+}

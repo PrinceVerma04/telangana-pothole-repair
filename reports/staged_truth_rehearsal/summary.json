@@ -1,0 +1,126 @@
+{
+  "mode": "synthetic_rehearsal",
+  "generated_at": "2026-11-13T18:17:40.457034+00:00",
+  "csv": "reports\\staged_truth_rehearsal\\filled.csv",
+  "n_rows": 28,
+  "n_measured": 28,
+  "n_with_depth": 28,
+  "n_water_or_rejected": 0,
+  "n_not_measured": 0,
+  "frame": {
+    "3-5 m": {
+      "n": 6,
+      "depth_mae_mm": 1.4083349622905803,
+      "depth_bias_mm": 1.4083349622905803,
+      "volume_mape": 0.05625466590389025,
+      "area_mape": 0.04328629578061255,
+      "depth_coverage_2sigma": 1.0,
+      "irc_class_accuracy": 1.0
+    },
+    "5-7 m": {
+      "n": 8,
+      "depth_mae_mm": 2.0469540348363013,
+      "depth_bias_mm": 2.0469540348363013,
+      "volume_mape": 0.12120147464374803,
+      "area_mape": 0.12193945639471912,
+      "depth_coverage_2sigma": 1.0,
+      "irc_class_accuracy": 1.0
+    },
+    "7-10 m": {
+      "n": 12,
+      "depth_mae_mm": 4.38650132389781,
+      "depth_bias_mm": 0.37060817587045786,
+      "volume_mape": 0.2636509313291332,
+      "area_mape": 0.18248987570146302,
+      "depth_coverage_2sigma": 1.0,
+      "irc_class_accuracy": 1.0
+    },
+    "10-12 m": {
+      "n": 2,
+      "depth_mae_mm": 6.993870900925579,
+      "depth_bias_mm": 6.993870900925579,
+      "volume_mape": 0.1457394495990464,
+      "area_mape": 0.13451921061807567,
+      "depth_coverage_2sigma": 1.0,
+      "irc_class_accuracy": 1.0
+    },
+    "all": {
+      "n": 28,
+      "depth_mae_mm": 3.2661214193235275,
+      "depth_bias_mm": 1.5450243558832337,
+      "volume_mape": 0.17008678099003635,
+      "area_mape": 0.13193394126768343,
+      "depth_coverage_2sigma": 1.0,
+      "irc_class_accuracy": 1.0
+    }
+  },
+  "fused": {
+    "3-5 m": {
+      "n": 6,
+      "depth_mae_mm": 1.4338918990860698,
+      "depth_bias_mm": 1.4338918990860698,
+      "volume_mape": 0.1339177287979413,
+      "area_mape": 0.04230199294039721,
+      "depth_coverage_2sigma": 1.0,
+      "irc_class_accuracy": 1.0
+    },
+    "5-7 m": {
+      "n": 2,
+      "depth_mae_mm": 2.5878456581019016,
+      "depth_bias_mm": 2.5878456581019016,
+      "volume_mape": 0.0766456803110123,
+      "area_mape": 0.01463691420459111,
+      "depth_coverage_2sigma": 1.0,
+      "irc_class_accuracy": 1.0
+    },
+    "all": {
+      "n": 8,
+      "depth_mae_mm": 1.7223803388400278,
+      "depth_bias_mm": 1.7223803388400278,
+      "volume_mape": 0.11959971667620903,
+      "area_mape": 0.03538572325644568,
+      "depth_coverage_2sigma": 1.0,
+      "irc_class_accuracy": 1.0
+    }
+  },
+  "fused_passes": 8,
+  "criteria_basis": "fused",
+  "criteria": {
+    "depth_mae_mm": {
+      "value": 1.7223803388400278,
+      "target": "<= 10",
+      "pass": true
+    },
+    "irc_class_accuracy": {
+      "value": 1.0,
+      "target": ">= 0.9",
+      "pass": true
+    },
+    "volume_mape": {
+      "value": 0.11959971667620903,
+      "target": "<= 0.25",
+      "pass": true
+    },
+    "overall": true
+  },
+  "k_fit": {
+    "k_sigma": 0.00016865138030585142,
+    "n": 28,
+    "coverage_2sigma_before": 1.0,
+    "z_rms_before": 0.6977324677132809,
+    "coverage_2sigma_after": 0.9285714285714286,
+    "z_rms_after": 0.9514046781789177,
+    "floor_limited": false,
+    "depth_mae_mm": 3.2661214193235275
+  },
+  "certified_all": false,
+  "calib_ids": [
+    "synthetic"
+  ],
+  "depth_model_versions": [
+    "synthetic"
+  ],
+  "validation_warnings": [],
+  "validation_errors": [],
+  "notes": []
+}

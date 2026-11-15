@@ -1,0 +1,201 @@
+{
+  "env": {
+    "generated_at": "2026-11-13T12:49:40+00:00",
+    "device": "CPU (NVIDIA GeForce MX330 is sm_61; this torch build has kernels for ['sm_100', 'sm_120', 'sm_75', 'sm_80', 'sm_86', 'sm_90'])",
+    "depth_backend": "da2_metric"
+  },
+  "elapsed_s": 328.1461040000431,
+  "synthetic": {
+    "accuracy_cases": 16,
+    "accuracy_pass": 16,
+    "max_abs_volume_err_pct": 2.932911645737857,
+    "max_abs_p95_err_mm": 0.5914593040954088,
+    "within_2sigma": 16,
+    "coverage_2sigma": {
+      "depth_p95_mm": 1.0,
+      "volume_l": 1.0,
+      "area_m2": 1.0,
+      "width_m": 1.0
+    },
+    "coverage_trials": 200,
+    "coverage_measured": 200,
+    "k_true": 0.0006,
+    "k_fitted": 0.0005205218307427715,
+    "k_rel_err": 0.13246361542871413
+  },
+  "real": {
+    "images": 5,
+    "calib": "configs/cameras/phone_demo.json",
+    "weights": "weights/bootstrap_pothole_yolo26m.pt",
+    "items": [
+      {
+        "image": "data/interim/measure_demo_imgs/bharatpothole/signal-2025-06-26-111944_frame_00080.jpg",
+        "dataset": "bharatpothole",
+        "mask_source": "detector",
+        "certified": false,
+        "depth_model_version": "depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf@hfov",
+        "n": 2,
+        "elapsed_s": 50.75322929979302,
+        "overlay": "reports\\measure_demo\\overlays\\signal-2025-06-26-111944_frame_00080.png",
+        "potholes": [
+          {
+            "depth_p95_mm": 28.57408919653116,
+            "depth_sigma_mm": 5.723838761453754,
+            "depth_max_mm": 39.62010023927681,
+            "area_m2": 6.747707017905022,
+            "area_sigma": 0.4096124403530845,
+            "volume_l": 38.229338197077645,
+            "volume_sigma": 38.521578532532764,
+            "length_m": 2.8903312224397206,
+            "width_m": 2.2555565792392036,
+            "range_m": 6.509024978719252,
+            "quality": 0.29526651282794775,
+            "reject_reason": null,
+            "water_filled": false,
+            "surface_model": "quadratic",
+            "scale_factor": 0.24113431278651778,
+            "severity": "large"
+          },
+          {
+            "depth_p95_mm": 49.553548048005894,
+            "depth_sigma_mm": 7.715438292299462,
+            "depth_max_mm": 51.84502409627215,
+            "area_m2": 3.913905946417933,
+            "area_sigma": 0.15744696194740404,
+            "volume_l": 102.36215433242072,
+            "volume_sigma": 29.927696404870332,
+            "length_m": 5.198940722980822,
+            "width_m": 1.2640683823957484,
+            "range_m": 3.7202317843932615,
+            "quality": 0.24695952058397233,
+            "reject_reason": null,
+            "water_filled": false,
+            "surface_model": "quadratic",
+            "scale_factor": 0.24113431278651778,
+            "severity": "large"
+          }
+        ]
+      },
+      {
+        "image": "data/interim/measure_demo_imgs/rdd2022/rdd_020294.jpg",
+        "dataset": "rdd2022",
+        "mask_source": "detector",
+        "certified": false,
+        "depth_model_version": "depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf@hfov",
+        "n": 1,
+        "elapsed_s": 17.12958710012026,
+        "overlay": "reports\\measure_demo\\overlays\\rdd_020294.png",
+        "potholes": [
+          {
+            "depth_p95_mm": 13.034368950421133,
+            "depth_sigma_mm": 5.362976795016683,
+            "depth_max_mm": 16.199840779492227,
+            "area_m2": 0.6648184392236657,
+            "area_sigma": 0.04978258672778503,
+            "volume_l": 1.899298342228283,
+            "volume_sigma": 3.5660997270564656,
+            "length_m": 1.37991934865224,
+            "width_m": 0.7855047587750564,
+            "range_m": 3.7571345474967894,
+            "quality": 0.14004097931273282,
+            "reject_reason": null,
+            "water_filled": false,
+            "surface_model": "quadratic",
+            "scale_factor": 0.26007003289400005,
+            "severity": "large"
+          }
+        ]
+      },
+      {
+        "image": "data/interim/measure_demo_imgs/bharatpothole/20250530151009_0060_frame_00008.jpg",
+        "dataset": "bharatpothole",
+        "mask_source": "dataset_label",
+        "certified": false,
+        "depth_model_version": "depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf@hfov",
+        "n": 1,
+        "elapsed_s": 12.416048600105569,
+        "overlay": "reports\\measure_demo\\overlays\\20250530151009_0060_frame_00008.png",
+        "potholes": [
+          {
+            "depth_p95_mm": 0.0,
+            "depth_sigma_mm": 30.918184067132394,
+            "depth_max_mm": 14.809376457420159,
+            "area_m2": 9.930021762648368,
+            "area_sigma": 0.866178136011383,
+            "volume_l": 4.859550057228318,
+            "volume_sigma": 308.3719881017054,
+            "length_m": 8.080161751444658,
+            "width_m": 1.9889420739638493,
+            "range_m": 5.831072723795597,
+            "quality": 0.17603125,
+            "reject_reason": null,
+            "water_filled": false,
+            "surface_model": "quadratic",
+            "scale_factor": 0.25659119654261797,
+            "severity": "large"
+          }
+        ]
+      },
+      {
+        "image": "data/interim/measure_demo_imgs/rdd2022/rdd_028932.jpg",
+        "dataset": "rdd2022",
+        "mask_source": "detector",
+        "certified": false,
+        "depth_model_version": "depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf@hfov",
+        "n": 1,
+        "elapsed_s": 9.959174999967217,
+        "overlay": "reports\\measure_demo\\overlays\\rdd_028932.png",
+        "potholes": [
+          {
+            "depth_p95_mm": 0.0,
+            "depth_sigma_mm": 8.254320270211336,
+            "depth_max_mm": 0.0,
+            "area_m2": 0.361749889673354,
+            "area_sigma": 0.049063417971569365,
+            "volume_l": 0.12404847412405819,
+            "volume_sigma": 3.007702106929117,
+            "length_m": 2.915515992035255,
+            "width_m": 0.19334654791931424,
+            "range_m": 4.566358561037143,
+            "quality": 0.08005349500104784,
+            "reject_reason": null,
+            "water_filled": false,
+            "surface_model": "quadratic",
+            "scale_factor": 0.254114239969066,
+            "severity": "small"
+          }
+        ]
+      },
+      {
+        "image": "data/interim/measure_demo_imgs/bharatpothole/20250528094919_0060_frame_00095.jpg",
+        "dataset": "bharatpothole",
+        "mask_source": "dataset_label",
+        "certified": false,
+        "depth_model_version": "depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf@hfov",
+        "n": 1,
+        "elapsed_s": 10.935164199909195,
+        "overlay": "reports\\measure_demo\\overlays\\20250528094919_0060_frame_00095.png",
+        "potholes": [
+          {
+            "depth_p95_mm": 67.75587449185699,
+            "depth_sigma_mm": 9.37242024125563,
+            "depth_max_mm": 84.87654083575585,
+            "area_m2": 27.336747925184838,
+            "area_sigma": 2.606919085029659,
+            "volume_l": 711.9246311410647,
+            "volume_sigma": 313.5939634405814,
+            "length_m": 16.04939914472478,
+            "width_m": 2.5853279227364974,
+            "range_m": 9.56613421292642,
+            "quality": 0.12124025086569606,
+            "reject_reason": null,
+            "water_filled": false,
+            "surface_model": "quadratic",
+            "scale_factor": 0.263434073938137,
+            "severity": "large"
+          }
+        ]
+      }
+    ]
+  }
+}

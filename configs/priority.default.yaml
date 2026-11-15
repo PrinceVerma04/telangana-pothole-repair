@@ -1,0 +1,77 @@
+# PLAN 6. Per-agency copies live in priority_config (versioned); this is the seed.
+version: 1
+weights: { S: 0.30, E: 0.25, V: 0.20, T: 0.15, M: 0.10 }
+
+severity_score:
+  large: 1.0
+  medium: 0.6
+  small: 0.3
+  water_unknown_min: 0.6
+  water_unknown_if_area_m2_ge: 0.3   # -> 0.8
+  water_unknown_large_area: 0.8
+  wheel_path_bonus: 0.2              # |lane_offset - wheel_track| < 0.35 m
+  wheel_path_tol_m: 0.35
+  junction_bonus: 0.2                # <= 30 m from a junction node
+  junction_dist_m: 30
+  imu_bonus: 0.1
+
+exposure:
+  class_weight:
+    motorway: 1.0
+    trunk: 1.0
+    primary: 1.0
+    secondary: 0.8
+    tertiary: 0.6
+    residential: 0.4
+    unclassified: 0.4
+    living_street: 0.3
+    service: 0.2
+  bus_passes_norm: 50          # B = min(1, bus_passes_per_day / 50)
+  observed_window_days: 7
+
+vulnerability:
+  radius_m: 200
+  poi_weight:
+    school: 0.5
+    hospital: 0.5
+    clinic: 0.5
+    bus_stop: 0.3
+    metro_station: 0.3
+    marketplace: 0.2
+  unlit_bonus: 0.2
+
+age_sla:
+  sla_hours:                   # GHMC Citizen's Charter 2023: arterial potholes in 24 h
+    arterial: 24               # motorway/trunk/primary/secondary
+    other_monsoon: 72
+    other_offseason: 168
+    rnb_state_road: 168
+  breached_bonus: 0.3
+  complaint_bonus_each: 0.1
+  complaint_bonus_max: 0.3
+  arterial_classes: [motorway, trunk, primary, secondary]
+
+monsoon:
+  base: 0.5
+  windows:                     # month ranges, inclusive (Telangana: SW Jun-Sep, NE Oct-Nov)
+    - { name: SW, from_month: 6, to_month: 9 }
+    - { name: NE, from_month: 10, to_month: 11 }
+  in_window: 0.8
+  heavy_rain_72h_mm: 30
+  heavy_rain: 1.0
+  hotspot_bonus: 0.2
+  water_filled_bonus: 0.1
+
+confirmation:                  # PLAN 5.5
+  min_passes: 2
+  min_distinct_trips: 2
+  citizen_radius_m: 25
+  imu_single_pass_min_quality: 0.6
+  candidate_archive_days: 30
+  candidate_archive_clean_passes: 5
+
+verification:                  # PLAN 5.7
+  clean_passes: 3
+  window_days: 14
+  min_distinct_trips: 2
+  qc_sample_frac: 0.10

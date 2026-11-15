@@ -1,0 +1,15 @@
+{
+  "client_uuid": "9a1e2b3c-4d5e-4f60-8a7b-1c2d3e4f5061",
+  "device_id": "tsrtc-bus-ts09ua1234",
+  "trip_id": "5d3a1f2e-7b8c-4d9e-a0b1-c2d3e4f5a6b7",
+  "seq": 43,
+  "captured_at": "2026-07-14T08:31:19.900+05:30",
+  "mono_ms": 3926900,
+  "source": "jolt",
+  "calib_id": "bus_default",
+  "model_version": "imu-jolt@0.1.0",
+  "gps": { "lat": 17.4369, "lon": 78.4477, "accuracy_m": 7.0, "speed_mps": 8.1, "heading_deg": 214.0 },
+  "imu": { "az_rms_1s": 0.21, "az_peak_g": 0.48, "window_key": null },
+  "frame": null,
+  "detections": []
+}

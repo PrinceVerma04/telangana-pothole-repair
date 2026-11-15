@@ -1,0 +1,43 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+data/raw/
+data/interim/
+data/datasets/
+data/tiles/
+data/store/
+data/*.db
+data/demo/
+data/tmp_wp7/
+data/tmp_wp9/
+runs/
+reports/*.json
+weights/*.pt
+weights/*.onnx
+weights/*.engine
+weights/*.tflite
+web/node_modules/
+web/dist/
+*.log
+*.egg-info/
+
+# machine-transfer staging (multi-GB archives; GitHub rejects files > 100 MB)
+gm_transfer/
+*.tar
+*.tar.gz
+# SQLite sidecar files of a live DB
+data/*.db-shm
+data/*.db-wal
+data/*.db-journal
+# root copy of scripts/windows/pull.ps1
+/pull.ps1
+# web test output
+web/test-results/
+web/playwright-report/
+
+# Claude Code notes (local only)
+CLAUDE.md
+.claude/

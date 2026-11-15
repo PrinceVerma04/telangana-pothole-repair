@@ -1,0 +1,28 @@
+\contentsline {section}{\numberline {1}Status at a glance}{2}{section.1}%
+\contentsline {section}{\numberline {2}The problem}{2}{section.2}%
+\contentsline {section}{\numberline {3}System architecture}{3}{section.3}%
+\contentsline {section}{\numberline {4}How the system works, step by step}{4}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Step 1 --- Calibrate the bus camera}{4}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Step 2 --- Capture on the bus}{4}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}Step 3 --- Upload and ingest}{5}{subsection.4.3}%
+\contentsline {subsection}{\numberline {4.4}Step 4 --- The processing pipeline}{5}{subsection.4.4}%
+\contentsline {subsection}{\numberline {4.5}Step 5 --- Measure depth, area and volume (with $\sigma $)}{5}{subsection.4.5}%
+\contentsline {subsection}{\numberline {4.6}Step 6 --- Locate, match to a road, deduplicate, confirm}{6}{subsection.4.6}%
+\contentsline {subsection}{\numberline {4.7}Step 7 --- Severity and priority}{6}{subsection.4.7}%
+\contentsline {subsection}{\numberline {4.8}Step 8 --- Repair plan}{7}{subsection.4.8}%
+\contentsline {subsection}{\numberline {4.9}Step 9 --- Work order, SLA and the daily repair run}{7}{subsection.4.9}%
+\contentsline {subsection}{\numberline {4.10}Step 10 --- The contractor repairs}{7}{subsection.4.10}%
+\contentsline {subsection}{\numberline {4.11}Step 11 --- Buses verify the repair}{7}{subsection.4.11}%
+\contentsline {subsection}{\numberline {4.12}Step 12 --- DLP watch, reopen and rework}{7}{subsection.4.12}%
+\contentsline {subsection}{\numberline {4.13}Step 13 --- Dashboards, citizens and public reporting}{8}{subsection.4.13}%
+\contentsline {section}{\numberline {5}The simulator and the end-to-end demo}{8}{section.5}%
+\contentsline {section}{\numberline {6}Evidence: what has been measured}{9}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Measurement geometry (verified)}{9}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}Staged known-depth targets (protocol ready, real run pending)}{9}{subsection.6.2}%
+\contentsline {subsection}{\numberline {6.3}Real Indian road images (chain runs; not measurements)}{9}{subsection.6.3}%
+\contentsline {subsection}{\numberline {6.4}Detector}{10}{subsection.6.4}%
+\contentsline {section}{\numberline {7}Status by work package}{10}{section.7}%
+\contentsline {section}{\numberline {8}Pending steps}{10}{section.8}%
+\contentsline {section}{\numberline {9}How to run it}{12}{section.9}%
+\contentsline {section}{\numberline {A}Key documents}{12}{appendix.A}%
+\contentsline {section}{\numberline {B}Glossary}{13}{appendix.B}%

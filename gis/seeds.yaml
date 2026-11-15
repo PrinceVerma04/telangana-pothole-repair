@@ -1,0 +1,193 @@
+# Seed data for gis/build_layers.py (WP10). EDITABLE. Everything here is an APPROXIMATION for the demo:
+# admin units are written with official: false and must be replaced by GHMC/HMDA-published boundaries
+# through POST /v1/admin/admin-units before any operational use.
+#
+# Coordinates are [lat, lon] WGS84. Where marked "osm", the point is the OSM place node of that name
+# (Geofabrik southern-zone extract, 2026-11, ODbL); "approx" points were placed by hand at the
+# locality's commonly known centre.
+valid_from: "2026-11-01"
+
+# GHMC (2016 limits = OSM relation 7868535 "Hyderabad", admin_level 8): 6 zones, 30 circles.
+# Wards (OSM admin_level 10) are assigned to the circle whose Voronoi cell (seeds below) they
+# overlap most; circles are dissolved into zones. Circle numbering follows GHMC's 1-30 order.
+ghmc:
+  agency: GHMC
+  zones:
+    - code: GHMC-LBN
+      name_en: LB Nagar
+      name_te: ఎల్‌బీ నగర్
+      name_hi: एलबी नगर
+      circles:
+        - [GHMC-C01, Kapra, కాప్రా, कापरा, 17.4846, 78.5610, osm]
+        - [GHMC-C02, Uppal, ఉప్పల్, उप्पल, 17.4025, 78.5613, osm]
+        - [GHMC-C03, Hayathnagar, హయత్‌నగర్, हयातनगर, 17.3281, 78.6045, osm]
+        - [GHMC-C04, LB Nagar, ఎల్‌బీ నగర్, एलबी नगर, 17.3502, 78.5511, osm]
+        - [GHMC-C05, Saroornagar, సరూర్‌నగర్, सरूरनगर, 17.3560, 78.5290, approx]
+    - code: GHMC-CHR
+      name_en: Charminar
+      name_te: చార్మినార్
+      name_hi: चारमीनार
+      circles:
+        - [GHMC-C06, Malakpet, మలక్‌పేట్, मलकपेट, 17.3737, 78.4996, osm]
+        - [GHMC-C07, Santosh Nagar, సంతోష్‌నగర్, संतोषनगर, 17.3477, 78.5044, osm]
+        - [GHMC-C08, Chandrayangutta, చాంద్రాయణగుట్ట, चंद्रायनगुट्टा, 17.3247, 78.4814, osm]
+        - [GHMC-C09, Charminar, చార్మినార్, चारमीनार, 17.3616, 78.4747, approx]
+        - [GHMC-C10, Falaknuma, ఫలక్‌నుమా, फलकनुमा, 17.3337, 78.4677, osm]
+        - [GHMC-C11, Rajendranagar, రాజేంద్రనగర్, राजेंद्रनगर, 17.3200, 78.4020, osm]
+    - code: GHMC-KHT
+      name_en: Khairatabad
+      name_te: ఖైరతాబాద్
+      name_hi: खैरताबाद
+      circles:
+        - [GHMC-C12, Mehdipatnam, మెహదీపట్నం, मेहदीपट्टनम, 17.3943, 78.4343, osm]
+        - [GHMC-C13, Karwan, కార్వాన్, कारवान, 17.3735, 78.4412, osm]
+        - [GHMC-C14, Goshamahal, గోషామహల్, गोशामहल, 17.3806, 78.4688, osm]
+        - [GHMC-C17, Khairatabad, ఖైరతాబాద్, खैरताबाद, 17.4118, 78.4622, osm]
+        - [GHMC-C18, Jubilee Hills, జూబ్లీహిల్స్, जुबली हिल्स, 17.4308, 78.4103, osm]
+    - code: GHMC-SEC
+      name_en: Secunderabad
+      name_te: సికింద్రాబాద్
+      name_hi: सिकंदराबाद
+      circles:
+        - [GHMC-C15, Musheerabad, ముషీరాబాద్, मुशीराबाद, 17.4147, 78.5068, osm]
+        - [GHMC-C16, Amberpet, అంబర్‌పేట్, अंबरपेट, 17.3900, 78.5180, approx]
+        - [GHMC-C28, Malkajgiri, మల్కాజిగిరి, मलकाजगिरी, 17.4512, 78.5369, osm]
+        - [GHMC-C29, Secunderabad, సికింద్రాబాద్, सिकंदराबाद, 17.4337, 78.5007, osm]
+        - [GHMC-C30, Begumpet, బేగంపేట్, बेगमपेट, 17.4462, 78.4630, osm]
+    - code: GHMC-SLP
+      name_en: Serilingampally
+      name_te: శేరిలింగంపల్లి
+      name_hi: शेरिलिंगमपल्ली
+      circles:
+        - [GHMC-C19, Yousufguda, యూసుఫ్‌గూడ, यूसुफगुडा, 17.4387, 78.4280, osm]
+        - [GHMC-C20, Serilingampally, శేరిలింగంపల్లి, शेरिलिंगमपल्ली, 17.4401, 78.3489, approx]
+        - [GHMC-C21, Chandanagar, చందానగర్, चंदानगर, 17.4936, 78.3246, osm]
+        - [GHMC-C22, RC Puram & Patancheru, రామచంద్రాపురం & పటాన్‌చెరు, रामचंद्रपुरम और पटनचेरु, 17.5200, 78.2720, approx]
+    - code: GHMC-KKP
+      name_en: Kukatpally
+      name_te: కూకట్‌పల్లి
+      name_hi: कूकटपल्ली
+      circles:
+        - [GHMC-C23, Moosapet, మూసాపేట్, मूसापेट, 17.4685, 78.4207, osm]
+        - [GHMC-C24, Kukatpally, కూకట్‌పల్లి, कूकटपल्ली, 17.4931, 78.4054, osm]
+        - [GHMC-C25, Quthbullapur, కుత్బుల్లాపూర్, कुतुबुल्लापुर, 17.5050, 78.4560, approx]
+        - [GHMC-C26, Gajularamaram, గాజులరామారం, गाजुलारामारम, 17.5272, 78.4200, osm]
+        - [GHMC-C27, Alwal, అల్వాల్, अलवाल, 17.5022, 78.5089, osm]
+
+# Peri-urban corporations inside the Outer Ring Road but outside GHMC-2016 limits (configs/agencies.yaml:
+# CMC, MMC). The area (ORR ring polygon buffered 1 km, minus GHMC and SCB) is split by Voronoi cells of
+# these seeds; each seed is one circle, circles are grouped into the zones listed.
+periurban:
+  - agency: CMC
+    code: CMC-W
+    name_en: Cyberabad West
+    name_te: సైబరాబాద్ పశ్చిమ
+    name_hi: साइबराबाद पश्चिम
+    circles:
+      - [CMC-C01, Narsingi, నార్సింగి, नरसिंगी, 17.3915, 78.3599, osm]
+      - [CMC-C02, Manikonda, మణికొండ, मणिकोंडा, 17.4037, 78.3766, osm]
+      - [CMC-C03, Tellapur, తెల్లాపూర్, तेल्लापुर, 17.4614, 78.2830, approx]
+      - [CMC-C04, Kollur, కొల్లూరు, कोल्लूर, 17.4445, 78.2516, osm]
+      - [CMC-C05, Ameenpur, అమీన్‌పూర్, अमीनपुर, 17.5240, 78.3270, approx]
+      - [CMC-C06, Bollaram, బొల్లారం, बोल्लारम, 17.5543, 78.3530, osm]
+      - [CMC-C07, Nizampet, నిజాంపేట్, निज़ामपेट, 17.5154, 78.3817, osm]
+      - [CMC-C08, Bachupally, బాచుపల్లి, बाचुपल्ली, 17.5411, 78.3635, osm]
+  - agency: CMC
+    code: CMC-S
+    name_en: Cyberabad South
+    name_te: సైబరాబాద్ దక్షిణ
+    name_hi: साइबराबाद दक्षिण
+    circles:
+      - [CMC-C09, Bandlaguda Jagir, బండ్లగూడ జాగీర్, बंडलागुडा जागीर, 17.3549, 78.3914, osm]
+      - [CMC-C10, Shamshabad, శంషాబాద్, शमशाबाद, 17.2611, 78.3932, osm]
+      - [CMC-C11, Tukkuguda, తుక్కుగూడ, तुक्कुगुडा, 17.2090, 78.4768, osm]
+      - [CMC-C12, Jalpally, జల్‌పల్లి, जलपल्ली, 17.3000, 78.5000, approx]
+      - [CMC-C13, Badangpet, బడంగ్‌పేట్, बडंगपेट, 17.3080, 78.5280, approx]
+      - [CMC-C14, Adibatla, ఆదిభట్ల, आदिभटला, 17.2340, 78.5800, approx]
+  - agency: MMC
+    code: MMC-N
+    name_en: Malkajgiri North
+    name_te: మల్కాజిగిరి ఉత్తర
+    name_hi: मलकाजगिरी उत्तर
+    circles:
+      - [MMC-C01, Kompally, కొంపల్లి, कोम्पल्ली, 17.5390, 78.4870, approx]
+      - [MMC-C02, Dundigal, దుండిగల్, दुंडीगल, 17.6075, 78.4142, osm]
+      - [MMC-C03, Medchal, మేడ్చల్, मेडचल, 17.6340, 78.4843, osm]
+      - [MMC-C04, Dammaiguda, దమ్మాయిగూడ, दम्मैगुडा, 17.5039, 78.5913, osm]
+      - [MMC-C05, Jawaharnagar, జవహర్‌నగర్, जवाहरनगर, 17.5100, 78.6200, approx]
+  - agency: MMC
+    code: MMC-E
+    name_en: Malkajgiri East
+    name_te: మల్కాజిగిరి తూర్పు
+    name_hi: मलकाजगिरी पूर्व
+    circles:
+      - [MMC-C06, Boduppal, బోడుప్పల్, बोडुप्पल, 17.4201, 78.5828, osm]
+      - [MMC-C07, Peerzadiguda, పీర్జాదిగూడ, पीरज़ादिगुडा, 17.3945, 78.5925, osm]
+      - [MMC-C08, Pocharam, పోచారం, पोचारम, 17.4366, 78.6422, osm]
+      - [MMC-C09, Ghatkesar, ఘట్‌కేసర్, घटकेसर, 17.4511, 78.6843, osm]
+      - [MMC-C10, Pedda Amberpet, పెద్ద అంబర్‌పేట్, पेद्दा अंबरपेट, 17.3220, 78.6440, approx]
+      - [MMC-C11, Turkayamjal, తుర్కయాంజాల్, तुर्कयामजाल, 17.2960, 78.6090, approx]
+
+# Secunderabad Cantonment Board: the notch of the GHMC polygon that contains this point
+# (OSM GHMC excludes the cantonment). Fallback polygon if the notch cannot be derived.
+scb:
+  agency: SCB
+  code: SCB
+  circle_code: SCB-C01
+  name_en: Secunderabad Cantonment
+  name_te: సికింద్రాబాద్ కంటోన్మెంట్
+  name_hi: सिकंदराबाद छावनी
+  probe: [17.4700, 78.5070]     # Trimulgherry
+  expected_km2: [25, 60]        # SCB is ~40 km2
+  fallback_polygon:             # [lat, lon] ring, approx.
+    - [17.4560, 78.4850]
+    - [17.4560, 78.5250]
+    - [17.4850, 78.5400]
+    - [17.5250, 78.5250]
+    - [17.5200, 78.4900]
+    - [17.4800, 78.4780]
+
+# Polygon ownership overrides applied after the ref rules (NH/SH/ORR keep their owner) and
+# before the default "ULB that contains the segment". name_contains restricts a corridor
+# override to the named road (e.g. the flyover, not the road beneath it).
+corridor_overrides:
+  - owner_agency: HMDA
+    reason: "P.V. Narasimha Rao Expressway (elevated, Mehdipatnam-Aramghar) maintained by HMDA (approx.)"
+    name_contains: "Narasimha Rao"
+    buffer_m: 20
+
+# Waterlogging hotspots repeatedly reported in Hyderabad news during monsoons (approximate points,
+# 150 m radius). Used by priority M term (+0.2 inside a hotspot).
+waterlogging_hotspots:
+  radius_m: 150
+  source: "news (approx.)"
+  spots:
+    - [Masab Tank, 17.4004, 78.4489]
+    - [Lakdikapul, 17.4054, 78.4599]
+    - [Khairatabad junction, 17.4118, 78.4622]
+    - [Tolichowki, 17.4003, 78.4118]
+    - [Malakpet railway bridge, 17.3760, 78.4985]
+    - [Rasoolpura, 17.4472, 78.4786]
+    - [Somajiguda / Raj Bhavan Road, 17.4255, 78.4585]
+    - [Panjagutta, 17.4254, 78.4518]
+    - [Ameerpet / Mythrivanam, 17.4375, 78.4483]
+    - [Mehdipatnam, 17.3943, 78.4343]
+    - [Shaikpet nala, 17.4058, 78.4007]
+    - [Chintalkunta, 17.3441, 78.5637]
+    - [Moosarambagh, 17.3744, 78.5161]
+    - [Chaderghat, 17.3820, 78.4925]
+    - [Attapur, 17.3672, 78.4307]
+    - [Raidurg, 17.4142, 78.3907]
+    - [Madhapur, 17.4409, 78.3916]
+    - [Nampally, 17.3919, 78.4660]
+    - [Begumpet / Prakash Nagar, 17.4425, 78.4704]
+    - [Saidabad, 17.3595, 78.5148]
+    - [Mallepally, 17.3921, 78.4546]
+    - [Boduppal, 17.4201, 78.5828]
+
+# CRMP packages (configs/agencies.yaml crmp_packages): corridor polygons = 20 m buffer around the
+# GHMC-owned arterial segments (highway classes below) of the hinted zone. "<Zone>-West" takes the
+# part of that zone west of the zone's median arterial longitude; the plain zone package the east part.
+crmp:
+  highways: [trunk, primary, secondary, trunk_link, primary_link, secondary_link]
+  buffer_m: 20

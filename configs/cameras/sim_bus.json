@@ -1,0 +1,41 @@
+{
+  "calib_id": "sim_bus",
+  "device_id": "sim-bus",
+  "vehicle_kind": "sim",
+  "fx": 1280.0,
+  "fy": 1280.0,
+  "cx": 640.0,
+  "cy": 360.0,
+  "dist": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "img_w": 1280,
+  "img_h": 720,
+  "reproj_rms_px": null,
+  "h_true_m": 2.4,
+  "pitch_deg": 18.0,
+  "roll_deg": 0.0,
+  "yaw_deg": 0.0,
+  "lateral_offset_m": 0.0,
+  "wheel_track_left_m": -1.0,
+  "wheel_track_right_m": 1.0,
+  "gnss_latency_s": 0.3,
+  "known_object_err_pct": null,
+  "calibrated_at": null,
+  "calibrated_by": null,
+  "certified": false,
+  "drift_history": [],
+  "truth_fit": {
+    "k_sigma": 0.0004,
+    "g_imu": null,
+    "n_truth": 0,
+    "depth_mae_mm": null,
+    "volume_mape": null,
+    "fitted_at": null
+  },
+  "notes": "DEMO fallback calibration (PLAN 4.1 step 4): fx=fy=image width, centred principal point, no distortion. certified=false -> prioritisation only, never Measurement Book billing."
+}

@@ -1,0 +1,10 @@
+{
+  "device_id": "tsrtc-bus-ts09ua1234",
+  "trip_id": "5d3a1f2e-7b8c-4d9e-a0b1-c2d3e4f5a6b7",
+  "gtfs_route_id": "10H",
+  "fixes": [
+    { "ts": "2026-07-14T08:31:06+05:30", "lat": 17.43762, "lon": 78.44829, "accuracy_m": 6.5, "speed_mps": 9.2, "heading_deg": 212.0, "az_rms": 0.07, "cam_active": true },
+    { "ts": "2026-07-14T08:31:07+05:30", "lat": 17.43755, "lon": 78.44823, "accuracy_m": 6.5, "speed_mps": 9.1, "heading_deg": 212.5, "az_rms": 0.08, "cam_active": true },
+    { "ts": "2026-07-14T08:31:08+05:30", "lat": 17.43748, "lon": 78.44817, "accuracy_m": 6.8, "speed_mps": 8.9, "heading_deg": 213.0, "az_rms": 0.31, "cam_active": true }
+  ]
+}

@@ -1,0 +1,79 @@
+# Measurement core parameters (PLAN 4). Read by measure/pipeline.py; every key has this default.
+depth:
+  backend: da2_metric                 # da2_metric | da3_metric | metric3d_onnx | synthetic | stereo_sgbm
+  model_id: depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf
+  da3_model_id: depth-anything/DA3METRIC-LARGE
+  scale_convention: fx_over_300       # da3 only: fx_over_300 | fx | relative
+  infer_long_side: 1036
+  device: cuda
+  fp16: true
+
+undistort: true
+
+road_candidates:
+  lower_frac: 0.65                    # lower 65 % of the image
+  mask_dilate_px: 20
+  z_min_m: 2.5
+  z_max_m: 14.0
+  max_points: 20000
+
+ransac:
+  iterations: 1000
+  inlier_mm: 15
+  confidence: 0.99
+  min_inlier_ratio: 0.5
+  max_rms_mm: 25
+  max_pitch_dev_deg: 4.0
+  use_open3d: false
+
+scale_lock:
+  clip: [0.5, 2.0]
+
+quadratic:
+  ring_inner_m: 0.3
+  ring_outer_m: 1.2
+  min_ring_px: 300
+  max_condition: 1.0e6
+
+mask:
+  erode_px: 1
+  min_mask_px: 400
+  depth_conf_min: 0.0
+
+uncertainty:
+  k_sigma_default: 4.0e-4             # sigma_Z = k Z^2 (1/m)
+  tape_sigma_m: 0.01
+  boundary_px: 1.0
+
+quality:
+  range_full_m: [3.0, 7.0]            # weight 1
+  range_far_m: 12.0                   # linear to 0.3 at 12 m, 0 beyond
+  range_far_q: 0.3
+  blur_lap_var_ref: 100.0
+  luma_ok: [40, 220]
+  min_quality_for_fusion: 0.2
+
+fusion:
+  mad_k: 3.0
+  sigma_k: 3.0
+  depth_sigma_floor_mm: 3.0
+  rel_sigma_floor: 0.05               # area, volume
+  max_keyframes: 3
+  reassoc_radius_m: 1.5
+
+water:
+  shallow_depth_mm: 8
+  luma_vs_sky: 0.6
+  texture_std_max: 6.0
+  min_area_m2: 0.05
+
+imu:
+  base_threshold_g: 0.25
+  speed_ref_mps: 8.0
+  speed_exp: 0.5
+  window_s: 0.5
+  wheel_tol_m: 0.35
+  hint_sigma_mm: 25
+  jolt_only_peak_g: 0.35
+  jolt_only_min_kmh: 15
+  min_truth_for_gain: 20

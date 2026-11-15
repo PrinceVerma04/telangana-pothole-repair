@@ -1,0 +1,160 @@
+{
+  "measurements": [
+    {
+      "depth_p95_mm": 13.034368950421133,
+      "depth_max_mm": 16.199840779492227,
+      "depth_mean_mm": 2.856867725338917,
+      "depth_sigma_mm": 5.362976795016683,
+      "area_m2": 0.6648184392236657,
+      "area_sigma": 0.04978258672778503,
+      "volume_l": 1.899298342228283,
+      "volume_sigma": 3.5660997270564656,
+      "length_m": 1.37991934865224,
+      "width_m": 0.7855047587750564,
+      "length_sigma_m": 0.03358317684594472,
+      "width_sigma_m": 0.014721131100538935,
+      "water_filled": false,
+      "depth_quality": "ok",
+      "quality": 0.14004097931273282,
+      "method": "mono",
+      "imu_corroborated": null,
+      "imu_depth_mm": null,
+      "range_m": 3.7571345474967894,
+      "lane_offset_m": 0.2472862970699628,
+      "ground_xz": [
+        0.2472862970699628,
+        3.8524272860786453
+      ],
+      "surface_model": "quadratic",
+      "plane_rms_mm": 7.232482718745402,
+      "ring_rms_mm": 4.9299548293950135,
+      "plane_inlier_ratio": 0.79695,
+      "scale_factor": 0.26007003289400005,
+      "reject_reason": null,
+      "depth_model_version": "depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf@hfov",
+      "calib_id": "phone_demo",
+      "certified": false,
+      "mask_px": 8896,
+      "seq": null,
+      "t_frame_ms": null,
+      "extras": {
+        "sigma_parts": {
+          "k_sigma": 0.0004,
+          "zc2": 27.741984317513207,
+          "other2": 2.4322802613085313e-05,
+          "sigma_s": 0.008815246714136672,
+          "surface_rms_mm": 4.9299548293950135
+        },
+        "depth_max_sigma_mm": 5.364960300957117,
+        "occlusion": {
+          "visible_l": 1.8904702439008871,
+          "hidden_bound_l": 0.017656196654791664,
+          "hidden_est_l": 0.008828098327395832,
+          "sigma_l": 0.005096904945754469,
+          "mode": "mirror",
+          "occluded_columns": 35,
+          "fallback_columns": 35
+        },
+        "perimeter_m": 3.4550952739715575,
+        "n_valid_px": 8896,
+        "n_stat_px": 8244,
+        "gates": {
+          "q_range": 1.0,
+          "q_mask_conf": 0.5623077154159546,
+          "q_plane": 0.9961875,
+          "q_area": 1.0,
+          "lap_var": 171.89031372108843,
+          "q_blur": 1.0,
+          "mask_luma": 64.05924010791367,
+          "q_illum": 1.0,
+          "q_pitch": 0.5,
+          "q_scale": 0.5
+        },
+        "water": {
+          "sky_luma": 204.20352172851562,
+          "mask_luma": 64.05924224853516,
+          "texture_std": 5.943027496337891,
+          "specular": false,
+          "stereo_disagreement": null
+        },
+        "offset_from_vehicle_centre_m": 0.2472862970699628,
+        "volume_cuboid_l": 17.559545500095297,
+        "surface": {
+          "h_hat": 5.3831653898033505,
+          "s": 0.26007003289400005,
+          "pitch_est_deg": -4.2997825032035975,
+          "n_road_pts": 20000,
+          "surface_model": "quadratic",
+          "reject_reason": null,
+          "roll_est_deg": 2.945308906376,
+          "pitch_dev_deg": 16.2997825032036,
+          "n_ring_px": 42375
+        },
+        "warnings": [
+          "scale_factor 0.26 outside [0.5, 2.0] (uncertified cert: wrong intrinsics/height or depth-model domain gap; measurement kept, quality reduced)",
+          "pitch_dev 16.3 deg > 4.0"
+        ],
+        "severity": "large",
+        "severity_labels": {
+          "en": "Large",
+          "te": "పెద్దది",
+          "hi": "बड़ा"
+        },
+        "intrinsics": {
+          "intrinsics": "hfov_preserved_aspect_mismatch",
+          "from": [
+            1280,
+            720
+          ],
+          "to": [
+            720,
+            720
+          ],
+          "fx": 720.0,
+          "undistorted": false
+        },
+        "timings_ms": {
+          "depth_ms": 6028.015699936077,
+          "depth_load_ms": 2105.074099963531,
+          "depth_preprocess_ms": 23.41400017030537,
+          "depth_forward_ms": 5985.1901000365615,
+          "depth_total_ms": 6014.028900070116,
+          "depth_net_input_hw": [
+            518,
+            518
+          ],
+          "depth_device": "cpu",
+          "depth_fx_rescale_factor": 1.7130828912811666,
+          "surface_ms": 405.98989999853075,
+          "mask_ms": 338.63890008069575
+        },
+        "detection": {
+          "source": "detector",
+          "bbox": [
+            280.8484191894531,
+            634.2960205078125,
+            498.0478820800781,
+            715.2711181640625
+          ],
+          "det_conf": 0.5623077154159546,
+          "cls": "pothole",
+          "mask_method": "sam2",
+          "detect_ms": 1194.0727999899536
+        },
+        "roadseg": {
+          "roadseg_ms": 1095.8042000420392,
+          "roadseg_model": "nvidia/segformer-b0-finetuned-cityscapes-1024-1024",
+          "roadseg_device": "cpu"
+        }
+      }
+    }
+  ],
+  "severities": [
+    "large"
+  ],
+  "depth_model_version": "depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf@hfov",
+  "calib_id": "phone_demo",
+  "certified": false,
+  "elapsed_ms": 17126.82340014726,
+  "overlay_url": "reports\\measure_demo\\overlays\\rdd_020294.png"
+}

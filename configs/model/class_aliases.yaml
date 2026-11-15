@@ -1,0 +1,15 @@
+# Raw model class names -> frozen classes (configs/classes.yaml). Used by ml/segmenter.py and ml/eval.py so that
+# third-party weights with other class names can be evaluated and used. An empty value drops the class.
+# Names are matched case-insensitively with non-alphanumerics folded to "_".
+aliases:
+  # weights/bootstrap_pothole_yolov8s.pt (RDD, 5 classes)
+  Longitudinal Crack: crack
+  Transverse Crack: crack
+  Alligator Crack: alligator_crack
+  Pothole: pothole
+  Other:            # RDD 'OTHER' (line blur etc.): not a GunthaMeter class
+  # weights/bootstrap_pothole_yolo26m.pt has the single class 'Pothole' (above)
+  potholes: pothole
+  water_pothole: pothole_water
+  manhole_cover: manhole
+  speed_bump: speed_breaker

@@ -1,0 +1,18 @@
+# Demo rate card (INR, excl. GST). EVERY item is editable per agency/FY via PUT /v1/admin/rate-card.
+# Provenance strings are shown in the UI next to each rate; replace with the circle's SOR/tender rates.
+agency: GHMC
+fy: "2026-27"
+version: 1
+currency: INR
+items:
+  coldmix_bag_25kg:   { rate: 350,  unit: bag,  provenance: "IndiaMART / HINCOL retail listings 2025-26 (demo)" }
+  coldmix_bag_50kg:   { rate: 680,  unit: bag,  provenance: "IndiaMART bulk listings 2025-26 (demo)" }
+  tack_emulsion_kg:   { rate: 45,   unit: kg,   provenance: "SS-1 emulsion trade price (demo)" }
+  crm_tonne:          { rate: 1100, unit: t,    provenance: "Crusher run aggregate, Hyderabad quarry (demo)" }
+  sand_kg:            { rate: 2,    unit: kg,   provenance: "demo" }
+  labour_hour:        { rate: 100,  unit: h,    provenance: "Unskilled mazdoor ~Rs 800/day, Telangana min. wage band (demo)" }
+  jet_patcher_m2:     { rate: 1942, unit: m2,   provenance: "BBMP Bengaluru 2025 reference - replace with GHMC circle tender rate" }
+  overhead_frac:      { rate: 0.10, unit: frac, provenance: "T&P + transport, demo" }
+baseline:
+  cost_per_pothole_inr: 7396
+  provenance: "GHMC reported spend per pothole, Deccan Chronicle 2021 (vs Rs 1,600 budgeted)"

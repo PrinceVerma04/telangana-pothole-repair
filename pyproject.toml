@@ -1,0 +1,74 @@
+[project]
+name = "gunthameter"
+version = "0.1.0"
+description = "GunthaMeter - bus-camera pothole mapping, metric depth/volume measurement, IRC prioritisation and cold-mix repair planning for Telangana"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = { text = "Proprietary (see docs/LICENCES.md for third-party model/data licences)" }
+# torch / torchvision are pre-installed in .venv (2.11.0+cu128) and deliberately NOT listed:
+# `pip install -e .` must never touch them (PLAN 8, DECISIONS).
+dependencies = [
+  "ultralytics==8.4.211",
+  "transformers==5.22.2",
+  "opencv-python>=4.11",
+  "albumentations>=2.0,<3",
+  "numpy>=2.1,<3",
+  "scipy>=1.15",
+  "scikit-learn==1.9.1",
+  "shapely==2.2.0",
+  "pyproj>=3.7",
+  "h3==4.5.0",
+  "pyrosm>=0.29",
+  "pandas>=2.2",
+  "pyyaml>=6",
+  "jsonschema>=4.23",
+  "fastapi==0.162.5",
+  "uvicorn[standard]==0.54.0",
+  "pydantic==2.14.3",
+  "python-multipart==0.0.33",
+  "sqlalchemy>=2.0.36",
+  "geoalchemy2==0.21.0",
+  "alembic==1.20.1",
+  "pyjwt==2.15.1",
+  "argon2-cffi>=25",
+  "python-dotenv",
+  "httpx",
+  "huggingface_hub>=1.0",
+  "pillow",
+]
+
+[project.optional-dependencies]
+postgres = ["psycopg[binary]==3.3.8"]
+queue = ["celery[redis]==5.7.0", "redis>=6"]
+s3 = ["boto3==1.44.1"]
+verifier = ["rfdetr>=1.4,<2"]
+o3d = ["open3d>=0.19"]
+data = ["kaggle"]
+dev = ["pytest", "pytest-asyncio", "hypothesis", "ruff"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["measure*", "repair*", "geo*", "priority*", "ml*", "server*", "edge*", "data*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "repair/tests", "server/tests", "priority/tests", "geo/tests"]
+pythonpath = ["."]
+addopts = "-q"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+  "gpu: needs CUDA and model weights",
+  "slow: > 30 s",
+  "data: needs downloaded datasets under data/raw",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = [".venv", "data/raw", "web", "runs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B"]
+ignore = ["E501"]

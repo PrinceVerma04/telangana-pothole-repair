@@ -1,0 +1,18 @@
+{
+  "client_uuid": "0b6f4b8e-2a7c-4f5e-9d1a-3c2e8f7a9b10",
+  "device_id": "tsrtc-bus-ts09ua1234",
+  "trip_id": "5d3a1f2e-7b8c-4d9e-a0b1-c2d3e4f5a6b7",
+  "seq": 42,
+  "captured_at": "2026-07-14T08:31:07.250+05:30",
+  "mono_ms": 3914250,
+  "source": "edge",
+  "calib_id": "bus_default",
+  "model_version": "y26n_seg_india@0.1.0-litert16",
+  "gps": { "lat": 17.4375, "lon": 78.4482, "accuracy_m": 6.5, "speed_mps": 9.2, "heading_deg": 212.0, "fix_age_ms": 120 },
+  "imu": { "az_rms_1s": 0.08, "az_peak_g": 0.42, "window_key": "imu/tsrtc-bus-ts09ua1234/5d3a1f2e-7b8c-4d9e-a0b1-c2d3e4f5a6b7/42.npz" },
+  "frame": { "key": "frames/tsrtc-bus-ts09ua1234/5d3a1f2e-7b8c-4d9e-a0b1-c2d3e4f5a6b7/42.jpg", "w": 1280, "h": 720, "jpeg_q": 75 },
+  "detections": [
+    { "track_id": 7, "cls": "pothole", "conf": 0.61, "bbox": [602, 498, 771, 566],
+      "polygon": [[610, 520], [655, 500], [730, 502], [768, 530], [741, 563], [660, 565], [612, 548]] }
+  ]
+}
