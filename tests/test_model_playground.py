@@ -46,6 +46,36 @@ def test_video_is_sampled_and_source_dropped(tmp_path):
     assert not list((tmp_path / "s" / it["id"]).glob("source.*"))
 
 
+def test_video_sampling_stops_at_the_end(tmp_path, monkeypatch):
+    """Seeking past the end of some phone mp4s returns the last frame again (seen on a 4.8 s clip that became 150
+    frames); that must not turn into fake extra frames."""
+    import cv2
+
+    class StickyCapture:  # 3 s at 30 fps; reads past the end keep returning the last frame
+        def __init__(self, *_a):
+            self.pos = 0.0
+
+        def isOpened(self):
+            return True
+
+        def get(self, prop):
+            return {cv2.CAP_PROP_FPS: 30.0, cv2.CAP_PROP_FRAME_COUNT: 90}.get(prop, 0.0)
+
+        def set(self, prop, v):
+            self.pos = v / 1000.0
+
+        def read(self):
+            k = min(int(self.pos * 30), 89)
+            return True, np.full((48, 64, 3), k, np.uint8)
+
+        def release(self):
+            pass
+
+    monkeypatch.setattr(cv2, "VideoCapture", StickyCapture)
+    it = mp.ingest(b"x" * 100, "short.mp4", every_s=0.5, root=tmp_path / "s")
+    assert len(it["frames"]) == 7 and max(f["t"] for f in it["frames"]) <= it["duration_s"]
+
+
 def test_ids_and_frame_paths_reject_tricks(tmp_path):
     assert mp.valid_id("0123456789abcdef") and not mp.valid_id("../../etc/passwd")
     with pytest.raises(ValueError):

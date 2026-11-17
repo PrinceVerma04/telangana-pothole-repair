@@ -337,7 +337,8 @@ function reasonShort(r) {
   if (!r) return "the measurement was not reliable";
   if (/^scale/.test(r)) return "the depth scale does not match the camera height. Enter this photo's real camera height and pitch";
   if (/^quality/.test(r)) return "the image quality or distance is too poor for a size estimate (it may be too far away or blurred)";
-  if (/plane_inlier_ratio|plane/.test(r)) return "the camera height or angle does not match this photo. Enter its real camera height and pitch";
+  if (/plane_inlier_ratio|plane/.test(r)) return "the ground around it is not a flat road surface (rubble, dirt, kerbs or walls in view), or the camera is tilted too much. Use a frame where the pothole sits in flat paved road";
+  if (/range_outside_gate/.test(r)) return "it is too close to or too far from the camera. Sizes work best 3 to 7 m ahead";
   if (/scale/.test(r)) return "the depth scale does not match the camera height";
   if (/small|mask_px|too few/.test(r)) return "it is too small or too far away in the picture";
   return "the measurement was not reliable";

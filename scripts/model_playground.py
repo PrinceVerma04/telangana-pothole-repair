@@ -164,12 +164,15 @@ def ingest(data: bytes, filename: str, every_s: float = 1.0, root: Optional[Path
         n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
         dur = n / fps if n else 0.0
         every = max(float(every_s), dur / MAX_FRAMES if dur else every_s, 0.1)
-        frames, t, k = [], 0.0, 0
+        frames, t, k, prev = [], 0.0, 0, None
         while len(frames) < MAX_FRAMES:
+            if dur and t > dur:  # seeking past the end returns the last frame again on some files: stop at the end
+                break
             cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
             ok, img = cap.read()
-            if not ok:
+            if not ok or (not dur and prev is not None and np.array_equal(img, prev)):
                 break
+            prev = img
             cv2.imwrite(str(d / "frames" / f"{k:06d}.jpg"), img, [cv2.IMWRITE_JPEG_QUALITY, 92])
             frames.append({"i": k, "t": round(t, 2)})
             k, t = k + 1, t + every

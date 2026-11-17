@@ -4,6 +4,7 @@ Bus-camera pothole mapping → metric **depth / area / volume** (with σ) → IR
 IRC:116 / SP:100 cold-mix repair plan (bags as a low–high range, ₹) → work orders, SLA escalation, bus-verified repair
 and DLP tracking. Built for the Telangana R&B / Municipal Administration challenge; India-only data and standards.
 
+- **How it works (workflow, models, where each runs): [`docs/WORKFLOW.md`](docs/WORKFLOW.md)**
 - Plan: [`docs/PLAN.md`](docs/PLAN.md) · decisions/deviations: [`docs/DECISIONS.md`](docs/DECISIONS.md) ·
   contracts: [`docs/CONTRACTS.md`](docs/CONTRACTS.md) · where work stopped: [`docs/HANDOFF.md`](docs/HANDOFF.md)
 - Method and validation: [`docs/DEPTH_METHOD.md`](docs/DEPTH_METHOD.md), [`reports/REPORT.md`](reports/REPORT.md)
