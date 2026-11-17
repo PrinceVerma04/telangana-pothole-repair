@@ -1,9 +1,9 @@
 {
-  "name": "gunthameter-web",
+  "name": "roadfix-web",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "GunthaMeter PWA - pothole measurement, prioritisation and repair operations (Telugu-first)",
+  "description": "RoadFix PWA - pothole measurement, prioritisation and repair operations (Telugu-first)",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

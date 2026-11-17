@@ -424,7 +424,7 @@ def in_process_client(a: argparse.Namespace) -> tuple[ApiClient, Any]:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    ap = argparse.ArgumentParser(description="GunthaMeter virtual fleet (WP7)")
+    ap = argparse.ArgumentParser(description="RoadFix virtual fleet (WP7)")
     add_common_args(ap)
     ap.add_argument("--buses", type=int, default=3)
     ap.add_argument("--routes", default="10H,218,5K", help="comma list of GTFS route ids")

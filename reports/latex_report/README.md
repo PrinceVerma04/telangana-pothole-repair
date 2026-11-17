@@ -1,4 +1,4 @@
-# GunthaMeter project report (LaTeX)
+# RoadFix project report (LaTeX)
 
 - `main.tex`: the report source (all diagrams are TikZ, so no image files are needed).
 - `main.pdf`: the compiled report (14 pages), built with MiKTeX `pdflatex` on 14 November 2026.

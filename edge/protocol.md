@@ -1,7 +1,7 @@
-# GunthaMeter edge protocol (bus device ↔ API)
+# RoadFix edge protocol (bus device ↔ API)
 
 This describes how a vehicle device (Android phone on a TGSRTC bus, Jetson box, or the WP7 simulator) talks to the
-GunthaMeter API. The wire format is frozen in `edge/schema/observation.schema.json` and
+RoadFix API. The wire format is frozen in `edge/schema/observation.schema.json` and
 `edge/schema/trip_fix.schema.json` (examples in `edge/schema/examples/`). See `docs/CONTRACTS.md`; any change to a
 schema goes together with that document. The Python reference client is `edge/sim/client.py`; the simulator
 (`edge/sim/replay.py`, `edge/sim/fleet.py`) uses exactly this protocol.
@@ -78,6 +78,6 @@ A report within 25 m of a single-pass candidate confirms it. Tracking: `GET /cit
 
 | Target | Where | State |
 |---|---|---|
-| Python simulator | `edge/sim/` (`replay.py` one bus, `fleet.py` buses × routes × days) | Working; used by `make demo` / `tasks.ps1 demo` |
+| Python simulator | `edge/sim/` (`replay.py` one bus, `fleet.py` buses × routes × days) | Working; used by `make demo` |
 | Android (Kotlin, CameraX + LiteRT + Room + WorkManager) | `edge/android/` | Skeleton: builds with the Android SDK (`./gradlew assembleDebug`); camera, model and upload paths are stubs with the protocol wired |
 | Jetson (Python, TensorRT/ONNX Runtime + GStreamer) | `edge/jetson/` | Stub: the same loop as the simulator with a camera source; needs JetPack |

@@ -1,7 +1,7 @@
 [project]
-name = "gunthameter"
+name = "roadfix"
 version = "0.1.0"
-description = "GunthaMeter - bus-camera pothole mapping, metric depth/volume measurement, IRC prioritisation and cold-mix repair planning for Telangana"
+description = "RoadFix - bus-camera pothole mapping, metric depth/volume measurement, IRC prioritisation and cold-mix repair planning for Telangana"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 license = { text = "Proprietary (see docs/LICENCES.md for third-party model/data licences)" }

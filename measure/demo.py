@@ -276,13 +276,17 @@ def write_readme(out: Path, syn: Optional[dict[str, Any]], real: Optional[dict[s
 
 
 def run_demo(out: str | Path = "reports/measure_demo", *, images_dir: str | Path = "data/interim/measure_demo_imgs",
-             n_images: int = 5, weights: str = "weights/bootstrap_pothole_yolo26m.pt", trials: int = 200,
+             n_images: int = 5, weights: Optional[str] = None, trials: int = 200,
              skip_real: bool = False, skip_synthetic: bool = False) -> dict[str, Any]:
     from datetime import datetime, timezone
 
     from measure.config import load_measure_cfg
     from measure.depth_backends.base import cuda_status
 
+    if not weights:  # D24: the best trained model (ml.common.DEFAULT_SEG_WEIGHTS), as a repo path
+        from ml.common import DEFAULT_SEG_WEIGHTS, resolve_repo_path
+
+        weights = str(resolve_repo_path(DEFAULT_SEG_WEIGHTS))
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     st = cuda_status()

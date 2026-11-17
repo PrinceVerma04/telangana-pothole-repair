@@ -1,4 +1,4 @@
-## Completeness critique of the GunthaMeter plan
+## Completeness critique of the RoadFix plan
 
 ### (a) Missing vs the brief
 - **"Fixed for good" root-cause loop is absent.** `recurrence_watch` only re-opens a patch. Add: ≥2 reopenings in 12 months or Poor stretch rating → escalate from patching to a stretch-level item (`defect_cause` enum: waterlogging, utility_cut, base_failure, edge_drop; drainage/resurfacing recommendation; separate work-order type). Otherwise the system optimises re-patching, not permanence.

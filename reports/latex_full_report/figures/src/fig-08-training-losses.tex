@@ -1,0 +1,77 @@
+%% Standalone source of one report figure. Rebuild: pdflatex -output-directory=.. fig-08-training-losses.tex
+\documentclass[11pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,backgrounds}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\pgfplotsset{compat=1.18}
+\setlength{\textwidth}{472.31595pt}  %% = the report's text width, so widths given in \textwidth match
+\definecolor{gmblue}{HTML}{0B3D6E}
+\definecolor{gmok}{HTML}{1E7B34}
+\definecolor{gmwarn}{HTML}{B35C00}
+\definecolor{gmbad}{HTML}{A32020}
+\definecolor{gmgrey}{HTML}{5A5F66}
+\definecolor{gmlight}{HTML}{EEF3F8}
+\definecolor{gmteal}{HTML}{1B7A8C}
+\newcommand{\done}{\textcolor{gmok}{\textbf{Done}}}
+\newcommand{\partly}{\textcolor{gmwarn}{\textbf{Partly}}}
+\newcommand{\pending}{\textcolor{gmbad}{\textbf{Pending}}}
+\newcommand{\pass}{\textcolor{gmok}{\textbf{PASS}}}
+\newcommand{\fail}{\textcolor{gmbad}{\textbf{FAIL}}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\INR}{INR~}
+\newcommand{\gbar}[5]{\fill[#5] (#1,-#3+0.32) rectangle (#2,-#3-0.32);
+  \node[anchor=east,font=\scriptsize] at (-0.3,-#3) {#4};}
+
+\tikzset{
+  box/.style={draw=gmblue, rounded corners=3pt, fill=gmlight, align=center, font=\small, inner sep=5pt,
+              minimum height=9mm},
+  gstep/.style={draw=gmblue, rounded corners=3pt, fill=white, align=center, font=\footnotesize, inner sep=4pt,
+               text width=27mm, minimum height=11mm},
+  st/.style={draw=gmblue, rounded corners=6pt, fill=gmlight, font=\scriptsize\ttfamily, inner sep=3pt,
+             minimum height=6mm},
+  arr/.style={-{Stealth[length=2.2mm]}, thick, gmblue},
+  darr/.style={-{Stealth[length=2mm]}, gmgrey, dashed},
+}
+\pgfplotstableread{
+ep  min   P     R     bmap  mmap   mm95   vcls  tbox  tseg  tcls
+1   26.9  0.336 0.092 0.0521 0.0470 0.0166 4.793 2.237 3.618 5.934
+2   25.2  0.334 0.143 0.0561 0.0395 0.0138 5.037 2.214 3.401 3.456
+3   31.4  0.076 0.134 0.0420 0.0325 0.0103 4.139 2.260 3.433 3.339
+4   76.2  0.330 0.118 0.0754 0.0562 0.0202 4.682 2.274 3.357 3.213
+5   64.7  0.113 0.187 0.0614 0.0413 0.0142 3.796 2.230 3.299 3.104
+6   37.7  0.167 0.189 0.0943 0.0753 0.0283 3.034 2.203 3.268 3.025
+7   34.5  0.219 0.136 0.0577 0.0466 0.0161 3.428 2.183 3.213 2.982
+8   44.6  0.164 0.150 0.0822 0.0718 0.0254 3.708 2.179 3.195 2.934
+9   68.8  0.371 0.140 0.0963 0.0813 0.0294 3.205 2.139 3.142 2.834
+10  23.3  0.143 0.218 0.0928 0.0700 0.0261 2.762 2.113 3.113 2.769
+11  14.0  0.148 0.171 0.1048 0.0895 0.0313 2.850 2.090 3.045 2.760
+12  12.5  0.157 0.221 0.1297 0.1047 0.0387 2.758 2.082 3.009 2.647
+13  12.6  0.139 0.208 0.1042 0.0862 0.0303 3.082 2.053 2.988 2.624
+14  12.5  0.137 0.218 0.0779 0.0558 0.0207 3.547 2.031 2.964 2.595
+15  12.5  0.170 0.203 0.1420 0.1175 0.0462 2.654 2.013 2.936 2.535
+16  12.6  0.147 0.226 0.1001 0.0720 0.0268 3.006 2.039 2.926 2.497
+17  12.3  0.127 0.207 0.1027 0.0790 0.0291 2.611 2.005 2.873 2.436
+18  12.3  0.137 0.215 0.1074 0.0791 0.0303 2.535 1.991 2.862 2.409
+19  32.6  0.156 0.229 0.1122 0.0867 0.0327 2.542 1.964 2.833 2.367
+20  12.4  0.149 0.227 0.1131 0.0881 0.0338 2.602 1.953 2.804 2.348
+}\trainlog
+
+\begin{document}
+\begin{tikzpicture}
+\begin{axis}[width=0.48\textwidth, height=5.6cm, xlabel={epoch}, ylabel={training loss}, xmin=1, xmax=20,
+  legend style={font=\scriptsize, at={(0.97,0.97)}, anchor=north east}, tick label style={font=\scriptsize},
+  title={\small Training losses (lower is better)}]
+\addplot[gmblue, thick, mark=*, mark size=1.2pt] table[x=ep, y=tbox] {\trainlog};
+\addplot[gmteal, thick, mark=square*, mark size=1.2pt] table[x=ep, y=tseg] {\trainlog};
+\addplot[gmwarn, thick, mark=triangle*, mark size=1.4pt] table[x=ep, y=tcls] {\trainlog};
+\legend{box, mask, class}
+\end{axis}
+\end{tikzpicture}
+\end{document}

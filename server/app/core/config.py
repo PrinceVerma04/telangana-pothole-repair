@@ -60,9 +60,9 @@ class Settings(BaseSettings):
     REDIS_URL: Optional[str] = None
 
     # models
-    SEG_WEIGHTS: str = "weights/bootstrap_pothole_yolo26m.pt"
-    VERIFIER_WEIGHTS: str = "weights/bootstrap_pothole_yolov8s.pt"
-    VERIFIER: str = "on"
+    SEG_WEIGHTS: str = "runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt"  # D24
+    VERIFIER_WEIGHTS: str = ""  # D24: no second model
+    VERIFIER: str = "off"
     DEPTH_BACKEND: str = "da2_metric"
     DEPTH_MODEL_ID: str = "depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf"
     CUDA_DEVICE: int = 0

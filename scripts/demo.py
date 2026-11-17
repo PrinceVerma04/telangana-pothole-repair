@@ -1,4 +1,4 @@
-"""End-to-end demo (WP12, ``make demo`` / ``.\\scripts\\windows\\tasks.ps1 demo``): API -> simulated TGSRTC fleet -> web.
+"""End-to-end demo (WP12, ``make demo``): API -> simulated TGSRTC fleet -> web.
 
     python scripts/demo.py                       # fresh demo DB, fleet, indent + KPI summary, keep API + web running
     python scripts/demo.py --exit                # same, then stop everything (CI / timing runs)
@@ -164,7 +164,7 @@ def kpis(client: ApiClient, token: str) -> list[dict[str, Any]]:
 def print_summary(s: dict[str, Any], base: str, web: Optional[str]) -> None:
     fl = s.get("fleet") or {}
     print("\n" + "=" * 78)
-    print("GunthaMeter demo summary (simulated fleet through the production pipeline; demo calibration, "
+    print("RoadFix demo summary (simulated fleet through the production pipeline; demo calibration, "
           "certified=false)")
     print("=" * 78)
     if fl:
@@ -199,7 +199,7 @@ def print_summary(s: dict[str, Any], base: str, web: Optional[str]) -> None:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    ap = argparse.ArgumentParser(description="GunthaMeter end-to-end demo (WP12)")
+    ap = argparse.ArgumentParser(description="RoadFix end-to-end demo (WP12)")
     ap.add_argument("--source-db", type=Path, default=ROOT / "data" / "gunthameter.db",
                     help="seeded DB to copy (never modified)")
     ap.add_argument("--db", type=Path, default=DEMO_DIR / "demo.db")

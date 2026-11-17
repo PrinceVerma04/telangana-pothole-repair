@@ -1,4 +1,4 @@
-# GunthaMeter — 7-minute jury walkthrough
+# RoadFix — 7-minute jury walkthrough
 
 **Before the jury arrives (≈ 15 min):** start the demo so the database already holds a full simulated
 fleet run.

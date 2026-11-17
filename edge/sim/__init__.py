@@ -1,4 +1,4 @@
-"""GunthaMeter edge simulator (WP7).
+"""RoadFix edge simulator (WP7).
 
 Virtual buses drive real TGSRTC GTFS route shapes (``data/interim/geo/gtfs_routes.json``) and speak the edge
 protocol (``edge/protocol.md``, ``edge/schema``) to the live API: distance-triggered keyframes, detections from

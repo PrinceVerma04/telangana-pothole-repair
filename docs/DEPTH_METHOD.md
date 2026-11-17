@@ -1,6 +1,6 @@
-# How GunthaMeter measures a pothole (depth, area, volume, with σ)
+# How RoadFix measures a pothole (depth, area, volume, with σ)
 
-This is the method behind every number GunthaMeter shows: one bus-camera frame → metric depth → road surface →
+This is the method behind every number RoadFix shows: one bus-camera frame → metric depth → road surface →
 cavity depth map → depth / area / volume with an uncertainty (σ), a method tag and a quality score; then several
 frames and passes fused into one pothole. Code: `measure/` (`pipeline.py`, `surface.py`, `pothole_geom.py`,
 `fuse.py`, `irc.py`); parameters: `configs/measure.yaml`; design: `docs/PLAN.md` §4. Units: depth **mm**, area
@@ -87,7 +87,7 @@ the surface normal.
 
 ## 7. Validation (PLAN 4.12): what has been verified, and what has not
 
-### Level 1 — synthetic scenes (verified; `tasks.ps1 measure-demo` → `reports/measure_demo/`)
+### Level 1 — synthetic scenes (verified; `make measure-demo` → `reports/measure_demo/`)
 Rendered road + spherical-cap or box cavity at known camera height and pitch; the depth map is the exact rendered Z;
 the production path (`measure.pipeline.measure_frames`) measures it. Noise-free, so this checks the geometry, not a
 depth model. Source: `reports/REPORT.md` §2 (generated from `reports/measure_demo/*.json`).

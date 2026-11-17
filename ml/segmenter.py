@@ -15,7 +15,7 @@ environment variable (same default as ``server/app/core/config.py``), so the boo
 trained model replaces it.
 
 Class names are mapped to the frozen ``configs/classes.yaml`` list via ``ml.common.canonical_class`` (RDD names,
-'Pothole', etc.). Detections of classes with no GunthaMeter meaning are dropped unless ``keep_unmapped=True``.
+'Pothole', etc.). Detections of classes with no RoadFix meaning are dropped unless ``keep_unmapped=True``.
 Coordinates: ``bbox`` = [x1, y1, x2, y2] and ``polygon`` = [[u, v], ...] in raw frame pixels (edge wire protocol).
 """
 
@@ -486,7 +486,7 @@ class RFDETRSegmenter(Segmenter):
 
         if importlib.util.find_spec("rfdetr") is None:
             raise ImportError("rfdetr is not installed (DECISIONS D5: it pins its own torch). Use "
-                              "UltralyticsSegmenter('weights/bootstrap_pothole_yolov8s.pt') as the verifier.")
+                              "an UltralyticsSegmenter .pt as the second model instead.")
         raise NotImplementedError("RF-DETR-Seg adapter: see ml/train_rfdetr_seg.py")
 
     def predict(self, img_bgr: np.ndarray, conf: Optional[float] = None,

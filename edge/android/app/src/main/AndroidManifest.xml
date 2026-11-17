@@ -11,7 +11,7 @@
     <!-- usesCleartextTraffic only for the demo API on a LAN/emulator; production uses HTTPS. -->
     <application
         android:allowBackup="false"
-        android:label="GunthaMeter Edge"
+        android:label="RoadFix Edge"
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.AppCompat.NoActionBar">
         <activity

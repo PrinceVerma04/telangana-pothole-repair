@@ -54,7 +54,7 @@ Pilot hardware total, indicative: 17 × ₹35–50k + 3 × ₹1.0–1.5 lakh ≈
   150–200 MB per bus per day; 20 buses ≈ 3–4 GB per night per pilot. A ≥ 50 Mbit/s depot uplink handles that in well
   under an hour.
 - **Depot Wi-Fi:** one outdoor 802.11ac/ax access point covering the parking bay at each depot, WPA2-Enterprise or a
-  dedicated SSID with device certificates, on a VLAN that reaches only the GunthaMeter upload endpoint.
+  dedicated SSID with device certificates, on a VLAN that reaches only the RoadFix upload endpoint.
 - **SIM:** M2M/IoT data SIMs on a pooled plan (≈ 1–2 GB per bus per month is enough for metadata; frames over LTE only
   when `upload_wifi_only` is off for a bus).
 

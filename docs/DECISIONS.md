@@ -329,3 +329,175 @@ manholes come from eYantra.
 - Training: `--batch` also takes a GPU-memory fraction (Ultralytics AutoBatch); profile `laptop_mx330_max` (batch
   0.90 → 3 on the MX330, 4 workers, RAM cache); `scripts/windows/train_full_gpu.ps1` / `tasks.ps1 train-max`
   (foreground, resumable); `tasks.ps1 classes` prints the class table.
+
+## D16. v2 training data: BharatPotHole by drive, human-drawn web masks, test near-duplicate guard (2026-11-16)
+Linux RTX 5080 box again (the project moved back from the laptop; `.venv` rebuilt: Python 3.11.18, torch
+2.11.0+cu128, ultralytics 8.4.211). The 0.221 laptop model had only ~705 Indian pothole frames in train.
+- **BharatPotHole licence verified:** Kaggle's dataset metadata (`api/v1/datasets/metadata`) lists **CC BY-SA 4.0**
+  (the bundled Roboflow yaml says CC BY 4.0) - the same terms as RDD2022. It is now used for training.
+- **Its own splits leak:** 111 of its 162 drives (source videos) have frames in more than one of its train/valid/test
+  splits. `build_dataset.py --bharat-split drive` (default) moves whole drives: 80/10/10 of frames -> 5,597 / 742 / 735.
+- **Human-drawn pothole masks from the web:** Kaggle `farzadnekouei/pothole-image-segmentation-dataset` (Apache-2.0;
+  Roboflow origin CC BY 4.0), 720 + 60 images, 2,047 polygons (`data/download.py --webseg`, `--include-webseg`).
+  train -> train; valid -> test (`ws_` subset): the first pothole masks scored against people, not SAM2.
+- **Test near-duplicate guard:** any train/val image within 24/256 bits (dHash) of a test image is dropped, across
+  sources (web pothole sets are often RDD remixes). The v2 build dropped 2 (bharat->bharat, webseg->webseg).
+- **Comparability:** the 514 RDD-India test images are locked in `data/splits/rdd_india_test.lock.txt` and checked by
+  `ml/pipeline.py`; the v2 build's RDD-India test equals the lock, and the laptop model scores exactly 0.2207 on it.
+- **Result** `data/datasets/india_pothole_seg4_v2` (from `india_pothole_seg_v2`, splits in `data/splits/v2/`):
+  train 8,911 images / 14,564 potholes (v1: 3,926), val 1,722 / 879 potholes (v1: 174), test 1,843 / 3,428
+  (RDD-India 514 + BharatPotHole drives + `ws_` + eYantra manhole sequences). SAM2.1 outlined 4,043 new images at
+  52 img/s (2.7 GB GPU). `configs/model/india_pothole_seg.yaml` points at v2; v1 is `india_pothole_seg4_v1.yaml`.
+- `ml/eval.py` reports `source_subsets` (bharat, webseg_human_masks, eyantra) next to the unchanged `rdd_india_subset`
+  acceptance block; `--limit` samples evenly over sources. `ml/export.py` parity uses the dataset's class mapping and
+  the registry records the RDD-India acceptance AP.
+- `configs/classes.yaml` gained the `pothole_seg_web` source map (vocabulary unchanged; CONTRACTS.md updated).
+
+## D17. Training pipeline with the GPU used to ~95 % (user request 2026-11-16)
+`ml/pipeline.py` (`make retrain`, `make retrain-smoke`): check -> data -> baseline -> train -> eval -> export -> report,
+all in the foreground. Profile `rtx5080_gpu95`:
+- **"95 % GPU" = 95 % of the memory that is free at start.** Ultralytics 8.4.211 AutoBatch measures
+  `torch.cuda.mem_get_info`, so `batch: 0.95` already means that; 95 % of the whole card would not fit (the desktop
+  holds 1.2-2 GB).
+- **OOM:** Ultralytics halves the batch on CUDA OOM (first epoch only) and crashes later. `oom_policy: restart` sets
+  its retry counter to the maximum at every epoch start, so an OOM exits with code 3 and the pipeline resumes from
+  `last.pt` with a 10 % smaller batch (fresh process). Tested: forced batch 44 -> OOM -> restarted at 39 -> finished.
+- **Model choice by measurement** (one full epoch each, v2 data, AMP, RAM cache, 16 workers):
+  yolo26s-seg batch 33, peak 91.7 % of the card's memory, load while training median 87 % / mean 75 %, 0.9 min/epoch;
+  **yolo26m-seg batch 18, peak 96.5 %, median 91 % / mean 86 %, 1.7 min/epoch.** More loader workers did not help
+  (16 vs 28: 0.159 s/step both); the gap with s is Ultralytics' fixed per-step CPU work. cuDNN autotuner: 4 % faster
+  steps but slow first epoch/validation -> off (option `--set cudnn_benchmark=true`). Default = m (more accurate, meets
+  the 95 % goal); `rtx5080_gpu95_s` kept. Running at the absolute memory limit is slower per image (batch 39 on s:
+  6.9 ms/img vs 4.8 ms/img at the 95 % batch 33).
+- **Best epoch by the acceptance metric:** `weights/best_pothole.pt` = the epoch with the best validation pothole box
+  AP50 (Ultralytics' best.pt follows its all-class box+mask fitness); eval and export use it.
+- **Pretrained pothole models from the web** (stage baseline, v2 test): laptop y26n RDD-India 0.2207 / BharatPotHole
+  0.035; bootstrap YOLO26m detector 0.088 / 0.021; Hugging Face `keremberke/yolov8s-pothole-segmentation` 0.001 /
+  0.000. None transfers to Indian dashcam frames, so we train our own (from COCO-pretrained YOLO26 weights).
+- **Third-party checkpoints are pickles:** before loading, `ml/pipeline.py` lists every import in the pickle
+  (pickletools, nothing executed) against an allow-list (torch, ultralytics, numpy, collections, ...); `os.system`,
+  `eval` and unresolvable imports are refused. `getattr` is allowed only in the exact
+  `getattr(<allowed class>, "forward")` form old YOLOv8 heads contain (keremberke). Tests: tests/test_training_pipeline.py.
+
+## D18. Clean-up and Linux-only (user decision 2026-11-16)
+Deleted with the user's approval: root logs and the duplicate `pull.ps1`, `data/*.log`, `data/tmp_wp7` (300 MB
+simulator DBs, recreated on demand) and `data/tmp_wp9`, `reports/*.log`, smoke-run configs, the stale Windows-path dHash
+cache, **the raw download archives** (RDD2022 full release 8.4 GB, eYantra 2.7 GB, BharatPotHole 0.8 GB, OSM southern
+zone 0.5 GB; the TGSRTC GTFS zip is kept) and **`scripts/windows` + `scripts/transfer`** (the project runs on Linux).
+`data/download.py` treats a source whose raw archive is gone but whose extracted copy is complete as OK (`--fetch`
+downloads it again); `geo/osm.py` uses the existing Hyderabad crop when the 560 MB extract is gone.
+Approved for later: the v1 datasets (`india_pothole_seg`, `india_pothole_seg4`), the v1 split files and the laptop run
+`runs/seg/y26n_seg_india_laptop`, once a v2 model beats RDD-India pothole AP50 0.2207 and `.env` `SEG_WEIGHTS` no
+longer points at the laptop weights: `make prune-v1` checks both and refuses otherwise.
+
+### D17 addendum: launcher and further efficiency tests (2026-11-16)
+`scripts/train_gpu.sh` (`make train-gpu`) starts or resumes the pipeline in the foreground: it lists the programs that
+hold GPU memory (asks before starting when one holds > 300 MB, because every freed GiB goes to the batch), sets
+`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` and logs to `runs/logs/`. One-epoch YOLO26m tests: expandable
+segments changed nothing measurable (batch 18, 0.173 s/step, median load 91 %) and is kept against fragmentation near the
+95 % limit (ml/pipeline.py sets it for every training step too); `torch.compile` could not run because Triton needs the
+Python 3.11 headers (`python3.11-dev`, sudo needed, not installed). The CPU governor was already `performance` and the
+GPU at its 360 W power limit, so the remaining lever is free GPU memory at start.
+
+## D19. First full v2 run failed the gate; fine-tuning profile `rtx5080_gpu95_ft` (user decision 2026-11-17)
+`make train-gpu` (profile `rtx5080_gpu95`, run `y26m_seg_india_v2`) ran 2026-11-16 17:29-19:22 and early-stopped at
+epoch 67/150. Test (v2 split): **RDD-India pothole box AP50 0.1602** (laptop y26n 0.2207, floor 0.70), BharatPotHole
+0.070 (laptop 0.035), human-mask `ws_` AP50 0.637 (0.338), `ws_` mask IoU 0.77 (0.72). Better on the new sources, worse
+on the acceptance basis, so `SEG_WEIGHTS` stays on the laptop model and `make prune-v1` refuses.
+- **Cause:** the profile had `optimizer: auto`; Ultralytics 8.4.211 then ignores `lr0` and picks MuSGD lr 0.01 when a
+  run has more than 10,000 steps (74k here), AdamW at `0.002*5/(4+nc)` = 0.00125 otherwise (the laptop run). Validation
+  pothole AP50 peaked at epoch 9 (0.164, = `best_pothole.pt`), all-class mAP50 jumped 0.13-0.19 between epochs and val
+  cls loss stayed 4-8 against ~2.7 in training. Early stopping (patience 40 on Ultralytics' all-class fitness) ended the
+  run while the linear LR was still ~55 % of lr0 and before mosaic closes (last 15 epochs), the phases that usually
+  give the largest gain.
+- **New profile `rtx5080_gpu95_ft`** (run `y26m_seg_india_v2ft`): same model, data, batch rule and augmentation;
+  `optimizer: AdamW`, `lr0: 0.00125`, `cos_lr: true` (to lr0*0.01), 80 epochs, `close_mosaic: 15`, `patience: 0`
+  (Ultralytics: 0 = no early stop). Estimate ~1.6 min/epoch at batch 18 -> ~2.2 h. `rtx5080_gpu95` is kept unchanged
+  for comparability. Command: `make train-gpu PROFILE=rtx5080_gpu95_ft NAME=y26m_seg_india_v2ft`.
+
+## D20. Display reserve: training no longer freezes the desktop (2026-11-17)
+Run `y26m_seg_india_v2ft` (D19) reached epoch 16/80 (best validation pothole AP50 0.1719, epoch 15) when the whole
+desktop froze at 12:40 IST and the machine was reset. RAM was not the cause (59 GiB, swap unused). Kernel log: the
+NVIDIA driver returned `NV_ERR_NO_MEMORY` and gnome-shell could not get video memory (`Failed to allocate NVKMS memory
+for GEM object`, `Failed to lock front buffer`). The monitor is on the RTX 5080 (HDMI, card1), the same GPU the D17 batch
+fills to ~96.5 %, so any new desktop allocation (window, VS Code/Chrome GPU process, lock or login screen) failed. Same
+cause as the 2026-11-16 VS Code freeze.
+- **Fix in code** (`ml/train_seg.py`, `apply_display_reserve`): when a *connected* monitor hangs off the training GPU
+  (Linux DRM sysfs, matched by PCI address), 3 GiB (`DISPLAY_RESERVE_GIB`) stay free: PyTorch is hard-capped with
+  `torch.cuda.set_per_process_memory_fraction` and a fractional batch is scaled to the capped budget (0.95 of 14.3 GiB
+  free -> 0.75, i.e. ~95 % of the 11.3 GiB cap). An overshoot is a normal CUDA OOM, answered by the D17 restart with a
+  10 % smaller batch. Applied on resume too (Ultralytics allows `batch` on resume). Override:
+  `GM_DISPLAY_RESERVE_GB` or `ml/pipeline.py --display-reserve-gb` (0 = off). Fewer than 2 GiB left -> refuses to start.
+- **Cost:** batch ~18 -> ~14 on YOLO26m-seg, so somewhat slower epochs. D17's "95 %" now means 95 % of what is left
+  after the reserve.
+- **Recommended hardware fix (zero cost):** plug the monitor into the motherboard port (Ryzen 9950X3D Radeon iGPU,
+  `0000:71:00.0`, already enabled; `prime-select` is `on-demand`). The reserve then switches itself off and training gets
+  the whole card again.
+
+## D21. Bus camera geometry augmentation: profile `rtx5080_gpu95_ft_geo` (user request 2026-11-17)
+The phone is mounted at a different height and pitch on every bus (windscreen, ~2-3 m) while most training footage is
+car/dashcam (~1.2-1.5 m). Up to D19 the geometry was scale 0.4, translate 0.1 (Ultralytics default), degrees 3,
+perspective 0. New profile = `rtx5080_gpu95_ft` (D19 recipe) with scale 0.5, translate 0.15, degrees 5,
+perspective 0.0005 (shear 0, flipud 0: not physical for a fixed forward camera). Checked on a preview of real v2 training
+images: masks follow the warp, keystone and zoom-out look like plausible mount changes. Ultralytics does not let these
+keys change on resume, so the user chose a **new run** `y26m_seg_india_v2ft_geo` over patching `y26m_seg_india_v2ft`
+(stopped at epoch 16/80, kept for comparison). Augmentation only makes the detector robust; metric depth/area still uses
+each bus's tape-measured height/pitch from its calibration certificate. Best evidence later: real frames from
+bus-mounted cameras in the training and test sets.
+
+## D22. Multi-user dataset review before the next training (user request 2026-11-17)
+`scripts/dataset_review.py` (`make review`): FastAPI app on the office LAN (port 8770) over the training dataset
+`india_pothole_seg4_v2` (12,476 images), decisions in SQLite `data/review/review.sqlite` (append-only history). User
+choices: LAN access with name + shared access code (signed HttpOnly cookie; images served only to signed-in reviewers,
+nothing leaves the PC); **split work** (batches of 20 held per reviewer, 30 min) with a **second look** for every reject
+by a different reviewer (two rejects remove; a keep overrules, so no single person removes data); decisions Keep / Reject
+/ Needs fix with reason tags and a note. **Test split stays locked:** test images can be reviewed, but their rejects go to
+`exports/rejected_test_pending.txt` and are applied only with a deliberate new test lock (scores stay comparable until
+then). Train/val rejects -> `exports/rejected_trainval.txt` -> `make derive-dataset-reviewed`
+(`data/derive_dataset.py --exclude`, applied after the manhole re-split so no other image changes split). Needs-fix images
+stay in the dataset and are listed in `exports/needs_fix.txt`. Rejected: a published claude.ai page (would upload the
+licensed images), Label Studio/CVAT (heavy, results need conversion).
+
+## D23. Model test page for own photos and videos (user request 2026-11-17)
+`scripts/model_playground.py` (`make playground`, LAN port 8780, same access code and sign-in as D22). User choices:
+own photos/videos, a web page, detection + measurement. Uploads are decoded before they are stored
+(`data/playground/`, gitignored); videos are sampled (1 frame/s default, <= 150 frames) and the video file is not kept.
+Detection runs once per frame and model at conf 0.05 and the page filters with its slider, so threshold changes and a
+two-model comparison cost no GPU time. Models: `runs/seg/*/weights/best_pothole.pt`, the `.env` model and pothole
+weights in `weights/` (COCO bases hidden), each through the D17 pickle scan; the list shows the RDD-India test pothole
+AP50 (`metrics.rdd_india_subset`, the acceptance basis). "Measure" runs `measure.cli.run_measure` on the exact pothole
+masks at or above the slider with a camera preset and optional per-photo height/pitch (written as an uncertified
+`+user` cert); refusals (e.g. `plane_inlier_ratio<0.5` when the road plane does not fit the assumed camera) are shown
+with their reason, and every result is labelled certified=false.
+
+## D24. Keep only the best model; new model in use, verifier off (user request 2026-11-17)
+User asked to keep only models with good accuracy, in the dashboards and in the project. Kept:
+`runs/seg/y26m_seg_india_v2ft_geo` (RDD-India pothole box AP50 0.2494) with `best_pothole.pt`, `best.pt`, `last.pt`
+(epoch0-70 snapshots deleted). Deleted with the user's approval (4.5 GB): runs `y26m_seg_india_v2` (0.1602),
+`y26m_seg_india_v2ft` (unfinished), `y26n_seg_india_laptop` (0.2207), `weights/bootstrap_pothole_yolo26m.pt` (0.088) and
+`weights/bootstrap_pothole_yolov8s.pt` (0.004, + its yaml). Their scores stay in `reports/model_eval.json`; LAPTOP_AP50
+stays the bar a new model must beat. Consequences: `.env` / `server/app/core/config.py` / `ml.common.DEFAULT_SEG_WEIGHTS`
+/ measure demo / registry seed point at the new model; `VERIFIER=off` (the verifier weights are gone; HANDOFF already
+listed "verifier off" as a fix for the gate that would have dropped most detections); the pipeline's local baselines are
+empty. COCO bases `weights/yolo26*-seg.pt` stay (training starts from them) and `weights/pretrained/` (web baseline) is
+unchanged. The model test page lists only models scored on RDD-India and at least as good as the model in use.
+Note: a shell that loaded the old `.env` into its environment (e.g. a VS Code terminal) still has the old values, which
+override `.env`; open a new terminal.
+
+## D25. Project renamed to RoadFix; plain-English summary on the model test page (user request 2026-11-17)
+**Name:** "RoadFix — Pothole Detection & Maintenance" replaces GunthaMeter in everything people see: page titles, web
+app (PWA name, header, i18n `app.name`; the Telugu brand name is dropped, user chose English only; Telugu UI text
+stays), API title, Android app label, overlays, docs, reports, LaTeX sources, and the package names (`pyproject`
+`roadfix`, re-registered editable with `--no-deps`; web `roadfix-web`). **Kept on purpose (legacy IDs)**: the folder
+`~/gunthameter` (the `.venv` has it baked in), `data/gunthameter.db`, Android `applicationId`/package
+`app.gunthameter.edge` (a new id would be a different app), the OTA config signing seed `gunthameter-edge-config-v1`
+(deployed devices verify it), schema ids `gunthameter.*` and `https://gunthameter.local/...`, IndexedDB
+`gunthameter-field` (offline data), dataset markers `.gunthameter_dataset`, `GUNTHAMETER_CONFIG_DIR`, and the file names
+of the delivered report archives `reports/GunthaMeter_*.zip`.
+**Summary (model test page, D23):** a short plain-English card: what was found (photo, or which frames of a video),
+then per measured pothole depth / area / volume / IRC:82 severity and a repair estimate from `repair.planner.plan`
+(cut size, cold-mix bags as a low-high range, labour hours, cost from the rate card). Sizes and repair estimates are
+given only when the measurement passes the fusion gates of `configs/measure.yaml` (not rejected, quality >=
+`min_quality_for_fusion` 0.2, scale lock inside `clip` [0.5, 2]); otherwise the summary says why it could not be
+measured. Found while testing: on the demo dashcam frames with demo calibrations the scale lock was 0.26 and quality
+0.12, which without the gate turned into a "14 m pothole" and 184-250 bags.

@@ -1,8 +1,8 @@
 {
   "app": {
-    "name": "GunthaMeter",
+    "name": "RoadFix",
     "org": "Telangana · Potholes, Fixed for Good",
-    "footer": "GunthaMeter · bus-camera pothole measurement · demo build — measurements carry ± σ; uncertified calibrations are not for billing"
+    "footer": "RoadFix · bus-camera pothole measurement · demo build — measurements carry ± σ; uncertified calibrations are not for billing"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -68,7 +68,7 @@
     "unauthorized": "Your session has expired. Please sign in again."
   },
   "pwa": {
-    "update": "A new version of GunthaMeter is available.",
+    "update": "A new version of RoadFix is available.",
     "reload": "Reload"
   },
   "login": {

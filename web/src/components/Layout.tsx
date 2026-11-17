@@ -73,7 +73,7 @@ export default function Layout() {
     <div className="app">
       <header className="topbar no-print">
         <div className="topbar-row">
-          <Link to="/" className="brand" aria-label="GunthaMeter">
+          <Link to="/" className="brand" aria-label="RoadFix">
             <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden><rect width="32" height="32" rx="6" fill="#0b3d6e" /><ellipse cx="16" cy="19" rx="10" ry="5" fill="#f2c94c" /><ellipse cx="16" cy="18" rx="6" ry="2.6" fill="#0b3d6e" /><rect x="15" y="5" width="2" height="9" fill="#fff" /></svg>
             <span className="brand-name">{t('app.name')}</span>
             <span className="brand-sub">{t('app.org')}</span>

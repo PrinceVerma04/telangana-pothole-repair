@@ -1,4 +1,4 @@
-# GunthaMeter Edge — Android skeleton
+# RoadFix Edge — Android skeleton
 
 Kotlin app for a phone mounted behind a TGSRTC bus windscreen. It implements the edge loop of `edge/protocol.md`:
 CameraX analysis, 1 Hz fused-location trip fixes with `cam_active`, the distance keyframe trigger

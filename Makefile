@@ -1,12 +1,18 @@
-# GunthaMeter - see README.md. All Python runs from .venv (Python 3.11; torch cu128, or cu126 on Pascal GPUs).
+# RoadFix - see README.md. All Python runs from .venv (Python 3.11, torch 2.11.0+cu128 for the RTX 5080).
 PY      := .venv/bin/python
+DASH_PORT ?= 8765
+REVIEW_PORT ?= 8770
+PLAY_PORT ?= 8780
 PYTEST  := $(PY) -m pytest
 export PYTHONPATH := $(CURDIR)
 
-.PHONY: help setup lock test test-fast lint data dataset derive-dataset train train-resume eval export pseudo-label fleet sim-api db seed api worker ops-tick tick web demo demo-lite measure-demo truth report clean
+.PHONY: help setup lock test test-fast lint data dataset derive-dataset derive-dataset-reviewed review review-export playground retrain train-gpu dashboard retrain-smoke train-check baselines prune-v1 train train-resume eval export pseudo-label fleet sim-api db seed api worker ops-tick tick web demo demo-lite measure-demo truth report clean
+
+NAME    ?= y26m_seg_india_v2
+PROFILE ?= rtx5080_gpu95
 
 help:
-	@grep -E '^[a-z-]+:' Makefile | cut -d: -f1 | tr '\n' ' '; echo
+	@grep -E '^[a-z0-9-]+:' Makefile | cut -d: -f1 | tr '\n' ' '; echo
 
 setup:            ## validate venv (no torch reinstall), .env, LOCKFILE.md
 	bash scripts/setup_dev.sh
@@ -23,26 +29,60 @@ test-fast:
 lint:
 	$(PY) -m ruff check .
 
-data:             ## WP1: unpack/convert downloaded datasets (data/raw already populated)
+data:             ## WP1: verify sources; unpack any whose extracted copy is missing (raw zips may be deleted, D18)
 	$(PY) -I data/download.py --all
 
-dataset:          ## WP1: unified YOLO-seg dataset with SAM2 pseudo-masks
-	$(PY) data/build_dataset.py --out data/datasets/india_pothole_seg --sam2 --negatives-frac 0.2
+dataset:          ## D16: v2 build (RDD2022 + eYantra + BharatPotHole by drive + human web masks, SAM2.1 on GPU)
+	$(PY) data/build_dataset.py --out data/datasets/india_pothole_seg_v2 --splits-dir data/splits/v2 --sam2 \
+	  --sam2-max-gpu-gb 10 --negatives-frac 0.2 --include-bharat --include-webseg
 
-derive-dataset:   ## D15: 4-class training set (india_pothole_seg4) + manhole re-split by drive sequence
-	$(PY) data/derive_dataset.py
+derive-dataset:   ## D15/D16: 4-class training set india_pothole_seg4_v2 (manholes re-split by drive sequence)
+	$(PY) data/derive_dataset.py --overwrite
 
-train:            ## WP3 (resumable sessions; on the RTX 5080 box: PROFILE=rtx5080_s NAME=y26s_seg_india)
-	$(PY) -m ml.train_seg --profile $(or $(PROFILE),laptop_mx330) --name $(or $(NAME),y26n_seg_india_laptop) --session-hours 8
+derive-dataset-reviewed: review-export ## D22: same, minus train/val images rejected in the dataset review (test stays locked)
+	$(PY) data/derive_dataset.py --overwrite --exclude data/review/exports/rejected_trainval.txt
+
+review:           ## D22: multi-user dataset review (keep/reject/needs fix) on the office LAN, port $(REVIEW_PORT)
+	$(PY) scripts/dataset_review.py serve --host 0.0.0.0 --port $(REVIEW_PORT)
+
+playground:       ## D23: test the trained model (+ measurement) on your own photos/videos, LAN port $(PLAY_PORT)
+	$(PY) scripts/model_playground.py --host 0.0.0.0 --port $(PLAY_PORT)
+
+review-export:    ## D22: write data/review/exports/* (rejected_trainval.txt, rejected_test_pending.txt, needs_fix.txt, CSV)
+	$(PY) scripts/dataset_review.py export
+
+retrain:          ## D17: whole training pipeline in the foreground: check, data, baseline, train (95 % GPU), eval, export, report
+	$(PY) -m ml.pipeline --name $(NAME) --profile $(PROFILE)
+
+train-gpu:        ## D17: same as retrain via scripts/train_gpu.sh: GPU check (asks to close GPU-heavy apps), log in runs/logs
+	NAME=$(NAME) PROFILE=$(PROFILE) bash scripts/train_gpu.sh
+
+dashboard:        ## live training dashboard on http://127.0.0.1:$(DASH_PORT) (read-only; own terminal, Ctrl+C stops)
+	$(PY) scripts/train_dashboard.py --port $(DASH_PORT)
+
+retrain-smoke:    ## D17: trial of the pipeline (1 epoch on 15 % of train, short eval); shows batch, GPU memory and load
+	$(PY) -m ml.pipeline --name $(NAME) --profile $(PROFILE) --smoke
+
+train-check:      ## environment + GPU + dataset + RDD-India test lock
+	$(PY) -m ml.pipeline --stages check
+
+baselines:        ## zero-shot scores of already-trained pothole models (laptop, bootstrap, Hugging Face) on our test
+	$(PY) -m ml.pipeline --stages baseline
+
+prune-v1:         ## D18: delete v1 datasets + laptop run, only once a v2 model beats it and .env no longer uses it
+	$(PY) -m ml.pipeline --stages prune-v1
+
+train:            ## WP3 training only (pipeline stage train without the OOM restarts); NAME=..., PROFILE=...
+	$(PY) -m ml.train_seg --profile $(PROFILE) --name $(NAME)
 
 train-resume:
-	$(PY) -m ml.train_seg --name $(or $(NAME),y26n_seg_india_laptop) --resume --session-hours 8
+	$(PY) -m ml.train_seg --name $(NAME) --resume
 
 eval:
-	$(PY) -m ml.eval --weights runs/seg/$(or $(NAME),y26n_seg_india_laptop)/weights/best.pt --stage trained_$(or $(NAME),y26n_seg_india_laptop)
+	$(PY) -m ml.pipeline --stages eval --name $(NAME)
 
 export:
-	$(PY) -m ml.export --weights runs/seg/$(or $(NAME),y26n_seg_india_laptop)/weights/best.pt --formats onnx --register
+	$(PY) -m ml.pipeline --stages export --name $(NAME)
 
 pseudo-label:     ## WP3: pseudo-labels for unlabelled frames (review before training on them)
 	$(PY) -m ml.pseudo_label

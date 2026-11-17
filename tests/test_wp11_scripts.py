@@ -277,7 +277,7 @@ def test_cli_smoke(tmp_path: Path):
                        capture_output=True, text=True, env=env, cwd=tmp_path, timeout=120)
     assert r.returncode == 0, r.stderr
     assert "model metrics: pending" in r.stdout and "staged truth: pending" in r.stdout
-    assert (tmp_path / "REPORT.md").read_text(encoding="utf-8").startswith("# GunthaMeter validation report")
+    assert (tmp_path / "REPORT.md").read_text(encoding="utf-8").startswith("# RoadFix validation report")
     r = subprocess.run([PY, str(REPO / "scripts" / "staged_pothole_truth.py"), "template", "--out",
                         str(tmp_path / "t.csv"), "--targets", "T20-S", "--passes", "1"],
                        capture_output=True, text=True, env=env, cwd=tmp_path, timeout=120)

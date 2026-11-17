@@ -155,9 +155,12 @@ def eval_metrics_for(weights: Path, report: Path = REPORTS / "model_eval.json") 
         return {}
     r = sorted(runs, key=lambda r: (r.get("limit") is None, r.get("created_at", "")))[-1]
     m = r.get("metrics", {})
+    acc = m.get("rdd_india_subset") or m  # the WP3 acceptance basis when the test split mixes sources (D15/D16)
     return {"stage": r.get("stage"), "split": r.get("split"), "n_images": m.get("n_images"),
-            "gt_boxes": m.get("gt_boxes"), "pothole_box_ap50": m.get("pothole", {}).get("box_ap50"),
-            "pothole_box_ap50_95": m.get("pothole", {}).get("box_ap50_95"),
+            "gt_boxes": m.get("gt_boxes"), "pothole_box_ap50": acc.get("pothole", {}).get("box_ap50"),
+            "pothole_box_ap50_95": acc.get("pothole", {}).get("box_ap50_95"),
+            "pothole_box_ap50_basis": "rdd_india_subset" if m.get("rdd_india_subset") else "whole split",
+            "pothole_box_ap50_whole_split": m.get("pothole", {}).get("box_ap50"),
             "map50_capable": m.get("capable_classes", {}).get("map50"),
             "pothole_mask_iou": m.get("mask", {}).get("pothole_mean_matched_mask_iou"),
             "device": r.get("device_name"), "ms_per_image": m.get("timing", {}).get("ms_per_image_mean"),
@@ -265,14 +268,16 @@ def main(argv: Optional[list[str]] = None) -> int:
 
 
 def onnx_parity(pt: Path, onnx_path: Path, n: int, imgsz: int) -> dict[str, Any]:
-    from ml.common import split_images
-    from ml.eval import detection_agreement, evaluate, parity
+    from ml.common import dataset_class_ids, split_images
+    from ml.eval import detection_agreement, evaluate, parity, sample_evenly
     from ml.segmenter import load_segmenter
 
-    images = split_images("test")[:n]
+    images = sample_evenly(split_images("test"), n)  # all sources, not the first n (sorted -> one source)
+    ids = dataset_class_ids()  # dataset label id -> canonical class (4-class subset, D15)
     a = load_segmenter(pt, device="cpu", conf=0.001, imgsz=imgsz, max_det=100)
     b = load_segmenter(onnx_path, conf=0.001, imgsz=imgsz, max_det=100)
-    ra, rb = evaluate(a, images, progress=False), evaluate(b, images, progress=False)
+    ra = evaluate(a, images, progress=False, label_ids=ids)
+    rb = evaluate(b, images, progress=False, label_ids=ids)
     out = {"n_images": len(images), "device": "cpu", **parity(ra, rb)}
     out["agreement_at_conf_025"] = detection_agreement(a, b, images)
     return out

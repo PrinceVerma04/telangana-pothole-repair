@@ -1,6 +1,6 @@
 """Model evaluation -> ``reports/model_eval.json`` (PLAN 3.4 eval metrics, WP3 acceptance).
 
-    python -m ml.eval --weights weights/bootstrap_pothole_yolo26m.pt --stage baseline_bootstrap
+    python -m ml.eval --weights runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt --stage trained_y26m_seg_india_v2ft_geo
     python -m ml.eval --weights runs/seg/<name>/weights/best.pt --stage smoke --compare runs/.../best.onnx --limit 50
 
 Ground truth
@@ -139,6 +139,20 @@ def choose_gt_boxes(images: Sequence[Path], mode: str) -> str:
 
 
 # ============================================================================================ evaluation
+# Test images by source (uid prefix written by data/build_dataset.py), scored separately next to the whole split.
+# RDD-India is the acceptance basis (``rdd_india_subset``, original RDD boxes); the others use the label polygons.
+SOURCE_SUBSETS = {"bharat": "bh_", "webseg_human_masks": "ws_", "eyantra": "ey_"}
+
+
+def sample_evenly(images: Sequence[Path], n: int) -> list[Path]:
+    """``n`` images spread evenly over the sorted list (``--limit``): sorted names group by source prefix, so the first
+    n would all come from one source."""
+    if not n or n >= len(images):
+        return list(images)
+    step = len(images) / n
+    return [images[int(i * step)] for i in range(n)]
+
+
 def evaluate(seg: Any, images: Sequence[Path], gt_boxes: str = "auto", conf: float = 0.001, masks: bool = True,
              mask_max_side: int = 256, progress: bool = True, label_ids: Optional[dict[int, int]] = None
              ) -> dict[str, Any]:
@@ -155,6 +169,8 @@ def evaluate(seg: Any, images: Sequence[Path], gt_boxes: str = "auto", conf: flo
     ev_lab = Evaluator(names, mask_max_side=mask_max_side)  # label polygons (box + mask)
     ev_rdd = Evaluator(names)  # original RDD boxes, RDD-India images only
     n_rdd = 0
+    ev_sub = {k: Evaluator(names, mask_max_side=mask_max_side) for k in SOURCE_SUBSETS}
+    n_sub: dict[str, int] = dict.fromkeys(SOURCE_SUBSETS, 0)
     capable = sorted({class_index(c) for c in seg.canonical_names().values() if c and class_index(c) is not None})
     do_masks = masks and str(getattr(seg, "task", "")) == "segment"
     times, n_det = [], 0
@@ -190,7 +206,15 @@ def evaluate(seg: Any, images: Sequence[Path], gt_boxes: str = "auto", conf: flo
             pm = [d.mask if d.mask is not None else np.zeros(mhw, bool) for d in dets]
             ev_lab.add_image(lc, lb, pc, pf, pb, gt_masks=gm, pred_masks=pm, image_hw=mhw)
         else:
+            gm = pm = None
             ev_lab.add_image(lc, lb, pc, pf, pb)
+        for k, pre in SOURCE_SUBSETS.items():
+            if p.name.startswith(pre):
+                n_sub[k] += 1
+                if do_masks:
+                    ev_sub[k].add_image(lc, lb, pc, pf, pb, gt_masks=gm, pred_masks=pm, image_hw=mhw)
+                else:
+                    ev_sub[k].add_image(lc, lb, pc, pf, pb)
         if progress and (i + 1) % 50 == 0:
             el = time.perf_counter() - t_start
             print(f"  {i + 1}/{len(images)} images, {el:.0f} s, {np.mean(times):.0f} ms/img", flush=True)
@@ -223,6 +247,22 @@ def evaluate(seg: Any, images: Sequence[Path], gt_boxes: str = "auto", conf: flo
                                                  "best_f1", "best_f1_conf")},
             "map50": rdd["map50"], "mean_over": rdd["mean_over"],
             "note": "RDD-India test images only: the PLAN WP3 acceptance basis (box mAP50 pothole >= 0.70)"}
+    subs: dict[str, Any] = {}
+    for k, ev in ev_sub.items():
+        if not n_sub[k] or n_sub[k] == len(images):
+            continue
+        sm = ev.summary(capable)
+        sp = sm["per_class"].get("pothole", {})
+        subs[k] = {"n_images": n_sub[k], "gt": "human-drawn polygons" if k == "webseg_human_masks" else "label polygons",
+                   "pothole": {x: sp.get(x) for x in ("n_gt", "n_pred", "box_ap50", "box_ap50_95", "p_at_025",
+                                                       "r_at_025", "best_f1", "best_f1_conf")},
+                   "map50": sm["map50"], "mean_over": sm["mean_over"]}
+        if do_masks:
+            subs[k]["mask"] = {"pothole_mask_ap50": sp.get("mask_ap50"),
+                               "pothole_mean_matched_mask_iou": sp.get("mean_matched_mask_iou"),
+                               "pothole_n_matched_masks": sp.get("n_matched_masks"), "pothole_pixel_iou": sp.get("pixel_iou")}
+    if subs:
+        res["source_subsets"] = subs
     if do_masks:
         lp_ = lab["per_class"].get("pothole", {})
         res["mask"] = {"pothole_mask_ap50": lp_.get("mask_ap50"), "pothole_mask_ap50_95": lp_.get("mask_ap50_95"),
@@ -230,8 +270,9 @@ def evaluate(seg: Any, images: Sequence[Path], gt_boxes: str = "auto", conf: flo
                        "pothole_n_matched_masks": lp_.get("n_matched_masks"),
                        "pothole_pixel_iou": lp_.get("pixel_iou"), "mask_map50_capable": lab["mask_map50"],
                        "eval_mask_max_side": mask_max_side,
-                       "note": "IoU against SAM2 pseudo-masks at <= %d px; matched = box IoU >= 0.5 at conf >= 0.25"
-                               % mask_max_side}
+                       "note": "IoU against the label polygons at <= %d px (SAM2.1 pseudo-masks for RDD/BharatPotHole, "
+                               "human-drawn for the ws_ subset: see source_subsets); matched = box IoU >= 0.5 at "
+                               "conf >= 0.25" % mask_max_side}
     else:
         res["mask"] = {"status": "n/a", "reason": "detection-only model: no masks; mask IoU is not defined"}
     return res
@@ -396,7 +437,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--imgsz", type=int, default=640)
     ap.add_argument("--conf", type=float, default=0.001)
     ap.add_argument("--max-det", type=int, default=100)
-    ap.add_argument("--limit", type=int, default=0, help="first N images (sorted) only; 0 = all")
+    ap.add_argument("--limit", type=int, default=0, help="N images spread evenly over the split; 0 = all")
     ap.add_argument("--device", default=None, help="cuda:0 | cpu (default: GPU if usable and free)")
     ap.add_argument("--compare", default=None, help="second weights (e.g. the ONNX export) for a parity check")
     ap.add_argument("--compare-stage", default=None)
@@ -414,7 +455,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     label_ids = dataset_class_ids(args.data)  # dataset label id -> canonical class (subset datasets, D15)
     if args.limit:
-        images = images[: args.limit]
+        images = sample_evenly(images, args.limit)
     if args.device is None:
         from measure.depth_backends.base import pick_device
 

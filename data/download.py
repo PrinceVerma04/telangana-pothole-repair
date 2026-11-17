@@ -1,4 +1,4 @@
-"""GunthaMeter WP1 - dataset acquisition: verify downloads in data/raw/ and unpack them into data/interim/<name>/.
+"""RoadFix WP1 - dataset acquisition: verify downloads in data/raw/ and unpack them into data/interim/<name>/.
 
 Run as ``.venv/bin/python -I data/download.py --all`` (``-I``: isolated mode, nothing is imported from the cwd or
 from data/raw). The script is self-contained (stdlib + numpy/opencv/pyyaml/huggingface_hub) on purpose.
@@ -11,16 +11,20 @@ Everything under data/raw/ is UNTRUSTED. This script never executes anything fro
   * per-member size is capped (decompression-bomb guard).
 
 Idempotent: every unpacked source gets ``data/interim/<name>/.done.json`` holding the raw file's size/mtime and the
-extractor version; a re-run with an unchanged raw file is a no-op (``--force`` re-extracts).
+extractor version; a re-run with an unchanged raw file is a no-op (``--force`` re-extracts). The big raw archives were
+deleted after extraction on 2026-11-16 (DECISIONS D18): a source whose raw file is gone but whose extracted copy is
+complete counts as OK; ``--fetch`` downloads the raw file again when a re-extraction is really needed.
 
-Downloads already happened (DECISIONS D11). Network fallbacks are kept and only run with ``--fetch`` when the raw file
-is missing:
+Network fallbacks only run with ``--fetch`` when the raw file is missing:
   rdd     : hf download akiii1234/RoadDamageDetection road_damage_dataset.zip --repo-type dataset (HF mirror, CC BY-SA 4.0)
             fallback Figshare full release / per-country S3 link (403 since 2026-11)
-  eyantra : kaggle datasets download -d eyantraiit/semantic-segmentation-datasets-of-indian-roads
-  bharat  : kaggle datasets download -d surbhisaswatimohanty/bharatpothole
+  eyantra : kaggle datasets download -d eyantraiit/semantic-segmentation-datasets-of-indian-roads   (GPL-2.0)
+  bharat  : kaggle datasets download -d surbhisaswatimohanty/bharatpothole                          (CC BY-SA 4.0)
+  webseg  : kaggle datasets download -d farzadnekouei/pothole-image-segmentation-dataset            (Apache-2.0;
+            human-drawn pothole polygons, Roboflow origin CC BY 4.0; DECISIONS D16)
   gtfs    : Mobility Database mdb-3361 (TGSRTC)            (owned by WP10: verify only)
-  osm     : Geofabrik southern-zone-latest.osm.pbf         (owned by WP10: verify only)
+  osm     : Geofabrik southern-zone-latest.osm.pbf         (owned by WP10: verify only; the Hyderabad crop in
+            data/interim/geo is what the geo build reads)
   weights : HF checkpoints facebook/sam2.1-hiera-small, depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf
 """
 
@@ -100,7 +104,16 @@ SOURCES: dict[str, Source] = {
         RAW / "bharatpothole" / "bharatpothole.zip",
         500_000_000,
         [["kaggle", "datasets", "download", "-d", "surbhisaswatimohanty/bharatpothole", "-p", str(RAW / "bharatpothole")]],
-        "UNVERIFIED (bundled data.yaml claims Roboflow 'CC BY 4.0'); excluded from training unless --include-bharat",
+        "CC BY-SA 4.0 (Kaggle dataset metadata, checked 2026-11-16; bundled Roboflow data.yaml says CC BY 4.0)",
+    ),
+    "webseg": Source(
+        "pothole_seg_web",
+        RAW / "pothole_seg_web" / "pothole-image-segmentation-dataset.zip",
+        50_000_000,
+        [["kaggle", "datasets", "download", "-d", "farzadnekouei/pothole-image-segmentation-dataset",
+          "-p", str(RAW / "pothole_seg_web")]],
+        "Apache-2.0 (Kaggle dataset metadata, checked 2026-11-16; Roboflow origin farzad/pothole_segmentation_yolov8 "
+        "CC BY 4.0) - human-drawn pothole polygons",
     ),
     "gtfs": Source(
         "gtfs_tgsrtc",
@@ -127,7 +140,7 @@ HF_CHECKPOINTS = [
     "depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf",
     "depth-anything/Depth-Anything-V2-Metric-Outdoor-Small-hf",
 ]
-LOCAL_WEIGHTS = ["yolo26n-seg.pt", "yolo26s-seg.pt", "bootstrap_pothole_yolo26m.pt", "bootstrap_pothole_yolov8s.pt"]
+LOCAL_WEIGHTS = ["yolo26n-seg.pt", "yolo26s-seg.pt", "yolo26m-seg.pt"]  # D24: bootstrap pothole weights deleted
 
 
 # --------------------------------------------------------------------------------------------- helpers
@@ -203,15 +216,36 @@ def mark_done(out: Path, sig: dict, extra: dict) -> None:
     (out / ".done.json").write_text(json.dumps({**sig, **extra, "finished_at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}, indent=2))
 
 
+def find_tool(name: str) -> str | None:
+    """A fetch tool on PATH, else next to this interpreter (``.venv/bin/kaggle``, ``.venv/bin/hf``)."""
+    found = shutil.which(name)
+    if found:
+        return found
+    cand = Path(sys.executable).parent / name
+    return str(cand) if cand.exists() else None
+
+
+def extracted_marker(key: str) -> Path | None:
+    """Extracted copy that makes a source usable when its raw archive was deleted (DECISIONS D18)."""
+    return {
+        "rdd": INTERIM / "rdd2022" / ".done.json",
+        "eyantra": INTERIM / "eyantra" / ".done.json",
+        "bharat": INTERIM / "bharatpothole" / ".done.json",
+        "webseg": INTERIM / "pothole_seg_web" / ".done.json",
+        "osm": INTERIM / "geo" / "hyderabad.osm.pbf",
+    }.get(key)
+
+
 def verify_raw(src: Source, fetch: bool) -> bool:
     if not src.raw.exists() and fetch:
         src.raw.parent.mkdir(parents=True, exist_ok=True)
         for cmd in src.fetch_cmds:
-            if shutil.which(cmd[0]) is None:
+            tool = find_tool(cmd[0])
+            if tool is None:
                 log(f"{src.name}: fallback tool {cmd[0]!r} not on PATH, skipping")
                 continue
             log(f"{src.name}: fetching: {' '.join(cmd)}")
-            if subprocess.run(cmd, check=False).returncode == 0 and src.raw.exists():
+            if subprocess.run([tool, *cmd[1:]], check=False).returncode == 0 and src.raw.exists():
                 break
     if not src.raw.exists():
         log(f"{src.name}: MISSING {src.raw} (re-run with --fetch, or: {' '.join(src.fetch_cmds[0]) if src.fetch_cmds else '-'})")
@@ -414,16 +448,74 @@ def extract_bharat(src: Source, force: bool) -> dict:
             if not dst.exists() or force:
                 write_bytes(dst, read_member(z, info))
             counts[f"{split}/{kind}"] += 1
-    note = {
-        "licence_status": "UNVERIFIED",
-        "claimed_by_bundled_data_yaml": claimed_licence,
-        "kaggle": "surbhisaswatimohanty/bharatpothole",
-        "policy": "excluded from data/datasets unless build_dataset.py --include-bharat; frames usable by the simulator",
-    }
+    note = bharat_licence_note(claimed_licence)
     (out / "LICENCE_NOTE.json").write_text(json.dumps(note, indent=2))
     extra = {"counts": dict(counts), "skipped": dict(skipped), **note}
     mark_done(out, sig, extra)
-    log(f"bharat: {dict(counts)} (skipped {dict(skipped)}), claimed licence {claimed_licence!r} (unverified)")
+    log(f"bharat: {dict(counts)} (skipped {dict(skipped)}), licence {note['licence']}")
+    return extra
+
+
+def bharat_licence_note(claimed_licence: str | None) -> dict:
+    return {
+        "licence_status": "VERIFIED",
+        "licence": "CC BY-SA 4.0",
+        "verified_by": "Kaggle dataset metadata (api/v1/datasets/metadata), 2026-11-16",
+        "claimed_by_bundled_data_yaml": claimed_licence,
+        "kaggle": "surbhisaswatimohanty/bharatpothole",
+        "policy": "used for training (build_dataset.py --include-bharat, DECISIONS D16): attribution + ShareAlike",
+    }
+
+
+WS_RE = re.compile(r"^Pothole_Segmentation_YOLOv8/(train|valid)/(images|labels)/([^/]+)$")
+
+
+def extract_webseg(src: Source, force: bool) -> dict:
+    """Human-labelled pothole polygons (YOLOv8-seg txt, one class 'Pothole'), DECISIONS D16. Only images and label
+    txt files are written; the bundled video and readme files are skipped."""
+    out = INTERIM / "pothole_seg_web"
+    sig = raw_signature(src.raw)
+    if is_done(out, sig) and not force:
+        log("webseg: already extracted")
+        return json.loads((out / ".done.json").read_text())
+    counts = collections.Counter()
+    skipped = collections.Counter()
+    claimed = None
+    with zipfile.ZipFile(src.raw) as z:
+        for info in z.infolist():
+            if info.is_dir():
+                continue
+            if info.filename == "Pothole_Segmentation_YOLOv8/data.yaml":
+                text = read_member(z, info).decode("utf-8", "replace")
+                write_bytes(out / "data_yaml.txt", text.encode())  # stored as inert text
+                mm = re.search(r"license:\s*(.+)", text)
+                claimed = mm.group(1).strip() if mm else None
+                continue
+            m = WS_RE.match(info.filename)
+            if not m:
+                skipped[Path(info.filename).suffix or "dir"] += 1
+                continue
+            split, kind, fname = m.groups()
+            p = Path(fname)
+            if kind == "images" and p.suffix.lower() in (".jpg", ".jpeg", ".png"):
+                ext = ".jpg" if p.suffix.lower() in (".jpg", ".jpeg") else ".png"
+            elif kind == "labels" and p.suffix == ".txt":
+                ext = ".txt"
+            else:
+                skipped[p.suffix] += 1
+                continue
+            dst = out / split / kind / f"{safe_stem(p.stem)}{ext}"
+            if not dst.exists() or force:
+                write_bytes(dst, read_member(z, info))
+            counts[f"{split}/{kind}"] += 1
+    note = {"licence": "Apache-2.0 (Kaggle metadata, 2026-11-16)", "roboflow_origin_licence": claimed,
+            "kaggle": "farzadnekouei/pothole-image-segmentation-dataset",
+            "labels": "human-drawn pothole polygons (YOLOv8-seg), class 'Pothole'",
+            "policy": "train -> train; valid -> test (human-mask test subset), DECISIONS D16"}
+    (out / "LICENCE_NOTE.json").write_text(json.dumps(note, indent=2))
+    extra = {"counts": dict(counts), "skipped": dict(skipped), **note}
+    mark_done(out, sig, extra)
+    log(f"webseg: {dict(counts)} (skipped {dict(skipped)})")
     return extra
 
 
@@ -474,7 +566,7 @@ def verify_weights(fetch: bool) -> dict:
 # --------------------------------------------------------------------------------------------- main
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    for flag in ("all", "rdd", "eyantra", "bharat", "gtfs", "osm", "weights"):
+    for flag in ("all", "rdd", "eyantra", "bharat", "webseg", "gtfs", "osm", "weights"):
         ap.add_argument(f"--{flag}", action="store_true")
     ap.add_argument("--roboflow", nargs="*", help="not available: no ROBOFLOW_API_KEY on the dev box (DECISIONS D6)")
     ap.add_argument("--fetch", action="store_true", help="run the network fallback commands for missing raw files")
@@ -485,7 +577,7 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     if a.roboflow is not None:
         log("roboflow: skipped - no ROBOFLOW_API_KEY (DECISIONS D6). Set it and use the Roboflow export UI/API manually.")
-    chosen = [k for k in ("rdd", "eyantra", "bharat", "gtfs", "osm", "weights") if getattr(a, k) or a.all]
+    chosen = [k for k in ("rdd", "eyantra", "bharat", "webseg", "gtfs", "osm", "weights") if getattr(a, k) or a.all]
     if not chosen and a.roboflow is None:
         ap.print_help()
         return 2
@@ -496,6 +588,11 @@ def main(argv: list[str] | None = None) -> int:
             report[k] = verify_weights(a.fetch)
             continue
         src = SOURCES[k]
+        marker = extracted_marker(k)
+        if not src.raw.exists() and not a.fetch and not a.force and marker is not None and marker.exists():
+            log(f"{src.name}: raw archive deleted (DECISIONS D18); using the extracted copy ({marker.relative_to(ROOT)})")
+            report[k] = {"ok": True, "raw": "deleted", "extracted": str(marker.relative_to(ROOT))}
+            continue
         if not verify_raw(src, a.fetch):
             ok = False
             report[k] = {"ok": False}
@@ -509,6 +606,8 @@ def main(argv: list[str] | None = None) -> int:
             report[k] = extract_eyantra(src, a.force)
         elif k == "bharat":
             report[k] = extract_bharat(src, a.force)
+        elif k == "webseg":
+            report[k] = extract_webseg(src, a.force)
         elif k == "gtfs":
             report[k] = verify_gtfs(src)
         elif k == "osm":

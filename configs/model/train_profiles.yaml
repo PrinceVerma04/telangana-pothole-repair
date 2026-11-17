@@ -78,3 +78,104 @@ profiles:
     amp: auto
     workers: 8
     epochs: 80
+
+  # ---- current default (make retrain) --------------------------------------------------------------------------
+  # Linux RTX 5080 (16 GB, sm_120) with the GPU used to ~95 % (user request 2026-11-16, DECISIONS D17).
+  #  * batch 0.95 = Ultralytics AutoBatch sized to 95 % of the GPU memory AVAILABLE at start. AutoBatch reads
+  #    torch.cuda.mem_get_info, so memory held by the desktop (~1.2-2 GB) or another user is subtracted first;
+  #    95 % of the whole 16 GB would not fit and would crash at once.
+  #  * oom_policy restart: on CUDA OOM the run ends (exit code 3) and ml/pipeline.py resumes it with a 10 % smaller
+  #    batch, instead of Ultralytics halving it (to ~47 %) for the rest of the run. Tested: batch 44 -> OOM -> 39.
+  #  * model yolo26m-seg: measured one full epoch each on this box (2026-11-16, v2 data, AMP, RAM cache):
+  #        yolo26s-seg  batch 33  GPU memory peak 91.7 %  load while training median 87 % / mean 75 %  0.9 min/epoch
+  #        yolo26m-seg  batch 18  GPU memory peak 96.5 %  load while training median 91 % / mean 86 %  1.7 min/epoch
+  #    With s, Ultralytics' fixed per-step CPU work (logging sync, EMA, optimizer) leaves the GPU idle part of the
+  #    time and more loader workers did not help (16 vs 28 workers: same 0.159 s/step); m gives the GPU enough work
+  #    per step to reach the 95 % target, and is the more accurate model. The server runs this segmenter (PLAN:
+  #    y26s/m on the server/van); a phone model is a separate n run (rtx5080_n).
+  #  * cuDNN autotuner left off: 4 % faster steps, but tuning time and 5x slower validation (rect batches) in a
+  #    1-epoch test. Settable per run: --set cudnn_benchmark=true.
+  #  * PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (set by ml/pipeline.py and scripts/train_gpu.sh): same speed
+  #    (0.173 s/step, batch 18), less fragmentation near the memory limit. torch.compile (--set compile=true) fails
+  #    here: Triton needs the Python 3.11 headers (sudo apt install python3.11-dev); untested once they exist.
+  #    CPU governor is already 'performance' and the GPU at its 360 W limit.
+  #  * imgsz 640: RDD-India frames are 720 px and BharatPotHole 640 px; 960 would only upscale them.
+  #  * best_metric pothole_ap50: weights/best_pothole.pt = the epoch with the best validation pothole box AP50
+  #    (the WP3 acceptance metric); Ultralytics' best.pt follows its own all-class box+mask fitness.
+  rtx5080_gpu95:
+    <<: *common
+    model: weights/yolo26m-seg.pt
+    imgsz: 640
+    batch: 0.95
+    amp: auto
+    workers: 16
+    cache: ram
+    epochs: 150
+    patience: 40
+    close_mosaic: 15
+    save_period: 10
+    oom_policy: restart
+    best_metric: pothole_ap50
+
+  # Fine-tuning recipe (DECISIONS D19, 2026-11-17). rtx5080_gpu95 left `optimizer: auto`, which Ultralytics turns
+  # into MuSGD lr 0.01 for runs over 10,000 steps (150 epochs x 496 = 74k): the y26m v2 run peaked on validation
+  # pothole AP50 at epoch 9 (0.164), jumped 0.13-0.19 between epochs, early-stopped at epoch 67 while the LR was still
+  # high and mosaic still on, and scored RDD-India 0.160 < laptop 0.2207. Here: AdamW at Ultralytics' own fitted lr for
+  # 4 classes (0.002*5/(4+nc) = 0.00125, what the laptop run got), cosine decay to lr0*lrf over 80 epochs, mosaic off
+  # for the last 15, and early stopping off (patience 0) so the run always reaches the low-LR, no-mosaic epochs.
+  rtx5080_gpu95_ft: &ft
+    <<: *common
+    model: weights/yolo26m-seg.pt
+    imgsz: 640
+    batch: 0.95
+    amp: auto
+    workers: 16
+    cache: ram
+    optimizer: AdamW
+    lr0: 0.00125
+    lrf: 0.01
+    cos_lr: true
+    warmup_epochs: 3.0
+    epochs: 80
+    patience: 0
+    close_mosaic: 15
+    save_period: 10
+    oom_policy: restart
+    best_metric: pothole_ap50
+
+  # Fine-tuning + bus camera geometry (DECISIONS D21, user request 2026-11-17). The phone sits at a different height
+  # and pitch on each bus (windscreen mount ~2-3 m vs the ~1.2-1.5 m car/dashcam footage most training images come
+  # from): higher/steeper -> potholes look smaller and more top-down, the horizon moves up or down the frame, the
+  # mount can be tilted on the windscreen and the bus leans on cambered roads. Ultralytics random_perspective warps
+  # images and masks together:
+  #   scale 0.5          zoom 0.5-1.5 (common 0.4): camera higher/lower, pothole size in pixels
+  #   translate 0.15     +-15 % shift (Ultralytics default 0.1): horizon position from mount height and pitch
+  #   degrees 5.0        +-5 deg roll (common 3): mount tilt + body roll
+  #   perspective 0.0005 projective warp (common 0, off): changed viewing angle / foreshortening
+  #   shear 0, flipud 0  not physical for a fixed forward camera
+  # This only makes the detector robust to mount geometry; metric depth/area still comes from each bus's tape-measured
+  # height and pitch in its calibration certificate (DEPTH_METHOD.md), not from the model.
+  rtx5080_gpu95_ft_geo:
+    <<: *ft
+    scale: 0.5
+    translate: 0.15
+    degrees: 5.0
+    perspective: 0.0005
+    shear: 0.0
+    flipud: 0.0
+
+  # Same with the small model: about half the time per epoch, GPU load lower (see above).
+  rtx5080_gpu95_s:
+    <<: *common
+    model: weights/yolo26s-seg.pt
+    imgsz: 640
+    batch: 0.95
+    amp: auto
+    workers: 16
+    cache: ram
+    epochs: 150
+    patience: 40
+    close_mosaic: 15
+    save_period: 10
+    oom_policy: restart
+    best_metric: pothole_ap50

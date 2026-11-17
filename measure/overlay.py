@@ -130,7 +130,7 @@ def render_overlay(img_bgr: np.ndarray, masks: Sequence[np.ndarray], fms: Sequen
     f_te, f_hi = _font("NotoSansTelugu-Regular.ttf", 16), _font("NotoSansDevanagari-Regular.ttf", 16)
     y = h + 8
     now = datetime.now(IST).strftime("%d %b %Y %H:%M IST")
-    dr.text((10, y), f"GunthaMeter (గుంత మీటర్)  {title}   {now}", font=f_b, fill=(20, 20, 20))
+    dr.text((10, y), f"RoadFix  {title}   {now}", font=f_b, fill=(20, 20, 20))
     dr.text((w + 10, 6), "depth map (near = red, far = blue)", font=f_en, fill=(255, 255, 255))
     y += 26
     for i, fm in enumerate(fms):

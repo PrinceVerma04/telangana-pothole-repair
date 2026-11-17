@@ -29,7 +29,7 @@ const queryClient = new QueryClient({
 
 async function start() {
   const root = createRoot(document.getElementById('root')!);
-  root.render(<div className="boot">GunthaMeter · గుంత మీటర్ …</div>);
+  root.render(<div className="boot">RoadFix …</div>);
   const info = await bootstrapApi();
   document.documentElement.dataset.apiMode = info.mode;
   const queue = new OfflineQueue(fieldDb());

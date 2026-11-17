@@ -28,6 +28,8 @@ source_maps:
     shallow: pothole_water   # refined by brightness/specularity in build_dataset.py
   bharatpothole:
     pothole: pothole
+  pothole_seg_web:    # Kaggle farzadnekouei/pothole-image-segmentation-dataset (human-drawn polygons, D16)
+    Pothole: pothole
   bootstrap_yolo26m:  # weights/bootstrap_pothole_yolo26m.pt (1 class)
     Pothole: pothole
   bootstrap_yolov8s:  # weights/bootstrap_pothole_yolov8s.pt (RDD 5 classes)

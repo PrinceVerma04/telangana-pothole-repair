@@ -1,7 +1,7 @@
 """Derive a training dataset from the built ``india_pothole_seg`` (WP1 output) without rebuilding it (DECISIONS D15).
 
-    .venv\\Scripts\\python.exe data\\derive_dataset.py                       # -> data/datasets/india_pothole_seg4
-    .venv\\Scripts\\python.exe data\\derive_dataset.py --keep auto --resplit-class manhole --fractions 0.70,0.15,0.15
+    .venv/bin/python data/derive_dataset.py               # india_pothole_seg_v2 -> data/datasets/india_pothole_seg4_v2
+    .venv/bin/python data/derive_dataset.py --keep auto --resplit-class manhole --fractions 0.70,0.15,0.15
 
 Two changes, both recorded in the output's ``stats.json``:
 
@@ -15,6 +15,11 @@ Two changes, both recorded in the output's ``stats.json``:
    an eYantra drive sequence (``ey_<sequence>_frame…``), so near-identical consecutive frames never end up on both
    sides of a split; any other image is its own group. Groups move whole, including their frames without that class.
    Images that are not in such a group keep their split.
+
+3. **Review exclusions** (``--exclude data/review/exports/rejected_trainval.txt``, DECISIONS D22): image stems
+   rejected in the dataset review (scripts/dataset_review.py) are left out, applied *after* the re-split so the split
+   assignment of everything else is unchanged. Test images are never excluded here: the test split is locked
+   (``data/splits/rdd_india_test.lock.txt``); test rejects wait for a deliberate new lock.
 
 Images are hard-linked (no extra disk space; copied when hard links are not possible) and labels are rewritten. The
 input dataset is never modified. Deterministic for a given ``--seed``.
@@ -64,6 +69,25 @@ def group_of(stem: str) -> str:
     if stem.startswith("ey_") and "_frame" in stem:
         return stem.split("_frame")[0]
     return stem
+
+
+def read_stem_list(files: list[Path]) -> set[str]:
+    out: set[str] = set()
+    for f in files:
+        for line in Path(f).read_text(encoding="utf-8").splitlines():
+            line = line.split("#", 1)[0].strip()
+            if line:
+                out.add(Path(line).stem if line.lower().endswith((".jpg", ".jpeg", ".png")) else line)
+    return out
+
+
+def apply_exclusions(imgs: list[Img], stems: set[str]) -> tuple[list[Img], dict[str, int]]:
+    """Drop listed train/val images; listed test images stay (locked split, D22)."""
+    present = {it.stem for it in imgs}
+    kept = [it for it in imgs if it.stem not in stems or it.split == "test"]
+    return kept, {"excluded": len(imgs) - len(kept),
+                  "test_kept": sum(1 for it in imgs if it.stem in stems and it.split == "test"),
+                  "not_found": len(stems - present)}
 
 
 def read_dataset(src: Path) -> tuple[dict[int, str], list[Img]]:
@@ -227,20 +251,22 @@ def write(out: Path, imgs: list[Img], keep: list[str]) -> dict[str, object]:
 
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--src", type=Path, default=ROOT / "data" / "datasets" / "india_pothole_seg")
-    ap.add_argument("--out", type=Path, default=ROOT / "data" / "datasets" / "india_pothole_seg4")
+    ap.add_argument("--src", type=Path, default=ROOT / "data" / "datasets" / "india_pothole_seg_v2")
+    ap.add_argument("--out", type=Path, default=ROOT / "data" / "datasets" / "india_pothole_seg4_v2")
     ap.add_argument("--keep", default="auto", help="'auto' (classes with train labels) or a comma list of classes")
     ap.add_argument("--resplit-class", default="manhole", help="class to spread over train/val/test ('' = none)")
     ap.add_argument("--fractions", default="0.70,0.15,0.15", help="train,val,test share of that class's instances")
     ap.add_argument("--seed", type=int, default=20261114)
     ap.add_argument("--overwrite", action="store_true", help="replace an existing derived dataset at --out")
+    ap.add_argument("--exclude", type=Path, action="append", default=[],
+                    help="file of image stems to leave out of train/val (one per line, '#' comments; D22)")
     a = ap.parse_args(argv)
 
     src, out = a.src.resolve(), a.out.resolve()
     if src == out:
         ap.error("--out must differ from --src (the source dataset is never modified)")
     if not (src / "data.yaml").is_file():
-        ap.error(f"{src} has no data.yaml (build it first: tasks.ps1 dataset / make dataset)")
+        ap.error(f"{src} has no data.yaml (build it first: make dataset)")
     fr = tuple(float(x) for x in a.fractions.split(","))
     if len(fr) != 3 or any(x < 0 for x in fr) or abs(sum(fr) - 1.0) > 1e-6:
         ap.error("--fractions needs three non-negative numbers that sum to 1, e.g. 0.70,0.15,0.15")
@@ -255,12 +281,14 @@ def main(argv: Optional[list[str]] = None) -> int:
     names, imgs = read_dataset(src)
     keep = choose_keep(a.keep, names, imgs)
     split_info = resplit(imgs, a.resplit_class, fr, a.seed) if a.resplit_class else None  # type: ignore[arg-type]
+    imgs, excl = apply_exclusions(imgs, read_stem_list(a.exclude))
     res = write(out, imgs, keep)
     (out / MARKER).write_text(f"derived from {src}\n", encoding="utf-8")
     stats = {"dataset": out.name, "derived_from": str(src), "derived_at": datetime.now(timezone.utc).isoformat(
         timespec="seconds"), "script": "data/derive_dataset.py", "seed": a.seed,
         "names": {str(i): n for i, n in enumerate(keep)},
-        "removed_classes": [n for n in names.values() if n not in keep], "resplit": split_info, **res}
+        "removed_classes": [n for n in names.values() if n not in keep], "resplit": split_info,
+        "review_exclusions": {**excl, "files": [str(f) for f in a.exclude]} if a.exclude else None, **res}
     (out / "stats.json").write_text(json.dumps(stats, indent=1), encoding="utf-8")
 
     print(f"derived {out} from {src}")
@@ -272,6 +300,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     for s, v in res["splits"].items():  # type: ignore[attr-defined]
         print(f"  {s:<5} {v['images']:>5} images  " + "  ".join(f"{n} {c}" for n, c in v["instances"].items()))
     print(f"files: {res['files']}; dropped label lines: {res['dropped_instances'] or 'none'}")
+    if a.exclude:
+        print(f"review exclusions: {excl['excluded']} train/val images left out; {excl['test_kept']} test rejects kept "
+              f"(test split is locked); {excl['not_found']} listed stems not in the dataset")
     return 0
 
 

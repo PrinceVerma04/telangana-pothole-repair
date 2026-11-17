@@ -1,8 +1,9 @@
-"""GunthaMeter WP1 - build the unified YOLO-seg dataset ``india_pothole_seg`` (PLAN 3.3, DECISIONS D6).
+"""RoadFix WP1 - build the unified YOLO-seg dataset ``india_pothole_seg`` (PLAN 3.3, DECISIONS D6).
 
 Inputs are the unpacked sources in data/interim/ (``python -I data/download.py --all``); nothing under data/raw/ is read.
 
-    .venv/bin/python data/build_dataset.py --out data/datasets/india_pothole_seg --sam2 --negatives-frac 0.2
+    make dataset   # = .venv/bin/python data/build_dataset.py --out data/datasets/india_pothole_seg_v2 --sam2 \
+                  #   --sam2-max-gpu-gb 10 --negatives-frac 0.2 --include-bharat --include-webseg
     .venv/bin/python data/build_dataset.py --out /tmp/x --limit 20            # quick smoke build (box polygons)
 
 Sources and label mapping (class ids from configs/classes.yaml, frozen):
@@ -40,6 +41,7 @@ import json
 import math
 import os
 import random
+import re
 import shutil
 import sys
 import time
@@ -57,27 +59,33 @@ from PIL import Image  # noqa: E402
 
 from data.seg_geometry import (  # noqa: E402
     box_polygon,
+    clip_polygon,
     dhash_words,
     hamming_words,
+    parse_yolo_seg_line,
     polygon_area,
     rasterize_polygons,
     yolo_box_to_xyxy,
     yolo_seg_line,
 )
 
-DEFAULT_OUT = ROOT / "data" / "datasets" / "india_pothole_seg"
+DEFAULT_OUT = ROOT / "data" / "datasets" / "india_pothole_seg_v2"  # D16; v1 lives in india_pothole_seg until D18 cleanup
+DEFAULT_SPLITS = ROOT / "data" / "splits" / "v2"
 DEFAULT_INTERIM = ROOT / "data" / "interim"
 CLASSES_YAML = ROOT / "configs" / "classes.yaml"
 SPLITS = ("train", "val", "test")
 POTHOLE_CLASSES = ("pothole", "pothole_water")
-BUILD_VERSION = 2
+BUILD_VERSION = 3
 LICENCES = {
     "rdd_india": "CC BY-SA 4.0 (RDD2022)",
     "rdd_foreign": "CC BY-SA 4.0 (RDD2022)",
     "rdd_negpool": "CC BY-SA 4.0 (RDD2022)",
     "eyantra": "GPL-2.0 (Kaggle eyantraiit) - prototype/evaluation only",
-    "bharat": "UNVERIFIED (bundled data.yaml claims CC BY 4.0)",
+    "bharat": "CC BY-SA 4.0 (Kaggle surbhisaswatimohanty/bharatpothole metadata, verified 2026-11-16)",
+    "webseg": "Apache-2.0 (Kaggle farzadnekouei/pothole-image-segmentation-dataset; Roboflow origin CC BY 4.0)",
 }
+UID_PREFIX = {"rdd_india": "rddin_", "rdd_foreign": "rddfx_", "rdd_negpool": "rddng_", "eyantra": "ey_",
+              "bharat": "bh_", "webseg": "ws_"}
 
 
 def log(msg: str) -> None:
@@ -286,7 +294,46 @@ def collect_eyantra(interim: Path, source_maps: dict, shallow_mode: str, pothole
     return items
 
 
-def collect_bharat(interim: Path, source_maps: dict, limit, seed, drop) -> list[Item]:
+BH_DRIVE_RE = re.compile(r"^(.+?)_frame_\d+")
+
+
+def bharat_drive(stem: str) -> str:
+    """Drive (source video) of a BharatPotHole frame: ``20250528094319_0060_frame_00012_jpg_rf_<hash>`` ->
+    ``20250528094319_0060``; ``signal-2025-06-25-183557_frame_00080...`` -> ``signal-2025-06-25-183557``."""
+    m = BH_DRIVE_RE.match(stem)
+    return m.group(1) if m else stem.split("_jpg_rf_")[0]
+
+
+def split_groups(sizes: dict[str, int], fractions: tuple[float, float, float], seed: int, salt: str) -> dict[str, str]:
+    """Assign whole groups to train/val/test so each split gets about its share of the items (deterministic).
+
+    Groups are visited in a seeded order; a group goes to test (then val) while that split is below its target and
+    the group does not push it more than 10 % past it; everything else is train."""
+    total = sum(sizes.values())
+    target = {"test": fractions[2] * total, "val": fractions[1] * total}
+    got = {"test": 0, "val": 0}
+    order = sorted(sizes)
+    stable_rng(seed, salt).shuffle(order)
+    out = {}
+    for g in order:
+        n = sizes[g]
+        dest = "train"
+        for s in ("test", "val"):
+            if got[s] < target[s] and got[s] + n <= 1.1 * target[s]:
+                dest = s
+                break
+        if dest != "train":
+            got[dest] += n
+        out[g] = dest
+    return out
+
+
+def collect_bharat(interim: Path, source_maps: dict, limit, seed, drop, split_mode: str = "drive",
+                   fractions: tuple[float, float, float] = (0.8, 0.1, 0.1)) -> list[Item]:
+    """BharatPotHole (CC BY-SA 4.0, DECISIONS D16). ``split_mode='drive'`` (default) splits by source video: the
+    Roboflow export's own train/valid/test put frames of 111 of its 162 drives into more than one split, so near-
+    identical consecutive frames would leak from train into val/test. ``'roboflow'`` keeps the old mapping
+    (train+valid -> train, test -> val)."""
     base = interim / "bharatpothole"
     names = ["pothole"]
     dy = base / "data_yaml.txt"
@@ -295,7 +342,8 @@ def collect_bharat(interim: Path, source_maps: dict, limit, seed, drop) -> list[
     bmap = source_maps.get("bharatpothole", {"pothole": "pothole"})
     id_map = {i: bmap.get(n) for i, n in enumerate(names)}
     items = []
-    for split, target in (("train", "train"), ("valid", "train"), ("test", "val")):
+    roboflow_target = {"train": "train", "valid": "train", "test": "val"}
+    for split in ("train", "valid", "test"):
         idir = base / split / "images"
         if not idir.is_dir():
             continue
@@ -304,33 +352,129 @@ def collect_bharat(interim: Path, source_maps: dict, limit, seed, drop) -> list[
             img = idir / f"{stem}.jpg"
             w, h = image_size(img)
             insts = _read_yolo_boxes(base / split / "labels" / f"{stem}.txt", w, h, id_map, drop)
-            items.append(Item(uid=f"bh_{stem}"[:120], source="bharat", image=img, w=w, h=h, insts=insts, fixed_split=target))
-    log(f"bharat: {len(items)} images")
+            target = roboflow_target[split] if split_mode == "roboflow" else None
+            items.append(Item(uid=f"bh_{stem}"[:120], source="bharat", image=img, w=w, h=h, insts=insts,
+                              fixed_split=target, group=f"bh:{bharat_drive(stem)}"))
+    if split_mode == "drive" and items:
+        sizes = collections.Counter(it.group for it in items)
+        dest = split_groups(dict(sizes), fractions, seed, "bharat_drives")
+        for it in items:
+            it.fixed_split = dest[it.group]
+    per = collections.Counter(it.fixed_split for it in items)
+    log(f"bharat: {len(items)} images from {len({it.group for it in items})} drives, split by {split_mode}: {dict(per)}")
+    return items
+
+
+def collect_webseg(interim: Path, source_maps: dict, limit, seed, drop) -> list[Item]:
+    """Human-drawn pothole polygons from the web (Kaggle farzadnekouei, Apache-2.0; DECISIONS D16): the only pothole
+    masks in the build that are not SAM2 pseudo-masks. train -> train; valid -> test (a human-mask test subset)."""
+    base = interim / "pothole_seg_web"
+    if not base.is_dir():
+        log(f"webseg: {base} missing - run data/download.py --webseg --fetch")
+        return []
+    names = ["Pothole"]
+    dy = base / "data_yaml.txt"
+    if dy.exists():
+        names = list((yaml.safe_load(dy.read_text()) or {}).get("names", names))
+    wmap = source_maps.get("pothole_seg_web", {"Pothole": "pothole"})
+    id_map = {i: wmap.get(n, wmap.get(str(n).lower())) for i, n in enumerate(names)}
+    items = []
+    for split, target in (("train", "train"), ("valid", "test")):
+        idir = base / split / "images"
+        if not idir.is_dir():
+            continue
+        stems = _limit([p.stem for p in idir.glob("*.jpg")], limit, seed, f"webseg_{split}")
+        for stem in stems:
+            img = idir / f"{stem}.jpg"
+            w, h = image_size(img)
+            insts = []
+            lab = base / split / "labels" / f"{stem}.txt"
+            for line in (lab.read_text().splitlines() if lab.exists() else []):
+                if len(line.split()) < 7:
+                    drop["webseg_short_polygon"] += 1
+                    continue
+                cid, xy = parse_yolo_seg_line(line)
+                cls = id_map.get(cid)
+                if cls is None:
+                    drop[f"webseg_class_{cid}"] += 1
+                    continue
+                poly = clip_polygon(xy * np.array([w, h], np.float32), w, h)
+                if len(poly) < 3 or polygon_area(poly) < 16:
+                    drop["webseg_tiny_polygon"] += 1
+                    continue
+                insts.append(Inst(cls=cls, poly=poly, mask_source="gt_polygon"))
+            items.append(Item(uid=f"ws_{stem}"[:120], source="webseg", image=img, w=w, h=h, insts=insts,
+                              fixed_split=target))
+    log(f"webseg: {len(items)} images, {sum(len(it.insts) for it in items)} human-drawn polygons")
     return items
 
 
 # ------------------------------------------------------------------------------------------------ near-duplicate groups
-def dhash_groups(items: list[Item], cache_path: Path | None, max_hamming: int) -> tuple[dict[str, str], dict]:
-    """Union-find over 256-bit dHash Hamming distance <= max_hamming. Returns uid -> group id and stats.
+def _dhash_key(p: Path) -> str:
+    p = Path(p).resolve()
+    try:
+        return p.relative_to(ROOT).as_posix()
+    except ValueError:
+        return p.as_posix()
 
-    Checked on RDD-India (2026-11-13): pairs <= 24/256 bits are consecutive frames of one drive; the 64-bit dHash at
-    <= 4 bits chained 320 unrelated 'road + sky' frames into one group."""
+
+def dhash_lookup(items: list[Item], cache_path: Path | None) -> list[np.ndarray]:
+    """256-bit dHash (4 x uint64) per item, cached by repo-relative path so the cache survives a project move."""
     cache: dict[str, str] = {}
     if cache_path and cache_path.exists():
         try:
             cache = json.loads(cache_path.read_text())
         except json.JSONDecodeError:
             cache = {}
-    words = []
+    words, dirty = [], False
     for it in items:
-        key = str(it.image)
+        key = _dhash_key(it.image)
         if key not in cache:
-            g = cv2.imread(key, cv2.IMREAD_GRAYSCALE)
+            g = cv2.imread(str(it.image), cv2.IMREAD_GRAYSCALE)
             cache[key] = dhash_words(g).tobytes().hex() if g is not None else "0" * 64
+            dirty = True
         words.append(np.frombuffer(bytes.fromhex(cache[key]), dtype=np.uint64))
-    if cache_path:
+    if cache_path and dirty:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_path.write_text(json.dumps(cache))
+    return words
+
+
+def drop_test_near_duplicates(items: list[Item], split: dict[str, str], cache_path: Path | None,
+                              max_hamming: int) -> tuple[set[str], dict]:
+    """Train/val images that are near-duplicates (256-bit dHash Hamming <= max_hamming) of any test image, across all
+    sources (DECISIONS D16). Web pothole sets are often remixes of RDD2022, and BharatPotHole drives can pass the same
+    road twice; dropping such images keeps the test split honest. The test split itself is never changed."""
+    test = [it for it in items if split.get(it.uid) == "test"]
+    rest = [it for it in items if split.get(it.uid) in ("train", "val")]
+    info: dict = {"checked": len(rest), "test_images": len(test), "max_hamming": max_hamming, "dropped": 0}
+    if not test or not rest:
+        return set(), info
+    words = dhash_lookup(test + rest, cache_path)
+    ht, hr = np.stack(words[: len(test)]), np.stack(words[len(test):])
+    drop: set[str] = set()
+    pairs: collections.Counter = collections.Counter()
+    examples: list[list] = []
+    for s in range(0, len(rest), 512):
+        d = hamming_words(hr[s : s + 512], ht)
+        j = d.argmin(axis=1)
+        dmin = d[np.arange(len(j)), j]
+        for k in np.nonzero(dmin <= max_hamming)[0]:
+            it, tt = rest[s + int(k)], test[int(j[k])]
+            drop.add(it.uid)
+            pairs[f"{it.source}->{tt.source}"] += 1
+            if len(examples) < 20:
+                examples.append([it.uid, tt.uid, int(dmin[k])])
+    info.update(dropped=len(drop), by_source_pair=dict(pairs), examples=examples)
+    return drop, info
+
+
+def dhash_groups(items: list[Item], cache_path: Path | None, max_hamming: int) -> tuple[dict[str, str], dict]:
+    """Union-find over 256-bit dHash Hamming distance <= max_hamming. Returns uid -> group id and stats.
+
+    Checked on RDD-India (2026-11-13): pairs <= 24/256 bits are consecutive frames of one drive; the 64-bit dHash at
+    <= 4 bits chained 320 unrelated 'road + sky' frames into one group."""
+    words = dhash_lookup(items, cache_path)
     n = len(items)
     parent = list(range(n))
 
@@ -578,7 +722,7 @@ def write_dataset(out: Path, split_items: dict[str, list[Item]], names: dict[str
             st["pothole_images"] += it.has_pothole
             st["no_pothole_images"] += not it.has_pothole
             st["fully_empty"] += it.empty
-            if it.source == "eyantra":
+            if it.source in ("eyantra", "webseg"):  # human-drawn polygons
                 st["gt_mask_images"] += 1
                 st["gt_mask_images_with_instances"] += bool(it.insts)
             if any(i.mask_source == "sam2" for i in it.insts):
@@ -619,7 +763,7 @@ def parse_args(argv=None):
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
     ap.add_argument("--interim", type=Path, default=DEFAULT_INTERIM)
     ap.add_argument("--classes", type=Path, default=CLASSES_YAML)
-    ap.add_argument("--splits-dir", type=Path, default=None, help="default data/splits (full build) or <out>/splits (--limit)")
+    ap.add_argument("--splits-dir", type=Path, default=None, help="default data/splits/v2 (full build) or <out>/splits (--limit)")
     ap.add_argument("--sam2", action="store_true", help="box -> SAM2.1 masks (else box polygons)")
     ap.add_argument("--sam2-device", default="auto", choices=["auto", "cuda", "cpu"])
     ap.add_argument("--sam2-max-gpu-gb", type=float, default=2.5)
@@ -633,7 +777,15 @@ def parse_args(argv=None):
     ap.add_argument("--dup-hamming", type=int, default=24, help="near-duplicate threshold, bits of 256-bit dHash")
     ap.add_argument("--foreign-d40", action=argparse.BooleanOptionalAction, default=True,
                     help="add non-India RDD frames with potholes to train")
-    ap.add_argument("--include-bharat", action="store_true", help="licence UNVERIFIED - off by default")
+    ap.add_argument("--include-bharat", action="store_true",
+                    help="add BharatPotHole (CC BY-SA 4.0, verified 2026-11-16; DECISIONS D16)")
+    ap.add_argument("--bharat-split", default="drive", choices=["drive", "roboflow"],
+                    help="drive: whole source videos per split (no leakage); roboflow: its own leaky splits")
+    ap.add_argument("--bharat-fractions", default="0.8,0.1,0.1", help="train,val,test share of BharatPotHole frames")
+    ap.add_argument("--include-webseg", action="store_true",
+                    help="add human-drawn pothole polygons from the web (Apache-2.0; valid -> test; DECISIONS D16)")
+    ap.add_argument("--dedup", action=argparse.BooleanOptionalAction, default=True,
+                    help="drop train/val images that near-duplicate a test image (any source)")
     ap.add_argument("--eyantra-shallow", default="manhole", choices=["manhole", "contract", "plan_heuristic", "drop"])
     ap.add_argument("--eyantra-pothole", default="exclude_image", choices=["exclude_image", "contract", "drop_label"])
     ap.add_argument("--road-aux", action="store_true", help="write eYantra road masks to aux_road/")
@@ -650,7 +802,7 @@ def build(args) -> dict:
     t0 = time.time()
     out: Path = args.out.resolve()
     interim: Path = args.interim.resolve()
-    splits_dir = args.splits_dir or (out / "splits" if args.limit else ROOT / "data" / "splits")
+    splits_dir = args.splits_dir or (out / "splits" if args.limit else DEFAULT_SPLITS)
     names, source_maps = load_classes(args.classes)
     drop = collections.Counter()
     claim_out_dir(out)
@@ -666,8 +818,13 @@ def build(args) -> dict:
         log("rdd: data/interim/rdd2022/meta.json missing - run data/download.py --rdd")
     items += collect_eyantra(interim, source_maps, args.eyantra_shallow, args.eyantra_pothole, args.limit, args.seed,
                              drop, args.road_aux)
+    bharat_fracs = tuple(float(x) for x in args.bharat_fractions.split(","))
+    if len(bharat_fracs) != 3 or abs(sum(bharat_fracs) - 1.0) > 1e-6:
+        raise SystemExit(f"--bharat-fractions {args.bharat_fractions!r}: give three shares that sum to 1")
     if args.include_bharat:
-        items += collect_bharat(interim, source_maps, args.limit, args.seed, drop)
+        items += collect_bharat(interim, source_maps, args.limit, args.seed, drop, args.bharat_split, bharat_fracs)
+    if args.include_webseg:
+        items += collect_webseg(interim, source_maps, args.limit, args.seed, drop)
     spare = collect_rdd(interim, "neg_pool", "rdd_negpool", id_map, args.limit, args.seed, drop, "train") if id_map else []
     if not items:
         raise SystemExit("no input data found under " + str(interim))
@@ -676,12 +833,13 @@ def build(args) -> dict:
         raise SystemExit(f"classes not in {args.classes}: {unknown}")
 
     # 2. near-duplicate groups + splits (persisted)
+    dhash_cache = interim / "dhash256_all.json" if not args.limit else None
     india = [it for it in items if it.source == "rdd_india"]
-    groups, dup_stats = dhash_groups(india, interim / "rdd2022" / "dhash256_cache.json" if not args.limit else None, args.dup_hamming)
+    groups, dup_stats = dhash_groups(india, dhash_cache, args.dup_hamming)
     for it in india:
         it.group = groups[it.uid]
     fp = {"v": BUILD_VERSION, "seed": args.seed, "test_n": args.test_n, "val_frac": args.val_frac, "limit": args.limit,
-          "dup_hamming": args.dup_hamming,
+          "dup_hamming": args.dup_hamming, "bharat_split": [args.bharat_split, list(bharat_fracs)],
           "uids": hashlib.sha1("|".join(sorted(it.uid for it in items)).encode()).hexdigest()}
     split_file = splits_dir / "india_pothole_seg.json"
     split = None
@@ -696,6 +854,16 @@ def build(args) -> dict:
         split = assign_splits(items, args.test_n, args.val_frac, args.seed)
         splits_dir.mkdir(parents=True, exist_ok=True)
         split_file.write_text(json.dumps({"fingerprint": fp, "split": split}, indent=0))
+    dedup_info: dict = {"enabled": bool(args.dedup)}
+    if args.dedup:
+        leaks, info = drop_test_near_duplicates(items, split, dhash_cache, args.dup_hamming)
+        dedup_info.update(info)
+        if leaks:
+            items = [it for it in items if it.uid not in leaks]
+            log(f"dedup: dropped {len(leaks)} train/val images that near-duplicate a test image "
+                f"{info.get('by_source_pair')}")
+        else:
+            log(f"dedup: no train/val image near-duplicates a test image ({info['checked']} checked)")
     by_split: dict[str, list[Item]] = {s: [] for s in SPLITS}
     for it in items:
         by_split[split[it.uid]].append(it)
@@ -721,7 +889,7 @@ def build(args) -> dict:
     for s in SPLITS:
         totals.update(per[s]["instances"])
     stats = {
-        "dataset": "india_pothole_seg",
+        "dataset": out.name,
         "build_version": BUILD_VERSION,
         "built_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "seconds": None,
@@ -734,9 +902,15 @@ def build(args) -> dict:
             "gt_polygon_images": per["val"]["gt_mask_images"],
             "gt_polygon_images_with_instances": per["val"]["gt_mask_images_with_instances"],
             "sam2_mask_images": per["val"]["sam2_mask_images"],
-            "note": "GT polygons come from eYantra (manhole/cover class + negatives; it has no reliable pothole masks); "
-                    "pothole masks in val/test are SAM2.1 pseudo-masks from RDD boxes.",
+            "note": "GT polygons come from eYantra (manhole/cover class + negatives; it has no reliable pothole masks) "
+                    "and, with --include-webseg, human-drawn pothole polygons (train + the ws_ test subset); all other "
+                    "pothole masks are SAM2.1 pseudo-masks from RDD/BharatPotHole boxes.",
         },
+        "sources": {"bharat": {"included": bool(args.include_bharat), "split": args.bharat_split,
+                               "fractions": list(bharat_fracs)},
+                    "webseg": {"included": bool(args.include_webseg), "valid_goes_to": "test"},
+                    "uid_prefix": UID_PREFIX},
+        "test_near_duplicates": dedup_info,
         "negatives": neg_info,
         "sam2": sam_stats,
         "dropped": dict(drop),

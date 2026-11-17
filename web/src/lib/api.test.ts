@@ -167,7 +167,7 @@ describe('HttpApi against the live endpoint shapes', () => {
   });
 
   it('health() refuses a static host that answers every path with index.html', async () => {
-    const html = () => new Response('<!doctype html><title>GunthaMeter</title>', { status: 200, headers: { 'content-type': 'text/html' } });
+    const html = () => new Response('<!doctype html><title>RoadFix</title>', { status: 200, headers: { 'content-type': 'text/html' } });
     const api = new HttpApi({ baseUrl: 'http://api.test', fetchImpl: stubFetch({ '/v1/healthz': html, '/healthz': html }, []) });
     await expect(api.health()).rejects.toBeInstanceOf(NetworkError);
     const ok = new HttpApi({

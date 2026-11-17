@@ -26,7 +26,7 @@ grade. Method background: `docs/DEPTH_METHOD.md` §1; code: `measure/calib.py`.
 | Cones | 4 traffic cones (750 mm, IRC:67) | 4 ట్రాఫిక్ కోన్లు |
 | Reference square | 1.000 m × 1.000 m, painted or taped on the ground, corners marked | నేలపై 1 మీ. × 1 మీ. చతురస్రం |
 | Spirit level / plumb line | to mark the point on the ground below the camera | స్పిరిట్ లెవెల్ / ప్లంబ్ లైన్ |
-| Laptop | GunthaMeter repo + `.venv` (or the tablet app, later) | ల్యాప్‌టాప్ |
+| Laptop | RoadFix repo + `.venv` (or the tablet app, later) | ల్యాప్‌టాప్ |
 
 ## Part A — Intrinsics (once per camera model) / భాగం A — కెమెరా లోపలి విలువలు (మోడల్‌కు ఒక్కసారి)
 1. Lock focus and zoom; switch off digital stabilisation and HDR. Use the resolution the bus will record at

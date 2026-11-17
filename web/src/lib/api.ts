@@ -1,5 +1,5 @@
 /**
- * Typed API client for GunthaMeter /v1 (docs/CONTRACTS.md, server/app/schemas/api.py).
+ * Typed API client for RoadFix /v1 (docs/CONTRACTS.md, server/app/schemas/api.py).
  *
  * Two implementations behind one interface:
  *   HttpApi  - real backend (JWT bearer, JSON + multipart)
@@ -116,7 +116,7 @@ export function buildQuery(q: Record<string, QueryValue> | undefined): string {
 // ------------------------------------------------------------------ live-response adapters (pure, tested)
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
-/** GET /healthz answered by a GunthaMeter API (not an SPA fallback page or a foreign server). */
+/** GET /healthz answered by a RoadFix API (not an SPA fallback page or a foreign server). */
 export function isHealth(x: unknown): x is Health {
   return isObj(x) && (x.status === 'ok' || x.status === 'degraded') && typeof x.db === 'boolean';
 }
@@ -248,7 +248,7 @@ export class HttpApi implements Api {
       h = await this.rawGetAbsolute<unknown>(`${this.base}/healthz`);
     }
     // A static host (vite preview, CDN) answers unknown paths with index.html (200): that is not an API.
-    if (!isHealth(h)) throw new NetworkError('health: no GunthaMeter API at this address');
+    if (!isHealth(h)) throw new NetworkError('health: no RoadFix API at this address');
     return h;
   }
 

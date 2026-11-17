@@ -52,12 +52,18 @@ _GEOD = Geod(ellps="WGS84")
 
 # ----------------------------------------------------------------------------- PBF I/O
 def crop_pbf(src: str | Path, dst: str | Path, bbox: Sequence[float] = HYD_BBOX, force: bool = False) -> Path:
-    """Crop ``src`` to ``bbox`` (complete ways) into ``dst`` unless an up-to-date crop exists."""
+    """Crop ``src`` to ``bbox`` (complete ways) into ``dst`` unless an up-to-date crop exists.
+
+    The 560 MB source extract may have been deleted after cropping (DECISIONS D18): an existing crop is then used
+    as it is."""
+    src, dst = Path(src), Path(dst)
+    if dst.exists() and not force and (not src.exists() or dst.stat().st_mtime >= src.stat().st_mtime):
+        return dst
+    if not src.exists():
+        raise FileNotFoundError(f"{src} is missing and there is no crop at {dst}: download the OSM extract again "
+                                "(python -I data/download.py --osm --fetch)")
     from pyrosm import OSM
 
-    src, dst = Path(src), Path(dst)
-    if dst.exists() and not force and dst.stat().st_mtime >= src.stat().st_mtime:
-        return dst
     dst.parent.mkdir(parents=True, exist_ok=True)
     osm = OSM(str(src), bounding_box=list(bbox), keep_metadata=False, progress=False)
     tmp = dst.with_suffix(".tmp.pbf")

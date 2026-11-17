@@ -64,7 +64,8 @@ def test_extract_bharat_safe_and_idempotent(sandbox: Path):
     info = dl.extract_bharat(src, force=False)
     out = sandbox / "data" / "interim" / "bharatpothole"
     assert (out / "train" / "images" / "a_b.jpg").exists() and (out / "train" / "labels" / "a_b.txt").exists()
-    assert info["claimed_by_bundled_data_yaml"] == "CC BY 4.0" and info["licence_status"] == "UNVERIFIED"
+    assert info["claimed_by_bundled_data_yaml"] == "CC BY 4.0"
+    assert info["licence_status"] == "VERIFIED" and info["licence"] == "CC BY-SA 4.0"  # Kaggle metadata, D16
     files = {p.relative_to(sandbox).as_posix() for p in sandbox.rglob("*") if p.is_file()}
     assert not any(f.endswith((".cache", ".sh")) or "evil" in f for f in files), files
     assert all(f.startswith(("data/raw/", "data/interim/bharatpothole/")) for f in files)
@@ -74,6 +75,40 @@ def test_extract_bharat_safe_and_idempotent(sandbox: Path):
     assert not (out / "train" / "images" / "a_b.jpg").exists()
     dl.extract_bharat(src, force=True)
     assert (out / "train" / "images" / "a_b.jpg").exists()
+
+
+def test_extract_webseg_safe_and_idempotent(sandbox: Path):
+    raw = sandbox / "data" / "raw" / "pothole_seg_web" / "w.zip"
+    raw.parent.mkdir(parents=True)
+    pre = "Pothole_Segmentation_YOLOv8/"
+    with zipfile.ZipFile(raw, "w") as zf:
+        zf.writestr(pre + "data.yaml", "names: ['Pothole']\nroboflow:\n  license: CC BY 4.0\n")
+        zf.writestr(pre + "train/images/p 1.jpg", _jpg())
+        zf.writestr(pre + "train/labels/p 1.txt", "0 0.1 0.1 0.5 0.1 0.5 0.5\n")
+        zf.writestr(pre + "valid/images/v.jpg", _jpg())
+        zf.writestr(pre + "valid/labels/v.txt", "0 0.2 0.2 0.6 0.2 0.6 0.6\n")
+        zf.writestr(pre + "sample_video.mp4", b"\0" * 10)  # skipped
+        zf.writestr(pre + "train/images/../../../evil.jpg", _jpg())  # traversal: never matches
+    src = dl.Source("pothole_seg_web", raw, 10)
+    info = dl.extract_webseg(src, force=False)
+    out = sandbox / "data" / "interim" / "pothole_seg_web"
+    assert (out / "train" / "images" / "p_1.jpg").exists() and (out / "valid" / "labels" / "v.txt").exists()
+    assert info["counts"] == {"train/images": 1, "train/labels": 1, "valid/images": 1, "valid/labels": 1}
+    assert info["roboflow_origin_licence"] == "CC BY 4.0" and "Apache-2.0" in info["licence"]
+    files = {p.relative_to(sandbox).as_posix() for p in sandbox.rglob("*") if p.is_file()}
+    assert not any(f.endswith(".mp4") or "evil" in f for f in files), files
+    (out / "train" / "images" / "p_1.jpg").unlink()
+    dl.extract_webseg(src, force=False)  # marker matches -> no-op
+    assert not (out / "train" / "images" / "p_1.jpg").exists()
+
+
+def test_main_accepts_deleted_raw_when_extracted(sandbox: Path):
+    """D18: the big raw archives were deleted after extraction; a complete extracted copy counts as OK."""
+    done = sandbox / "data" / "interim" / "eyantra" / ".done.json"
+    done.parent.mkdir(parents=True)
+    done.write_text("{}")
+    assert dl.main(["--eyantra"]) == 0
+    assert dl.main(["--bharat"]) == 1  # neither raw archive nor extracted copy
 
 
 def test_extract_eyantra_layout(sandbox: Path):

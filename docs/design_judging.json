@@ -12,7 +12,7 @@
     "best_ideas_to_steal": "1 Hz trip_fix telemetry with cam_active flag (the only honest basis for 'clean pass' auto-closure and bus-exposure counts); jolt-only observations for water-filled/night potholes; split DBSCAN clusters by lateral offset >1.5 m for adjacent lanes; signed (ed25519) model OTA with ETag config; metered-upload rules keyed to GPS accuracy and queue age; separate storage of cavity volume vs square-cut design volume to show the saving vs cuboid; greedy 500 m same-owner work-order batching."
    },
    {
-    "design": "DESIGN 2: GunthaMeter",
+    "design": "DESIGN 2: RoadFix",
     "feasibility_now": 8,
     "india_fit": 8,
     "depth_credibility": 8,
@@ -32,7 +32,7 @@
     "best_ideas_to_steal": "Audit log on every transition; escalation chain and SLA timers; daily repair-run indent per circle with route ordering; jurisdiction queue for unknown owners; contract/DLP table with payment gated on verified_closed and dlp_event as an evidence package rather than an automatic penalty; PostGIS nearest-way + heading fallback so the demo does not depend on an OSRM build; synthetic bowl rendered into a planar image as a maths unit test; projecting the mask centroid onto the road plane to place the pothole (not the camera) on the map; Telugu-first field SOP and admin-unit layer with validity dates for the 150/300-ward change."
    }
   ],
-  "winner": "DESIGN 2: GunthaMeter \u2014 it is the only design that makes the user's mandatory depth/volume requirement provable on the dev machine (uncertainty-tagged measurements, local surface fit, IMU corroboration, synthetic exact-volume test, staged known-depth foam-board target) and front-loads that into a minimum viable jury demo while using the already-working Python 3.11/CUDA venv. Build it, but graft on Design 3's operations layer (audit log, escalation chain, daily circle indent, jurisdiction queue, payment gated on verified_closed, PostGIS nearest-way fallback) and Design 1's 1 Hz trip telemetry with cam_active for honest clean-pass verification; fix DBSCAN min_samples so single-pass candidates get an entity, keep d_design on p95 not mean, and drop 'exact bags' language in favour of bags \u00b1 sigma."
+  "winner": "DESIGN 2: RoadFix \u2014 it is the only design that makes the user's mandatory depth/volume requirement provable on the dev machine (uncertainty-tagged measurements, local surface fit, IMU corroboration, synthetic exact-volume test, staged known-depth foam-board target) and front-loads that into a minimum viable jury demo while using the already-working Python 3.11/CUDA venv. Build it, but graft on Design 3's operations layer (audit log, escalation chain, daily circle indent, jurisdiction queue, payment gated on verified_closed, PostGIS nearest-way fallback) and Design 1's 1 Hz trip telemetry with cam_active for honest clean-pass verification; fix DBSCAN min_samples so single-pass candidates get an entity, keep d_design on p95 not mean, and drop 'exact bags' language in favour of bags \u00b1 sigma."
  },
  {
   "scores": [
@@ -47,7 +47,7 @@
     "best_ideas_to_steal": "Distance-triggered inference (>=4 m, >=5 km/h) to kill signal-stop duplicates; 1 Hz trip_fix telemetry with cam_active so 'clean passes' are provable; jolt observations when IMU fires but camera does not; greedy 500 m work-order batching per road owner so one jet-patcher trip handles 5-20 holes; ed25519-signed OTA model config; storing both square-cut V_mix and integrated V_cavity to show the saving vs cuboid; Tier A' Pi 5 + Hailo as the heat-tolerant production path; lateral-offset split of clusters for adjacent lanes."
    },
    {
-    "design": "DESIGN 2: GunthaMeter",
+    "design": "DESIGN 2: RoadFix",
     "feasibility_now": 7,
     "india_fit": 7,
     "depth_credibility": 8,
@@ -82,7 +82,7 @@
     "best_ideas_to_steal": "IMU-jolt observation record sent even without a camera detection (catches water-filled/night holes); 1 Hz trip_fix telemetry with cam_active flag so clean passes are provable; online camera-height drift monitoring via rolling median of RANSAC height per trip; thermal callbacks dropping fps on Snapdragon; depot Wi-Fi drain at 29 Greater Hyderabad depots; signed OTA model config; lateral-offset lane splitting of DBSCAN clusters; square-cut vs integrated cavity volume both stored to show savings."
    },
    {
-    "design": "DESIGN 2: GunthaMeter",
+    "design": "DESIGN 2: RoadFix",
     "feasibility_now": 7,
     "india_fit": 8,
     "depth_credibility": 9,
@@ -102,6 +102,6 @@
     "best_ideas_to_steal": "Daily per-circle repair run / indent with route ordering; jurisdiction queue for unresolved road ownership; audit_log with before/after JSON and field geolocation on every transition; escalation timers by AE/DEE/EE hierarchy; PostGIS nearest-way + heading map-match fallback for the demo; DLP events as evidence packages (before/after/re-detection) not auto-penalties; requiring 3 clean passes AND a 10 % random engineer QC sample before auto-close; Segmenter interface so YOLO26 (AGPL) can be swapped for RF-DETR (Apache) for government procurement; pluggable admin_unit table ready for the 300-ward re-delimitation."
    }
   ],
-  "winner": "DESIGN 2: GunthaMeter"
+  "winner": "DESIGN 2: RoadFix"
  }
 ]

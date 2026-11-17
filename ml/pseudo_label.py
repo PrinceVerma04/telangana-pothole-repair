@@ -1,8 +1,8 @@
 """Pseudo-labels for unlabelled road frames (WP3): current segmenter (+ optional second model) -> YOLO-seg labels
 that a human reviews before they are ever trained on.
 
-    python -m ml.pseudo_label --images data/store/frames --weights weights/bootstrap_pothole_yolo26m.pt \
-        --out data/interim/pseudo/bus_frames_2026w46 [--verifier weights/bootstrap_pothole_yolov8s.pt] \
+    python -m ml.pseudo_label --images data/store/frames --weights runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt \
+        --out data/interim/pseudo/bus_frames_2026w46 [--verifier <second model .pt>] \
         [--mask auto|sam2|grabcut|ellipse] [--limit 500]
 
 For every image (``*.jpg|*.jpeg|*.png``, searched recursively; read with OpenCV only, never executed):
@@ -192,7 +192,7 @@ def run(a: argparse.Namespace) -> dict[str, Any]:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    ap = argparse.ArgumentParser(description="GunthaMeter pseudo-labelling (WP3)")
+    ap = argparse.ArgumentParser(description="RoadFix pseudo-labelling (WP3)")
     ap.add_argument("--images", required=True, help="directory of frames (searched recursively)")
     ap.add_argument("--weights", default=None, help="segmenter (.pt/.onnx); default SEG_WEIGHTS / bootstrap")
     ap.add_argument("--verifier", default=None, help="second model: accept only when both agree")

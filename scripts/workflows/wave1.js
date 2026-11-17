@@ -1,6 +1,6 @@
 export const meta = {
   name: 'gunthameter-wave1',
-  description: 'Build GunthaMeter wave 1 (WP1 data, WP2 measurement, WP4 DB/API, WP8a repair planner, WP9 web, WP10 GIS) in parallel, then integrate and test',
+  description: 'Build RoadFix wave 1 (WP1 data, WP2 measurement, WP4 DB/API, WP8a repair planner, WP9 web, WP10 GIS) in parallel, then integrate and test',
   phases: [
     { title: 'Build', detail: '6 builders on disjoint directories against frozen WP0 contracts' },
     { title: 'Integrate', detail: 'run full test suite + lint, fix cross-WP breakage, report status' },
@@ -10,7 +10,7 @@ export const meta = {
 const ROOT = '/home/coral/Desktop/Telangana pathole detection'
 
 const COMMON = `
-You are one builder in a parallel team implementing "GunthaMeter", an end-to-end pothole detection + metric depth/volume
+You are one builder in a parallel team implementing "RoadFix", an end-to-end pothole detection + metric depth/volume
 measurement + IRC prioritisation + cold-mix repair planning system for Telangana (India). Project root: ${ROOT}
 (NOT a git repo). Today is 2026-11-13.
 

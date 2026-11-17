@@ -1,1 +1,1 @@
-"""GunthaMeter server package (FastAPI app in ``server.app``, workers in ``server.workers``)."""
+"""RoadFix server package (FastAPI app in ``server.app``, workers in ``server.workers``)."""

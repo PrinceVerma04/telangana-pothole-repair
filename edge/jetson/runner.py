@@ -234,7 +234,7 @@ def run(a: argparse.Namespace) -> dict[str, Any]:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    ap = argparse.ArgumentParser(description="GunthaMeter Jetson edge runner (stub)")
+    ap = argparse.ArgumentParser(description="RoadFix Jetson edge runner (stub)")
     ap.add_argument("--video", required=True, help="file, camera index, or GStreamer pipeline ending in appsink")
     ap.add_argument("--gps-csv", type=Path, required=True)
     w = ap.add_mutually_exclusive_group()

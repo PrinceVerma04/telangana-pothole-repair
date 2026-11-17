@@ -1,0 +1,16 @@
+# v1 training set (DECISIONS D15), used by the 2026-11-15 laptop model (RDD-India pothole AP50 0.221).
+# Kept only to re-evaluate that model; deleted with data/datasets/india_pothole_seg4 once a v2 model beats it
+# (DECISIONS D18). Paths are relative to `path`.
+# 4-class dataset derived from the WP1 build by data/derive_dataset.py: pothole_water, speed_breaker and utility_cut
+# have no labelled examples and are left out; manholes are re-split by eYantra drive sequence so test has some.
+# Names are an ordered subset of configs/classes.yaml (the system-wide vocabulary); models map back to it by name.
+# The original 7-class build stays at data/datasets/india_pothole_seg (configs/model/india_pothole_seg7.yaml).
+path: ../../data/datasets/india_pothole_seg4
+train: images/train
+val: images/val
+test: images/test
+names:
+  0: pothole
+  1: alligator_crack
+  2: crack
+  3: manhole

@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model Test</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f4f2; --surface-1: #fcfcfb; --surface-2: #f0efec; --border: #e2e1dc; --grid: #e9e8e4;
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #77766f; --accent: #2a78d6; --accent-ink: #fff;
+    --c-pothole: #2a78d6; --c-alligator_crack: #eb6834; --c-crack: #1baf7a; --c-manhole: #eda100; --c-other: #e87ba4;
+    --warning: #fab219; --critical: #d03b3b; --good: #0ca30c; --track: #cde2fb; --shadow: 0 1px 2px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #111110; --surface-1: #1a1a19; --surface-2: #232321; --border: #2e2e2b; --grid: #2a2a28;
+      --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86; --accent: #3987e5;
+      --c-pothole: #3987e5; --c-alligator_crack: #d95926; --c-crack: #199e70; --c-manhole: #c98500; --c-other: #d55181;
+      --track: #104281; --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #111110; --surface-1: #1a1a19; --surface-2: #232321; --border: #2e2e2b; --grid: #2a2a28;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86; --accent: #3987e5;
+    --c-pothole: #3987e5; --c-alligator_crack: #d95926; --c-crack: #199e70; --c-manhole: #c98500; --c-other: #d55181;
+    --track: #104281; --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text-primary); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif; }
+  .wrap { max-width: 1600px; margin: 0 auto; padding: 12px 16px 24px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 10px; }
+  h1 { font-size: 17px; margin: 0; font-weight: 650; } h1 span { color: var(--text-muted); font-weight: 500; }
+  .who { margin-left: auto; display: flex; gap: 8px; align-items: center; color: var(--text-secondary); font-size: 13px; }
+  button, select, input { font: inherit; color: var(--text-primary); }
+  button { cursor: pointer; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 650; }
+  select, input[type=text], input[type=password], input[type=number] { background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; }
+  input[type=number] { width: 72px; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow); min-width: 0; }
+  .card h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: end; margin-bottom: 12px; }
+  .ctl { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--text-muted); font-weight: 600; }
+  .ctl .row { display: flex; gap: 6px; align-items: center; font-weight: 400; }
+  .confv { min-width: 38px; font-variant-numeric: tabular-nums; color: var(--text-primary); font-size: 13px; }
+  .layout { display: grid; grid-template-columns: 260px minmax(0, 1fr) 400px; gap: 12px; align-items: start; }
+  @media (max-width: 1200px) { .layout { grid-template-columns: 220px minmax(0, 1fr); } .results { grid-column: 1 / -1; } }
+  @media (max-width: 760px) { .layout { grid-template-columns: 1fr; } }
+  .drop { border: 2px dashed var(--border); border-radius: 12px; padding: 18px 10px; text-align: center; color: var(--text-secondary);
+          cursor: pointer; transition: border-color .2s, background .2s; font-size: 13px; }
+  .drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .drop b { color: var(--text-primary); }
+  .items { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; max-height: calc(100vh - 330px); overflow: auto; }
+  .item { display: grid; grid-template-columns: 56px 1fr; gap: 8px; align-items: center; padding: 6px; border-radius: 8px; border: 1px solid transparent;
+          background: transparent; text-align: left; width: 100%; }
+  .item.on { border-color: var(--accent); background: var(--surface-2); }
+  .item img { width: 56px; height: 42px; object-fit: cover; border-radius: 5px; background: #000; }
+  .item .n { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .s { font-size: 11.5px; color: var(--text-muted); }
+  .views { display: grid; gap: 10px; grid-template-columns: 1fr; }
+  .views.two { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 1000px) { .views.two { grid-template-columns: 1fr; } }
+  .view h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .view h3 small { color: var(--text-muted); font-weight: 400; }
+  .view { text-align: center; } .view h3 { text-align: left; }
+  .stage { position: relative; display: inline-block; max-width: 100%; background: #000; border-radius: 10px; overflow: hidden; line-height: 0; }
+  .stage img { display: block; max-width: 100%; max-height: calc(100vh - 300px); width: auto; height: auto; }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .empty { padding: 70px 20px; text-align: center; color: var(--text-muted); }
+  .timeline { margin-top: 10px; }
+  .tl { display: flex; align-items: flex-end; gap: 2px; height: 56px; padding: 4px 0; border-bottom: 1px solid var(--grid); overflow-x: auto; }
+  .tl button { flex: 1 0 6px; min-width: 6px; max-width: 18px; padding: 0; border: 0; border-radius: 3px 3px 0 0; background: var(--track); align-self: flex-end; }
+  .tl button.has { background: var(--accent); }
+  .tl button.on { outline: 2px solid var(--text-primary); outline-offset: 1px; }
+  .tlinfo { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--text-secondary); margin: 6px 0; }
+  .legend span { display: inline-flex; gap: 6px; align-items: center; } .legend i { width: 12px; height: 12px; border-radius: 3px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 5px 6px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+  th { color: var(--text-secondary); font-weight: 600; }
+  td .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  .callout { border-left: 3px solid var(--warning); background: var(--surface-2); padding: 8px 10px; border-radius: 6px; font-size: 12.5px; margin: 8px 0; }
+  .callout.err { border-color: var(--critical); }
+  .mcard { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
+  .mcard .top { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  .mgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .mgrid div { background: var(--surface-2); border-radius: 8px; padding: 6px 8px; }
+  .mgrid .k { font-size: 11.5px; color: var(--text-muted); } .mgrid .v { font-size: 17px; font-weight: 650; }
+  .mgrid .v small { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+  .summary { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
+  .summary h2 { margin-bottom: 6px; }
+  .summary p { margin: 0 0 6px; font-size: 14px; line-height: 1.5; }
+  .summary p.lead { font-size: 15px; font-weight: 600; }
+  .summary p.fine { font-size: 12px; color: var(--text-muted); margin: 6px 0 0; }
+  .refused { font-size: 12.5px; color: var(--text-secondary); }
+  .refused b { color: var(--critical); }
+  .sub { font-size: 12px; color: var(--text-muted); }
+  .overlay img { width: 100%; border-radius: 8px; margin-top: 6px; }
+  .busy { display: inline-flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--text-secondary); }
+  .spin { width: 14px; height: 14px; border: 2px solid var(--track); border-top-color: var(--accent); border-radius: 50%; animation: sp .8s linear infinite; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  .login { max-width: 380px; margin: 12vh auto; } .login label { display: block; margin: 10px 0 4px; font-size: 13px; color: var(--text-secondary); }
+  .login input { width: 100%; } .err { color: var(--critical); font-weight: 600; font-size: 13px; min-height: 18px; margin-top: 8px; }
+  .hidden { display: none !important; }
+  kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--text-secondary); }
+  button.primary kbd { color: var(--accent-ink); border-color: rgba(255,255,255,.55); background: transparent; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section id="login" class="card login hidden">
+    <h1>RoadFix <span>model test</span></h1>
+    <p class="sub">Sign in with your name and the access code (same as the dataset review).</p>
+    <form id="loginform">
+      <label for="lname">Your name</label><input id="lname" type="text" maxlength="40" required>
+      <label for="lcode">Access code</label><input id="lcode" type="password" required>
+      <button class="primary" style="width:100%;margin-top:12px" type="submit">Sign in</button>
+      <div class="err" id="lerr"></div>
+    </form>
+  </section>
+
+  <div id="app" class="hidden">
+    <header>
+      <h1>RoadFix <span>model test</span></h1>
+      <div class="who"><span id="whoname"></span><button id="theme" type="button">Theme</button></div>
+    </header>
+
+    <div class="card controls">
+      <label class="ctl">Model<div class="row"><select id="mA"></select></div></label>
+      <label class="ctl">Compare with<div class="row"><select id="mB"><option value="">none</option></select></div></label>
+      <label class="ctl">Confidence ≥<div class="row"><input type="range" id="conf" min="5" max="90" value="25"><span class="confv" id="confv">0.25</span></div></label>
+      <label class="ctl">Camera preset<div class="row"><select id="cam"></select></div></label>
+      <label class="ctl">Camera height (m)<div class="row"><input type="number" id="hgt" min="0.3" max="6" step="0.05"></div></label>
+      <label class="ctl">Pitch down (°)<div class="row"><input type="number" id="pitch" min="0" max="80" step="0.5"></div></label>
+      <div class="ctl">&nbsp;<div class="row"><button class="primary" id="measure" type="button" disabled>Measure potholes <kbd>Enter</kbd></button></div></div>
+    </div>
+
+    <div class="layout">
+      <aside class="card">
+        <div class="drop" id="drop" tabindex="0" role="button">
+          <b>Drop photos or videos here</b><br>or click to choose<br>
+          <span class="sub">jpg, png, webp · mp4, mov, avi, mkv</span>
+        </div>
+        <div class="row sub" style="margin-top:8px;display:flex;gap:6px;align-items:center">Video sampling
+          <select id="every"><option value="0.5">2 frames/s</option><option value="1" selected>1 frame/s</option><option value="2">1 frame / 2 s</option></select></div>
+        <input type="file" id="file" accept="image/*,video/*" multiple hidden>
+        <div class="items" id="items"></div>
+      </aside>
+
+      <main>
+        <div class="card">
+          <div class="views" id="views"><div class="empty" id="emptymsg">Add a road photo or a dashcam / bus video to see what the model finds.</div></div>
+          <div class="legend" id="legend"></div>
+          <div class="timeline hidden" id="timeline">
+            <div class="tl" id="tl"></div>
+            <div class="tlinfo"><span id="tlinfo"></span><span>bars = potholes found per frame · <kbd>←</kbd> <kbd>→</kbd> step</span></div>
+          </div>
+        </div>
+      </main>
+
+      <section class="card results" id="results">
+        <div class="summary" id="summary"><h2>Summary</h2><p class="sub">Add a photo or video to get a short summary.</p></div>
+        <h2>Detections</h2>
+        <div id="dettable" class="sub">Nothing analysed yet.</div>
+        <h2 style="margin-top:14px">Measurement</h2>
+        <div id="meas" class="sub">Pick a camera preset (and this photo's camera height / pitch if you know them), then press <b>Measure potholes</b>.</div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+const fmt = (v, d = 0) => v == null ? "–" : Number(v).toFixed(d);
+let SETUP = null, items = [], cur = null, frame = 0, det = {}, measureRes = {};
+
+const api = async (path, opts = {}) => {
+  const r = await fetch(path, { credentials: "same-origin", ...opts });
+  if (r.status === 401) { showLogin(); throw new Error("signed out"); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || `HTTP ${r.status}`);
+  return j;
+};
+const post = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+try { const t = localStorage.getItem("gm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+$("theme").onclick = () => { const d = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.dataset.theme = d ? "light" : "dark"; try { localStorage.setItem("gm-theme", document.documentElement.dataset.theme); } catch (e) {} render(); };
+
+function showLogin() { $("app").classList.add("hidden"); $("login").classList.remove("hidden"); }
+$("loginform").onsubmit = async (ev) => { ev.preventDefault(); $("lerr").textContent = "";
+  try { await post("/api/login", { name: $("lname").value, code: $("lcode").value }); start(); } catch (e) { $("lerr").textContent = e.message; } };
+
+const conf = () => $("conf").value / 100;
+const key = (model, f) => `${cur.id}|${f}|${model}`;
+const models = () => [$("mA").value, $("mB").value].filter(Boolean);
+const mlabel = (id) => (SETUP.models.find((m) => m.id === id) || {}).label || id;
+const colorOf = (c) => css(`--c-${c}`) || css("--c-other");
+
+// ------------------------------------------------------------------ upload
+const drop = $("drop");
+drop.onclick = () => $("file").click(); drop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") $("file").click(); };
+["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
+$("file").onchange = () => { addFiles($("file").files); $("file").value = ""; };
+
+async function addFiles(list) {
+  for (const f of list) {
+    const row = itemRow({ id: null, name: f.name, kind: f.type.startsWith("video") ? "video" : "image", frames: [] }, "uploading…");
+    try {
+      const it = await api(`/api/upload?name=${encodeURIComponent(f.name)}&every_s=${$("every").value}`, { method: "POST", body: f });
+      items.push(it); row.remove(); itemRow(it); await select(it);
+    } catch (e) { row.querySelector(".s").textContent = `failed: ${e.message}`; }
+  }
+}
+function itemRow(it, status) {
+  const b = el("button", "item"); b.type = "button";
+  const im = el("img"); if (it.id) im.src = `/media/${it.id}/frames/000000.jpg`; im.alt = "";
+  const t = el("div"); t.append(el("div", "n", it.name), el("div", "s", status || (it.kind === "video" ? `video · ${it.frames.length} frames · ${it.duration_s} s` : `photo · ${it.w}×${it.h}`)));
+  b.append(im, t); if (it.id) { b.dataset.id = it.id; b.onclick = () => select(it); }
+  $("items").prepend(b); return b;
+}
+function markItem() { document.querySelectorAll(".item").forEach((b) => b.classList.toggle("on", cur && b.dataset.id === cur.id)); }
+
+// ------------------------------------------------------------------ detect
+async function ensureDet(f) {
+  const out = [];
+  for (const m of models()) {
+    const k = key(m, f);
+    if (!det[k]) det[k] = await post("/api/detect", { item: cur.id, frame: f, model: m });
+    out.push(det[k]);
+  }
+  return out;
+}
+async function select(it) {
+  cur = it; frame = 0; markItem(); render();
+  try { history.replaceState(null, "", `#${it.id}`); } catch (e) {}
+  if (it.kind === "video") await analyseVideo(); else { await ensureDet(0); render(); }
+}
+async function analyseVideo() {
+  const it = cur, n = it.frames.length;
+  for (let f = 0; f < n; f++) {
+    if (cur !== it) return;
+    $("tlinfo").replaceChildren(busy(`analysing frame ${f + 1} of ${n}…`));
+    try { await ensureDet(f); } catch (e) { $("tlinfo").textContent = e.message; return; }
+    if (f === frame || f % 5 === 0) render();
+  }
+  render();
+}
+const busy = (t) => { const s = el("span", "busy"); s.append(el("span", "spin"), document.createTextNode(t)); return s; };
+
+// ------------------------------------------------------------------ render
+function drawDets(canvas, d) {
+  const W = d.w, H = d.h; canvas.width = W; canvas.height = H;
+  const g = canvas.getContext("2d"), lw = Math.max(2, Math.round(W / 450)), fs = Math.max(13, Math.round(W / 70));
+  g.font = `600 ${fs}px system-ui, sans-serif`;
+  const meas = measureRes[key(d.model, d.frame)];
+  const mByK = Object.fromEntries(((meas && meas.measured) || []).map((m) => [m.k, m]));
+  for (const x of d.detections.filter((x) => x.conf >= conf())) {
+    const col = colorOf(x.cls);
+    if (x.polygon) { g.beginPath(); x.polygon.forEach(([u, v], i) => i ? g.lineTo(u, v) : g.moveTo(u, v)); g.closePath();
+      g.globalAlpha = .28; g.fillStyle = col; g.fill(); g.globalAlpha = 1; g.lineWidth = lw + 2; g.strokeStyle = "rgba(0,0,0,.6)"; g.stroke(); g.lineWidth = lw; g.strokeStyle = col; g.stroke(); }
+    else { g.lineWidth = lw; g.strokeStyle = col; g.strokeRect(x.bbox[0], x.bbox[1], x.bbox[2] - x.bbox[0], x.bbox[3] - x.bbox[1]); }
+    const m = mByK[x.k];
+    const label = `${x.cls.replace("_", " ")} ${x.conf.toFixed(2)}` + (m && m.depth_p95_mm != null ? ` · ${fmt(m.depth_p95_mm)} mm` : "");
+    const tw = g.measureText(label).width + 10, tx = Math.min(Math.max(0, x.bbox[0]), W - tw), ty = Math.max(fs + 6, x.bbox[1]);
+    g.fillStyle = "rgba(0,0,0,.72)"; g.fillRect(tx, ty - fs - 6, tw, fs + 6); g.fillStyle = "#fff"; g.fillText(label, tx + 5, ty - 5);
+  }
+}
+function render() {
+  const V = $("views"); V.replaceChildren();
+  const ms = models();
+  if (!cur) { V.append(el("div", "empty", "Add a road photo or a dashcam / bus video to see what the model finds.")); return; }
+  V.classList.toggle("two", ms.length === 2);
+  const src = `/media/${cur.id}/frames/${String(frame).padStart(6, "0")}.jpg`;
+  for (const m of ms) {
+    const d = det[key(m, frame)], box = el("div", "view"), h = el("h3");
+    const n = d ? d.detections.filter((x) => x.conf >= conf()).length : null, info = SETUP.models.find((x) => x.id === m) || {};
+    h.append(document.createTextNode(info.label || m), el("small", null, d ? `${n} found ≥ ${conf().toFixed(2)} · ${fmt(d.ms)} ms` : "analysing…"),
+             el("small", null, info.rdd_india_ap50 != null ? `test AP50 ${info.rdd_india_ap50.toFixed(3)}` : ""));
+    const st = el("div", "stage"), im = el("img"), cv = el("canvas"); im.src = src; im.alt = cur.name; st.append(im, cv);
+    if (d) drawDets(cv, d);
+    box.append(h, st); V.append(box);
+  }
+  // legend
+  const L = $("legend"); L.replaceChildren();
+  const seen = new Set(); for (const m of ms) { const d = det[key(m, frame)]; if (d) d.detections.forEach((x) => x.conf >= conf() && seen.add(x.cls)); }
+  for (const c of seen) { const s = el("span"), i = el("i"); i.style.background = colorOf(c); s.append(i, document.createTextNode(c.replace("_", " "))); L.append(s); }
+  // timeline
+  const T = $("timeline"); T.classList.toggle("hidden", cur.kind !== "video");
+  if (cur.kind === "video") {
+    const tl = $("tl"); tl.replaceChildren(); const mA = ms[0];
+    const counts = cur.frames.map((f) => { const d = det[key(mA, f.i)]; return d ? d.detections.filter((x) => x.cls === "pothole" && x.conf >= conf()).length : null; });
+    const mx = Math.max(1, ...counts.filter((c) => c != null));
+    cur.frames.forEach((f, i) => { const b = el("button"); b.type = "button"; const c = counts[i];
+      b.style.height = c == null ? "3px" : `${8 + 40 * c / mx}px`; b.className = (c ? "has" : "") + (i === frame ? " on" : "");
+      b.title = `t = ${f.t}s · ${c == null ? "not analysed" : `${c} pothole${c === 1 ? "" : "s"}`}`; b.setAttribute("aria-label", b.title);
+      b.onclick = () => go(i); tl.append(b); });
+    const done = counts.filter((c) => c != null).length;
+    if (done === cur.frames.length) $("tlinfo").textContent = `frame ${frame + 1} of ${cur.frames.length} · t = ${cur.frames[frame].t}s · potholes in ${counts.filter((c) => c).length} frames`;
+  }
+  renderTable(); renderMeasure(); renderSummary();
+  $("measure").disabled = !det[key(ms[0], frame)];
+}
+async function go(i) { if (!cur) return; frame = Math.max(0, Math.min(cur.frames.length - 1, i)); render(); await ensureDet(frame).catch(() => {}); render(); }
+
+function renderTable() {
+  const box = $("dettable"); box.replaceChildren();
+  const ms = models(); if (!cur) { box.textContent = "Nothing analysed yet."; return; }
+  for (const m of ms) {
+    const d = det[key(m, frame)]; if (!d) continue;
+    const rows = d.detections.filter((x) => x.conf >= conf());
+    if (ms.length > 1) box.append(el("div", "sub", mlabel(m)));
+    if (!rows.length) { box.append(el("div", "sub", `Nothing at or above ${conf().toFixed(2)}. Lower the confidence to see weaker detections.`)); continue; }
+    const t = el("table"), hr = el("tr"); ["#", "class", "conf", "box (px)"].forEach((h) => hr.append(el("th", null, h))); t.append(hr);
+    rows.forEach((x, i) => { const tr = el("tr"), c = el("td"), sw = el("span", "sw"); sw.style.background = colorOf(x.cls); c.append(sw, document.createTextNode(x.cls.replace("_", " ")));
+      tr.append(el("td", null, i + 1), c, el("td", null, x.conf.toFixed(2)), el("td", null, `${Math.round(x.bbox[2] - x.bbox[0])}×${Math.round(x.bbox[3] - x.bbox[1])}`)); t.append(tr); });
+    box.append(t);
+  }
+}
+
+// ------------------------------------------------------------------ plain-English summary
+const plural = (n, one, many) => `${n} ${n === 1 ? one : (many || one + "s")}`;
+const inr = (v) => `₹${Math.round(v).toLocaleString("en-IN")}`;
+const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, "0")}`;
+const SEV = { small: "small", medium: "medium", large: "large (urgent)", unknown_water: "unknown (water-filled)" };
+function reasonShort(r) {
+  if (!r) return "the measurement was not reliable";
+  if (/^scale/.test(r)) return "the depth scale does not match the camera height. Enter this photo's real camera height and pitch";
+  if (/^quality/.test(r)) return "the image quality or distance is too poor for a size estimate (it may be too far away or blurred)";
+  if (/plane_inlier_ratio|plane/.test(r)) return "the camera height or angle does not match this photo. Enter its real camera height and pitch";
+  if (/scale/.test(r)) return "the depth scale does not match the camera height";
+  if (/small|mask_px|too few/.test(r)) return "it is too small or too far away in the picture";
+  return "the measurement was not reliable";
+}
+function modelNote(m) {
+  const ap = (SETUP.models.find((x) => x.id === m) || {}).rdd_india_ap50;
+  return ap != null && ap < 0.7 ? `This model scores ${ap.toFixed(2)} on the test set (target 0.70): it misses some potholes and makes some false alarms, so check by eye.` : "Check the result by eye.";
+}
+function renderSummary() {
+  const box = $("summary"); box.replaceChildren(el("h2", null, "Summary"));
+  const add = (t, c) => box.append(el("p", c, t));
+  if (!cur) { add("Add a photo or video to get a short summary.", "sub"); return; }
+  const m = models()[0], c = conf(), d = det[key(m, frame)];
+  if (!d) { add("Checking the image…", "sub"); return; }
+  const hits = d.detections.filter((x) => x.conf >= c), ph = hits.filter((x) => x.cls === "pothole");
+  const others = {}; hits.filter((x) => x.cls !== "pothole").forEach((x) => others[x.cls] = (others[x.cls] || 0) + 1);
+  const where = cur.kind === "video" ? `this frame (${mmss(cur.frames[frame].t || 0)})` : "this photo";
+  if (cur.kind === "video") {
+    const counts = cur.frames.map((f) => { const q = det[key(m, f.i)]; return q ? q.detections.filter((x) => x.cls === "pothole" && x.conf >= c).length : null; });
+    const done = counts.filter((n) => n != null).length, withP = counts.map((n, i) => n ? i : -1).filter((i) => i >= 0);
+    if (done < cur.frames.length) add(`Checking the video… ${done} of ${cur.frames.length} frames done.`, "sub");
+    else if (!withP.length) add(`No potholes found in the video (${cur.frames.length} frames checked).`, "lead");
+    else add(`Potholes seen in ${withP.length} of ${cur.frames.length} frames, first at ${mmss(cur.frames[withP[0]].t)}${withP.length > 1 ? `, last at ${mmss(cur.frames[withP[withP.length - 1]].t)}` : ""}.`, "lead");
+  }
+  if (!ph.length) add(`No pothole found in ${where}${cur.kind === "video" ? "" : ""}. ${c > 0.1 ? "Lower the confidence to see weaker guesses." : ""}`, cur.kind === "video" ? null : "lead");
+  else add(`${plural(ph.length, "pothole")} found in ${where}${ph.length ? ` (model confidence ${ph.map((x) => x.conf.toFixed(2)).join(", ")})` : ""}.`, cur.kind === "video" ? null : "lead");
+  const ot = Object.entries(others).map(([k, n]) => plural(n, k.replace("_", " "))).join(", ");
+  if (ot) add(`Also found: ${ot}.`);
+  const r = measureRes[key(m, frame)];
+  if (!ph.length) { add(modelNote(m), "fine"); return; }
+  if (!r || r.error || r.conf !== c) { add("Press Measure potholes to estimate depth, size and the repair needed."); add(modelNote(m), "fine"); return; }
+  let lo = 0, hi = 0, cost = 0, kg = null, nPlan = 0;
+  r.measured.forEach((q, i) => {
+    const name = r.measured.length > 1 ? `Pothole ${i + 1}` : "The pothole";
+    if (!q.reliable) { add(`${name}: found, but its size could not be measured reliably, because ${reasonShort(q.unreliable_why || q.reject_reason)}.`); return; }
+    const size = q.water_filled ? "is full of water, so its depth is unknown" : `is about ${fmt(q.depth_p95_mm)} mm deep (±${fmt(q.depth_sigma_mm)})`;
+    let t = `${name} ${size}, covers about ${fmt(q.area_m2, 2)} m²` + (q.volume_l != null ? ` and holds about ${fmt(q.volume_l, 1)} litres` : "") + `. Severity: ${SEV[q.severity] || q.severity || "not rated"}.`;
+    if (q.repair && !q.repair.error) {
+      const rp = q.repair; lo += rp.bags_low; hi += rp.bags_high; cost += rp.cost_inr; kg = rp.bag_kg; nPlan++;
+      t += ` Repair: cut a ${rp.cut_m[0]} × ${rp.cut_m[1]} m patch and fill with ${rp.bags_low === rp.bags_high ? rp.bags_low : `${rp.bags_low}–${rp.bags_high}`} bags (${rp.bag_kg} kg) of cold mix, about ${fmt(rp.labour_h, 1)} h of work, roughly ${inr(rp.cost_inr)}${rp.lower_bound ? " (at least: re-measure when dry)" : ""}.`;
+    }
+    add(t);
+  });
+  if (nPlan > 1) add(`Total for ${where}: ${lo}–${hi} bags (${kg} kg) of cold mix, roughly ${inr(cost)}.`, "lead");
+  add(`Estimates use a demo camera setup (${r.camera}${r.user_geometry ? ", your height/pitch" : ""}), not certified: not for billing. Bag counts are a range, never exact.`, "fine");
+}
+
+// ------------------------------------------------------------------ measure
+function syncCam() { const c = SETUP.cameras.find((x) => x.id === $("cam").value); if (c) { $("hgt").value = c.h_true_m ?? ""; $("pitch").value = c.pitch_deg ?? ""; } }
+$("cam").onchange = syncCam;
+$("measure").onclick = runMeasure;
+async function runMeasure() {
+  if (!cur) return; const m = models()[0], k = key(m, frame);
+  $("meas").replaceChildren(busy("measuring depth, area and volume… (first run loads the depth model)"));
+  try { measureRes[k] = await post("/api/measure", { item: cur.id, frame, model: m, conf: conf(), camera: $("cam").value, h_true_m: $("hgt").value, pitch_deg: $("pitch").value }); }
+  catch (e) { measureRes[k] = { error: e.message }; }
+  render();
+}
+function renderMeasure() {
+  const box = $("meas"); if (!cur) return;
+  const r = measureRes[key(models()[0], frame)];
+  if (!r) { box.replaceChildren(); box.className = "sub"; box.innerHTML = ""; box.append(document.createTextNode("Pick a camera preset (and this photo's camera height / pitch if you know them), then press "), el("b", null, "Measure potholes"), document.createTextNode(".")); return; }
+  box.className = ""; box.replaceChildren();
+  if (r.error) { box.append(el("div", "callout err", r.error)); return; }
+  if (r.conf !== conf()) box.append(el("div", "callout", `Measured at confidence ≥ ${r.conf.toFixed(2)}; press Measure again for the current threshold.`));
+  box.append(el("div", "callout", `Demo calibration “${r.camera}”${r.user_geometry ? " with the height / pitch you entered" : ""}: certified = false, an estimate, never billing-grade.`));
+  if (!r.measured.length) { box.append(el("div", "sub", r.note || "Nothing measured.")); return; }
+  r.measured.forEach((m, i) => {
+    const c = el("div", "mcard"), top = el("div", "top");
+    top.append(el("span", null, `Pothole ${i + 1} · conf ${m.conf.toFixed(2)}`), el("span", "sub", m.severity ? `IRC:82 ${m.severity}` : ""));
+    c.append(top);
+    if (!m.reliable && (m.depth_p95_mm != null || m.water_filled)) c.append(el("div", "callout err", `Not reliable (${m.unreliable_why}): numbers below are shown for checking only, no repair estimate.`));
+    if (m.depth_p95_mm == null && !m.water_filled) {
+      const p = el("div", "refused"); p.append(el("b", null, "Not measured: "), document.createTextNode(explain(m.reject_reason)));
+      c.append(p);
+    } else {
+      const g = el("div", "mgrid");
+      const cell = (k, v, s, u) => { const d = el("div"); d.append(el("div", "k", k)); const vv = el("div", "v", v); if (s) vv.append(el("small", null, ` ±${s}`)); if (u) vv.append(el("small", null, ` ${u}`)); d.append(vv); return d; };
+      g.append(cell("depth p95", m.water_filled ? "water" : fmt(m.depth_p95_mm), m.depth_sigma_mm != null ? fmt(m.depth_sigma_mm) : null, "mm"),
+               cell("area", fmt(m.area_m2, 3), fmt(m.area_sigma, 3), "m²"),
+               cell("volume", m.volume_l == null ? "–" : fmt(m.volume_l, 1), m.volume_sigma != null ? fmt(m.volume_sigma, 1) : null, "L"));
+      c.append(g);
+      c.append(el("div", "sub", `${fmt(m.length_m, 2)} × ${fmt(m.width_m, 2)} m · quality ${fmt(m.quality, 2)} · ${m.method} · ${fmt(m.range_m, 1)} m away` + (m.reject_reason ? ` · note: ${explain(m.reject_reason)}` : "")));
+    }
+    box.append(c);
+  });
+  box.append(el("div", "sub", `${r.depth_model || ""} · ${fmt(r.elapsed_ms)} ms`));
+  if (r.overlay) { const o = el("div", "overlay"), im = el("img"); im.src = r.overlay; im.alt = "measurement overlay: depth map and fitted road plane"; o.append(el("div", "sub", "Measurement overlay (depth map, masks, road plane)"), im); box.append(o); }
+}
+function explain(reason) {
+  if (!reason) return "no reason given";
+  const map = [[/plane_inlier_ratio/, "the road surface does not fit the assumed camera height / pitch. Enter this photo's real camera height and pitch, or use a frame where more road is visible"],
+               [/scale/, "the depth scale disagrees with the camera height by too much (wrong height / pitch, or not a road view)"],
+               [/small|mask_px|too few/, "the pothole is too small in the image to measure"],
+               [/water/, "water-filled: depth is unknown"]];
+  for (const [re, txt] of map) if (re.test(reason)) return `${txt} (${reason})`;
+  return reason;
+}
+
+// ------------------------------------------------------------------ controls
+$("conf").oninput = () => { $("confv").textContent = conf().toFixed(2); render(); };
+$("mA").onchange = $("mB").onchange = async () => { if (!cur) return render(); if (cur.kind === "video") analyseVideo(); else { render(); await ensureDet(frame).catch(() => {}); render(); } };
+document.addEventListener("keydown", (e) => {
+  if (e.target.matches("input, select, textarea")) return;
+  if (e.key === "ArrowRight") { go(frame + 1); e.preventDefault(); } else if (e.key === "ArrowLeft") { go(frame - 1); e.preventDefault(); }
+  else if (e.key === "Enter" && !$("measure").disabled) runMeasure();
+});
+
+async function start() {
+  try { $("whoname").textContent = `Signed in as ${(await api("/api/me")).name}`; } catch (e) { return; }
+  SETUP = await api("/api/setup");
+  $("login").classList.add("hidden"); $("app").classList.remove("hidden");
+  if ($("mA").options.length) return;
+  for (const m of SETUP.models) {
+    const txt = `${m.label}${m.rdd_india_ap50 != null ? ` · AP50 ${m.rdd_india_ap50.toFixed(3)}` : ""}${m.in_use ? " · in use" : ""}`;
+    $("mA").append(new Option(txt, m.id)); $("mB").append(new Option(txt, m.id));
+  }
+  const best = SETUP.models.filter((m) => m.rdd_india_ap50 != null).sort((a, b) => b.rdd_india_ap50 - a.rdd_india_ap50)[0];
+  if (best) $("mA").value = best.id;
+  for (const c of SETUP.cameras) $("cam").append(new Option(`${c.id} (${c.kind || "?"}, ${c.h_true_m} m, ${c.pitch_deg}°)${c.certified ? "" : " · demo"}`, c.id));
+  $("cam").value = SETUP.cameras.some((c) => c.id === "phone_demo") ? "phone_demo" : SETUP.cameras[0].id; syncCam();
+  const prev = (await api("/api/items")).items;
+  for (const it of prev.slice().reverse()) { items.push(it); itemRow(it); }
+  const want = location.hash.slice(1), pick = prev.find((x) => x.id === want) || prev[0];
+  if (pick) await select(pick);
+}
+start().then(() => { if (!SETUP) showLogin(); });
+</script>
+</body>
+</html>

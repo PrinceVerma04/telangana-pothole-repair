@@ -7,7 +7,7 @@ aliases:
   Transverse Crack: crack
   Alligator Crack: alligator_crack
   Pothole: pothole
-  Other:            # RDD 'OTHER' (line blur etc.): not a GunthaMeter class
+  Other:            # RDD 'OTHER' (line blur etc.): not a RoadFix class
   # weights/bootstrap_pothole_yolo26m.pt has the single class 'Pothole' (above)
   potholes: pothole
   water_pothole: pothole_water

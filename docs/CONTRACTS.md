@@ -10,7 +10,7 @@ Any work package that needs to change one of these files updates this document i
 | State machines + RBAC on WO transitions | `server/app/schemas/states.py` | WP4, WP5, WP8 |
 | Edge wire protocol | `edge/schema/{observation,trip_fix}.schema.json` (+ `examples/`) | WP7, WP4, Android/Jetson |
 | Tables | `server/app/db/tables.md` | WP4 (+ all readers) |
-| Classes | `configs/classes.yaml` (vocabulary, 7 classes). Training datasets and models may use an **ordered subset**, renumbered 0..k-1 (D15: `configs/model/india_pothole_seg.yaml` = pothole, alligator_crack, crack, manhole); detections are mapped to the vocabulary **by name** (`ml.common.canonical_class`), never by index | WP1, WP3, WP7 |
+| Classes | `configs/classes.yaml` (vocabulary, 7 classes). Training datasets and models may use an **ordered subset**, renumbered 0..k-1 (D15: `configs/model/india_pothole_seg.yaml` = pothole, alligator_crack, crack, manhole); detections are mapped to the vocabulary **by name** (`ml.common.canonical_class`), never by index. `source_maps` (how each dataset's labels map into the vocabulary) may gain entries for new sources without changing the vocabulary (D16 added `pothole_seg_web`) | WP1, WP3, WP7 |
 | IRC constants | `configs/irc_rules.yaml` | WP2 (`measure/irc.py`), WP8 |
 | Priority weights | `configs/priority.default.yaml` | WP5 |
 | Rate card | `configs/rate_card.ghmc_fy2026.yaml` | WP8 |

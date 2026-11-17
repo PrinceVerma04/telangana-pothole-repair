@@ -13,7 +13,7 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
-        // API base URL of the GunthaMeter server; override with -PgmApi=https://... at build time.
+        // API base URL of the RoadFix server; override with -PgmApi=https://... at build time.
         buildConfigField("String", "GM_API", "\"${project.findProperty("gmApi") ?: "http://10.0.2.2:8000"}\"")
         buildConfigField("String", "CALIB_ID", "\"${project.findProperty("gmCalib") ?: "bus_default"}\"")
     }

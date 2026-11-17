@@ -1,171 +1,99 @@
-# HANDOFF — GunthaMeter on the Windows laptop (updated 2026-11-15: laptop segmenter trained + evaluated; 2026-11-14: wave 2 batch B + WP12 done)
+# HANDOFF — RoadFix on the Linux RTX 5080 box (updated 2026-11-17)
 
 This file is the single source of truth for "where did we stop". Claude Code memory does NOT travel between
-machines; this file and `CLAUDE.md` replace it. Read `docs/DECISIONS.md` D12-D14 and the status sections
-("Wave 1", "Wave 2 batch A", **"Wave 2 batch B"**, **"WP12"**) next.
+machines; this file and `CLAUDE.md` replace it. Read `docs/DECISIONS.md` **D16 (v2 data), D17 (training pipeline,
+95 % GPU), D18 (clean-up, Linux-only) and D19 (first v2 run, fine-tuning profile)** next; D1-D15 and the wave sections are the history.
 
 ---
 
 ## 1. Where the project stopped
 
-The project lives on a **native Windows 11 laptop** at `C:\gunthameter` (no WSL). i7-10510U, 15.8 GB RAM, MX330 2 GB
-(torch cu126, usable but slow; D14).
+The project lives on the Linux box at `~/gunthameter` (it came back from the Windows laptop on 2026-11-16; the laptop
+scripts were deleted, D18). Machine: AMD Ryzen 9 9950X3D (16 cores / 32 threads), 59 GB RAM, **RTX 5080 16 GB
+(sm_120)**, NVIDIA driver 595.99. `.venv`: Python 3.11.18, torch 2.11.0+cu128, ultralytics 8.4.211 (`LOCKFILE.md`).
 
-**All work packages WP0-WP12 are built and verified on this laptop (2026-11-14).** The interrupted batch-B workflow
-(`wf_6045d889-f84`) was finished by hand in one session; do not resume it. Details: DECISIONS "Wave 2 batch B status"
-and "WP12 status".
-
-- `pytest -m "not gpu and not data"`: **276 passed** (~5-6 min incl. the WP12 e2e fleet test). `ruff check .` clean.
-- Web: vitest 38 passed, `npm run build` OK, `npm run smoke` 15 ok / 1 skip, Playwright 3/3 with `PW_CHANNEL=msedge`
-  (the default Chrome channel hangs on this laptop).
-- **Demo:** `.\scripts\windows\tasks.ps1 demo` → 732 s from a clean DB copy; WP7 acceptance 4/4 (43 confirmed,
-  verified_closed, reopened + DLP rework, 4 jurisdiction items). Records: `reports/demo_summary.json`,
-  `reports/fleet_run.json`. Demo depth is the synthetic road render (method `synthetic`), never a measurement.
+- `make test`: **312 passed** in ~1 min (`-m "not gpu and not data"`); `ruff check .` clean.
+- WP0-WP12 software is complete (status table below). New on 2026-11-16: the v2 training data (D16), the retraining
+  pipeline with the GPU at ~95 % (D17), and the clean-up (D18). **2026-11-17: the first full v2 run (`y26m_seg_india_v2`)
+  scored RDD-India 0.1602 < 0.2207 (optimizer auto -> MuSGD lr 0.01, early stop at epoch 67; D19). Next run: profile
+  `rtx5080_gpu95_ft` (AdamW 0.00125, cosine, 80 epochs, no early stop) as `y26m_seg_india_v2ft`.**
 
 | WP | State |
 |---|---|
-| WP0 contracts | Done (no contract file changed in batch B) |
-| WP1 data | Done |
+| WP0 contracts | Done. `configs/classes.yaml` gained the `pothole_seg_web` source map (vocabulary unchanged; CONTRACTS.md updated) |
+| WP1 data | **v2 built** (D16): `data/datasets/india_pothole_seg4_v2`, train 8,911 / val 1,722 / test 1,843 images; 14,564 training potholes (v1: 3,926). RDD-India test locked (`data/splits/rdd_india_test.lock.txt`, 514 images) |
 | WP2 measurement | Done; synthetic 16/16, σ coverage 1.00. Real-camera accuracy: pending the staged session |
-| WP3 training | Code done. **Training dataset is now 4 classes** (`data/datasets/india_pothole_seg4`, D15: pothole, alligator_crack, crack, manhole; manholes re-split by eYantra sequence, test has 69). **Laptop model trained (2026-11-15)**: `runs/seg/y26n_seg_india_laptop/weights/best.pt` (yolo26n-seg, 20 epochs, best = epoch 15). RDD-India test pothole box mAP50 **0.221** (bootstrap 0.0885) — **FAILS** the 0.70 floor; mask IoU 0.689 on 149 matched potholes vs SAM2 pseudo-masks (pixel IoU only 0.27). Now `SEG_WEIGHTS` in `.env` as a stopgap. Verifier stays `bootstrap_pothole_yolov8s.pt` (cracks 0.64/0.56 vs 0.21/0.12) |
-| WP4 DB/API, WP5 geo, WP6 workers, WP8 ops, WP10 GIS | Done (batch A) |
-| WP7 simulator | Done: `replay.py`, `fleet.py`, `sim_server.py`, `protocol.md`, Jetson stub, Android skeleton (not compiled: no SDK) |
-| WP9 web | Done; Lighthouse not run |
-| WP11 validation + docs | Done: `DEPTH_METHOD`, `CALIBRATION_SOP` (te/en), `DEPLOYMENT_TSRTC`, `LICENCES`, `DEMO_SCRIPT`, `reports/REPORT.md` |
-| WP12 demo | Done: `scripts/demo.py`, `make demo` / `tasks.ps1 demo`, `tests/e2e/test_demo_pipeline.py` |
+| WP3 training | Pipeline ready (`make retrain`, D17). Current model = `y26m_seg_india_v2ft_geo` (D21; RDD-India pothole box AP50 **0.2494**, best so far, FAILS the 0.70 floor), `SEG_WEIGHTS` in `.env` since 2026-11-17 with `VERIFIER=off` (D24). Older runs, bootstrap and laptop weights deleted (D24); their scores stay in `reports/model_eval.json`. ONNX export skipped: `onnx` package not installed |
+| WP4-WP12 | Done (see DECISIONS waves). Web, simulator, ops, demo unchanged by this session |
 
-How to run things here (PowerShell, from `C:\gunthameter`):
-```powershell
-.\scripts\windows\tasks.ps1 test            # 276 tests, ~5-6 min
-.\scripts\windows\tasks.ps1 demo            # full demo, keeps API :8000 + web :5173 up (add --exit to stop)
-.\scripts\windows\tasks.ps1 web-test        # vitest; web-build for the production build
-cd web; $env:PW_CHANNEL='msedge'; npm run build; npm run test:e2e   # Playwright offline field test
-.\scripts\windows\tasks.ps1 measure-demo    # ~5.5 min CPU -> reports\measure_demo\README.md
-.\scripts\windows\tasks.ps1 sim-api         # simulator API on :8002 (copy of the demo DB); then: tasks.ps1 fleet
-.\scripts\windows\tasks.ps1 report          # regenerate reports\REPORT.md
-```
-Do not pass pytest flags such as `-p` through `tasks.ps1`: PowerShell swallows them as common parameters. Call
-`.venv\Scripts\python.exe -m pytest ...` directly instead. Watch RAM: the demo (API + fleet) and the test suite
-together are fine; add torch models or a second demo and the laptop swaps.
+Scores on the v2 test split (`reports/model_eval.json`; RDD-India = the acceptance basis):
 
-## 2. Next steps (none of them is more code)
+| Model | RDD-India pothole AP50 | BharatPotHole AP50 | human-mask (`ws_`) AP50 | `ws_` mask IoU |
+|---|---|---|---|---|
+| laptop YOLO26n (stopgap) | 0.2207 | 0.035 | 0.338 | 0.72 |
+| v2 run 1 YOLO26m (`y26m_seg_india_v2`, D19) | 0.1602 | 0.070 | 0.637 | 0.77 |
+| bootstrap YOLO26m detector | 0.088 | 0.021 | 0.624 | n/a |
+| Hugging Face keremberke YOLOv8s-seg | 0.001 | 0.000 | 0.105 | 0.70 |
 
-1. **Train the segmenter** (WP3 acceptance: box mAP50 ≥ 0.70 on RDD-India test, mask IoU ≥ 0.65).
-   RTX 5080 box (preferred): `make train PROFILE=rtx5080_s NAME=y26s_seg_india`, then `make eval NAME=...`,
-   `make export NAME=...`, `make report`. Laptop: `.\scripts\windows\tasks.ps1 train` (8-hour resumable sessions,
-   ~1 h/epoch), continue with `tasks.ps1 train-resume`; then `tasks.ps1 eval --weights runs\seg\y26n_seg_india_laptop\weights\best.pt --stage trained_y26n_laptop`.
-   **Laptop run done 2026-11-15** (box mAP50 0.221, below floor; `.env` `SEG_WEIGHTS` now points at it, revert line
-   is in the `.env` comment). More laptop epochs will not reach 0.70 (epochs 16-20 never beat epoch 15): the remaining
-   path is the RTX 5080 `y26s` run. Its best conf for F1 is ~0.08, so pipeline thresholds tuned for 0.25 may miss
-   detections. A stray `$env:SEG_WEIGHTS` in a shell overrides `.env` (pydantic: env beats file) — open a fresh shell.
-2. **Staged foam-board accuracy session** with a checkerboard-calibrated camera: `scripts/staged_pothole_truth.py`
-   (template → film → measure → compare) → `reports/staged_truth/summary.json` → `tasks.ps1 report`.
-3. **Licence decisions** (`docs/LICENCES.md` §4): Ultralytics AGPL vs Enterprise vs RF-DETR; confirm the DA-V2 Metric
-   Outdoor Base card licence (else switch `depth.backend` to `da3_metric`).
-4. Android: install the SDK, `gradle wrapper`, `./gradlew assembleDebug` in `edge/android`; then the LiteRT segmenter.
-5. Lighthouse PWA audit; a fresh-eyes run of the README quickstart; `make demo` under WSL/Linux.
-6. Production path (DECISIONS D1-D3): PostgreSQL/PostGIS (`mapmatch_pg` never ran against PostGIS), real secrets,
-   DEMO_MODE off. Pilot plan: `docs/DEPLOYMENT_TSRTC.md`.
+GPU trials (one full epoch each, D17): YOLO26m-seg batch 18, 96.5 % of the card's memory, load while training median
+91 %, 1.7 min/epoch (the `make retrain` default); YOLO26s-seg batch 33, 91.7 %, median 87 %, 0.9 min/epoch.
 
-## 3. Transfer (done 2026-11-13, all checksums OK — kept for reference; `gm_transfer` can be deleted)
+## 2. Next steps
 
-The Linux box (`192.168.0.121`, user `coral`, SSH on port 22) has a staging folder `~/gm_transfer/`:
+1. **Done 2026-11-17:** `y26m_seg_india_v2ft_geo` trained (80 epochs, D21) -> RDD-India AP50 0.2494 (laptop 0.2207);
+   it is `SEG_WEIGHTS`, the verifier is off (its 0.004 model is deleted), and only the best run is kept (D24).
+   Next model work is data, not epochs (best validation epoch was 23/80): review the dataset (`make review`, D22),
+   add real bus-mounted frames, then `make derive-dataset-reviewed` and retrain with
+   `make train-gpu PROFILE=rtx5080_gpu95_ft_geo NAME=<new run>`. Test models on own images: `make playground` (D23).
+2. **Verifier:** off. Re-enable only with a second model that actually scores (e.g. a second v2 model); the gate in
+   `server/workers/stages.py` drops unconfirmed detections below conf 0.5.
+3. **ONNX export:** `pip install --no-deps onnx ml_dtypes` in `.venv`, then `make export NAME=y26m_seg_india_v2ft_geo`
+   (the post-training export was skipped). `make prune-v1` (v1 datasets + split files; approved 2026-11-16) can run now.
+4. Still open, not code: staged foam-board accuracy session (`make truth`), licence decisions (`docs/LICENCES.md` §4:
+   Ultralytics AGPL, DA-V2 Metric Outdoor Base card, eYantra GPL-2.0), Android build, Lighthouse audit, PostGIS
+   production path (DECISIONS D1-D3; `mapmatch_pg` never ran against PostGIS).
 
-| file | size | content |
-|---|---|---|
-| `gunthameter_code.tar.gz` | ~0.2 GB | all code, configs, docs, tests, weights, web sources (no `.venv`, no `node_modules`) |
-| `gunthameter_data_processed.tar` | ~4.2 GB | `data/interim/` (extracted datasets, geo outputs, SAM2 cache) + `data/datasets/` |
-| `data_raw/` | ~13 GB | original downloads: RDD2022 zip, eYantra zip, BharatPotHole zip, TGSRTC GTFS, OSM PBF |
-| `SHA256SUMS` | | checksums for everything above |
-| `HANDOFF.md` | | this file |
-| `pull.ps1`, `verify.ps1` | | Windows helpers (copies of `scripts/windows/`) |
+### Known issues found in the 2026-11-16 code review (not fixed yet)
+- `PIPELINE_INLINE=0` (production path, D2) is half-wired: no production code enqueues jobs, and trip-close runs its
+  hooks inline once (`server/app/routers/ingest.py:258-265`), before the poller processes that trip's observations.
+- Demo OTP: in `DEMO_MODE` the fixed code works for any phone and OTP login matches staff by phone, so it yields a
+  super_admin token (`server/app/routers/auth.py:62-75`). Fine for the demo, never for a deployment.
+- `edge/sim/fleet.py:247` seeds trips with Python's per-process `hash()`: fleet runs are not reproducible.
+- Reported by the review, not re-checked: `recurrence_watch` never entered; jurisdiction queue resolvable across
+  agencies; anonymous signed frame URLs and no face/plate blurring (DPDP); Android outbox can lose data and retries
+  4xx forever; fleet verification timing (`claim_at + 20 min`) can miss on a slow survey.
 
-Pull from the laptop (Windows 10/11 has `ssh`, `scp` and `tar` built in; you will be asked for `coral`'s password):
-
-**Native Windows (PowerShell) — one command does copy + verify + unpack:**
-```powershell
-mkdir C:\gunthameter; cd C:\gunthameter                       # avoid paths with spaces
-scp coral@192.168.0.121:gm_transfer/pull.ps1 .
-powershell -ExecutionPolicy Bypass -File .\pull.ps1           # -Dest / -Server / -User to override
-```
-Manual equivalent:
-```powershell
-cd C:\gunthameter
-scp -r coral@192.168.0.121:gm_transfer .
-powershell -ExecutionPolicy Bypass -File .\gm_transfer\verify.ps1
-tar -xzf .\gm_transfer\gunthameter_code.tar.gz
-tar -xf  .\gm_transfer\gunthameter_data_processed.tar
-New-Item -ItemType Directory -Force data\raw | Out-Null
-Get-ChildItem .\gm_transfer\data_raw | Move-Item -Destination data\raw\
-```
-
-**WSL2 (Ubuntu terminal):**
+## 3. How to run things (Linux, from `~/gunthameter`)
 ```bash
-mkdir -p ~/gunthameter && cd ~/gunthameter
-scp -r coral@192.168.0.121:gm_transfer .        # or: rsync -a --partial --progress coral@192.168.0.121:gm_transfer/ gm_transfer/
-(cd gm_transfer && sha256sum -c SHA256SUMS)
-tar -xzf gm_transfer/gunthameter_code.tar.gz
-tar -xf  gm_transfer/gunthameter_data_processed.tar
-mkdir -p data/raw && mv gm_transfer/data_raw/* data/raw/
+make test                 # 312 CPU tests, ~1 min
+make train-check          # venv, GPU (sm_120), free memory, dataset, RDD-India test lock
+make retrain-smoke        # ~2 min trial of the training pipeline (batch, GPU memory/load)
+make dashboard            # live training dashboard http://127.0.0.1:8765 (read-only; own terminal)
+make review               # multi-user dataset review on the LAN :8770 (D22); make derive-dataset-reviewed applies it
+make playground           # test models (+ measurement, plain-English summary) on own photos/videos, LAN :8780 (D23/D25)
+make retrain              # full retraining: check, data, baselines, train, eval, export, report
+make baselines            # already-trained pothole models scored on the v2 test
+make dataset && make derive-dataset   # rebuild v2 (SAM2 on GPU, ~2 min; cached)
+make demo                 # end-to-end demo, keeps API :8000 + web :5173 up (add --exit to stop)
+make measure-demo         # measurement demo -> reports/measure_demo/README.md
+make report               # regenerate reports/REPORT.md
 ```
-Keep the project inside the WSL filesystem (`~/...`), **not** under `/mnt/c` — file access there is 5–10× slower.
-Delete `gm_transfer` once everything works.
+`cd web && npm ci` once before the demo's web app; `npm test` / `npm run build` for the web checks. Playwright uses the
+installed Chrome by default: on this box set `PW_CHANNEL=bundled` and run `npx playwright install chromium` once.
 
-~17 GB over gigabit LAN ≈ 3–5 min; over Wi-Fi 5 ≈ 15–30 min. If `scp` is interrupted, delete the half-copied `gm_transfer` and rerun (or use `rsync --partial` from WSL, which resumes).
-
-Not transferred on purpose:
-- `.venv/` (Linux binaries, 8.6 GB) → recreate (section 4).
-- `web/node_modules/` (platform-specific esbuild/rollup) → `npm ci`.
-- Hugging Face model cache → re-downloads automatically on first use (DA-V2 Metric Outdoor Base ≈ 0.4 GB, SAM2.1 small
-  ≈ 0.2 GB, YOLO26 seg weights are already in `weights/`).
-- Kaggle API key (`~/.kaggle/kaggle.json`) — a secret; copy it yourself only if you need to re-download Kaggle data
-  (`scp coral@192.168.0.121:.kaggle/kaggle.json` → `%USERPROFILE%\.kaggle\` or `~/.kaggle/` in WSL, then `chmod 600`).
-
-## 4. Environment setup on the laptop
-
-Requirements: Python **3.11** (exactly — torch/ultralytics/onnxruntime wheels), Node **22**, Git (optional), NVIDIA GPU
-optional (CPU works for tests, the API and the simulator; depth inference and training want CUDA).
-
-### Option A — WSL2 Ubuntu (recommended: Makefile and bash scripts work unchanged)
-```powershell
-# once, PowerShell as Administrator, then reboot
-wsl --install -d Ubuntu-24.04
-```
-Install the normal Windows NVIDIA driver; do NOT install a Linux driver inside WSL. `nvidia-smi` in WSL should then work.
+## 4. Environment setup on a fresh Linux machine
 ```bash
-sudo apt update && sudo apt install -y software-properties-common make build-essential
-sudo add-apt-repository -y ppa:deadsnakes/ppa && sudo apt install -y python3.11 python3.11-venv python3.11-dev
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs
-cd ~/gunthameter
-python3.11 -m venv .venv
-.venv/bin/python -m pip install -U pip
-# GPU:
+python3.11 -m venv .venv && .venv/bin/python -m pip install -U pip
 .venv/bin/python -m pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu128
-# CPU only instead:  ... --index-url https://download.pytorch.org/whl/cpu
 .venv/bin/python -m pip install -r requirements-lock.txt
 make setup && make test
-cd web && npm ci && npm run build
 ```
-With sudo available in WSL you may also `apt install postgresql postgis redis-server` for the production path
-(DECISIONS D1–D3); the demo does not need them.
+Raw downloads were deleted after extraction (D18): `data/interim` holds the extracted sources and is what the builds
+read. On a machine without `data/interim`, `python -I data/download.py --all --fetch` downloads again (Kaggle needs
+`~/.kaggle/kaggle.json`; Hugging Face mirror for RDD2022).
 
-### Option B — native Windows (PowerShell)
-```powershell
-winget install -e --id Python.Python.3.11
-winget install -e --id OpenJS.NodeJS.LTS        # Node 22
-cd C:\gunthameter
-powershell -ExecutionPolicy Bypass -File scripts\windows\setup.ps1          # GPU (cu128)
-# powershell -ExecutionPolicy Bypass -File scripts\windows\setup.ps1 -Cpu   # no NVIDIA GPU
-.\scripts\windows\tasks.ps1 test
-```
-`scripts/windows/tasks.ps1 <target>` replaces `make` (targets: setup, test, lint, db, seed, api, web, measure-demo,
-dataset, train). Known native-Windows caveats: `pyrosm` (only needed to rebuild `data/interim/geo`, which was transferred)
-may need `pip install pyrosm` from conda-forge wheels if it fails; bash scripts (`scripts/setup_dev.sh`, future
-`run_demo.sh`) need Git Bash or WSL; set `PYTHONUTF8=1` (setup.ps1 does) so Telugu strings read correctly.
-
-## 5. Machine-specific facts that do NOT carry over
-- Linux box: no sudo, GPU shared with another account (~12 GB used) — DECISIONS D1–D3 and D10 were driven by this.
-  On the laptop re-check: `nvidia-smi` free VRAM; if you have sudo/WSL you can choose PostGIS + Redis instead of SQLite +
-  in-process (keep the SQLite path working; it is the zero-service demo).
-- `LOCKFILE.md` describes the Linux venv; regenerate it on the laptop with `python scripts/write_lockfile.py`.
-- Paths: code uses `pathlib` relative to the repo root; avoid spaces in the laptop path anyway.
+## 5. Machine facts that do not carry over
+- The GPU is shared with the desktop (1.2-2 GB) and possibly another account (`ml`, D10): training sizes its batch
+  from the memory free at start; an out-of-memory restart steps the batch down by 10 %.
+- No PostgreSQL/PostGIS/Redis installed; the SQLite + in-process path is the demo (D1-D3).
+- `LOCKFILE.md` describes this machine; regenerate it elsewhere with `make lock`.

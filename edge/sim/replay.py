@@ -89,7 +89,7 @@ def write_dry_run(out: Path, data: Any) -> None:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    ap = argparse.ArgumentParser(description="GunthaMeter virtual bus (WP7 replay)")
+    ap = argparse.ArgumentParser(description="RoadFix virtual bus (WP7 replay)")
     add_common_args(ap)
     ap.add_argument("--route", default="10H", help="GTFS route_id (must exist in gtfs_routes.json)")
     ap.add_argument("--device", default="sim-bus-01")

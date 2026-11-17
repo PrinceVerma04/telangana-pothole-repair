@@ -1,7 +1,7 @@
-"""GunthaMeter measurement CLI.
+"""RoadFix measurement CLI.
 
   python -m measure.cli run  --image X.jpg --calib configs/cameras/phone_demo.json \\
-                             [--mask m.png | --detect weights/bootstrap_pothole_yolo26m.pt] --json out.json
+                             [--mask m.png | --detect runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt] --json out.json
   python -m measure.cli demo --out reports/measure_demo
 
 ``run`` writes a JSON with the ``server.app.schemas.api.MeasureResponse`` shape (measurements,
@@ -139,7 +139,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     d.add_argument("--out", default="reports/measure_demo")
     d.add_argument("--images", default="data/interim/measure_demo_imgs")
     d.add_argument("--n-images", type=int, default=5)
-    d.add_argument("--weights", default="weights/bootstrap_pothole_yolo26m.pt")
+    d.add_argument("--weights", default=None, help="segmenter weights (default: ml.common.DEFAULT_SEG_WEIGHTS)")
     d.add_argument("--trials", type=int, default=200)
     d.add_argument("--skip-real", action="store_true")
     d.add_argument("--skip-synthetic", action="store_true")

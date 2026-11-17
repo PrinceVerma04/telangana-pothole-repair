@@ -35,7 +35,7 @@ CORE_ROUTERS = ("auth", "edge", "ingest", "citizen", "potholes", "measure", "adm
 OPTIONAL_ROUTERS = ("plans", "work_orders", "runs", "contractors", "kpi", "exports", "truth")
 
 DESCRIPTION = """
-**GunthaMeter (గుంత మీటర్)** - bus-camera pothole mapping, metric depth/volume measurement, IRC:82 prioritisation
+**RoadFix** - bus-camera pothole mapping, metric depth/volume measurement, IRC:82 prioritisation
 and IRC:116 cold-mix repair planning for Telangana.
 
 Units: depth **mm**, area **m²**, volume **litres**, lengths **m**, money **INR**. Timestamps are UTC (ISO-8601);
@@ -103,7 +103,7 @@ def create_app(settings: Optional[Settings] = None, *, create_tables: Optional[b
         yield
         database.dispose()
 
-    app = FastAPI(title="GunthaMeter API", version=APP_VERSION, description=DESCRIPTION, lifespan=lifespan,
+    app = FastAPI(title="RoadFix API", version=APP_VERSION, description=DESCRIPTION, lifespan=lifespan,
                   openapi_url="/v1/openapi.json", docs_url="/docs", redoc_url="/redoc")
     app.state.settings = settings
     app.state.database = database
@@ -131,7 +131,7 @@ def create_app(settings: Optional[Settings] = None, *, create_tables: Optional[b
 
     @app.get("/", include_in_schema=False)
     def root() -> dict[str, Any]:
-        return {"name": "GunthaMeter API", "version": APP_VERSION, "docs": "/docs", "openapi": "/v1/openapi.json",
+        return {"name": "RoadFix API", "version": APP_VERSION, "docs": "/docs", "openapi": "/v1/openapi.json",
                 "routers": app.state.routers}
 
     return app

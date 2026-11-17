@@ -1,9 +1,12 @@
-# Ultralytics dataset yaml for training (DECISIONS D15). Paths are relative to `path`.
-# 4-class dataset derived from the WP1 build by data/derive_dataset.py: pothole_water, speed_breaker and utility_cut
-# have no labelled examples and are left out; manholes are re-split by eYantra drive sequence so test has some.
+# Ultralytics dataset yaml for training: the CURRENT training set (DECISIONS D15, D16). Paths are relative to `path`.
+# 4-class v2 dataset derived by data/derive_dataset.py from data/datasets/india_pothole_seg_v2 (data/build_dataset.py
+# --include-bharat --include-webseg): RDD2022-India + RDD2022 foreign potholes + eYantra manholes + BharatPotHole
+# (CC BY-SA 4.0, split by drive) + human-drawn pothole polygons from the web (Apache-2.0). The RDD2022 negative pool
+# added 0 images: the sources already give 33 % pothole-free training frames (> --negatives-frac 0.2).
+# The RDD-India test images are identical to v1 (data/splits/rdd_india_test.lock.txt), so scores stay comparable.
 # Names are an ordered subset of configs/classes.yaml (the system-wide vocabulary); models map back to it by name.
-# The original 7-class build stays at data/datasets/india_pothole_seg (configs/model/india_pothole_seg7.yaml).
-path: ../../data/datasets/india_pothole_seg4
+# Previous set: configs/model/india_pothole_seg4_v1.yaml. Rebuild: make dataset && make derive-dataset.
+path: ../../data/datasets/india_pothole_seg4_v2
 train: images/train
 val: images/val
 test: images/test

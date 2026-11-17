@@ -284,9 +284,91 @@ def test_include_bharat_flag(tmp_path: Path):
     out = tmp_path / "ds"
     s_off = run_build(interim, out)
     assert "bharat" not in json.dumps(s_off["splits"])
-    s_on = run_build(interim, out, "--include-bharat")
+    s_on = run_build(interim, out, "--include-bharat", "--bharat-split", "roboflow")  # old mapping still available
     assert s_on["splits"]["train"]["by_source"]["bharat"] == 2 and s_on["splits"]["val"]["by_source"]["bharat"] == 1
-    assert "UNVERIFIED" in s_on["licences"]["bharat"]
+    assert "CC BY-SA 4.0" in s_on["licences"]["bharat"]
+
+
+def test_bharat_drive_names():
+    assert bd.bharat_drive("20250528094319_0060_frame_00012_jpg_rf_abc") == "20250528094319_0060"
+    assert bd.bharat_drive("signal-2025-06-25-183557_frame_00080_jpg_rf_9f") == "signal-2025-06-25-183557"
+    assert bd.bharat_drive("odd_name_jpg_rf_123") == "odd_name"
+
+
+def test_split_groups_whole_groups_and_shares():
+    sizes = {f"d{i}": 10 + (i % 7) for i in range(60)}
+    dest = bd.split_groups(sizes, (0.8, 0.1, 0.1), seed=1, salt="x")
+    assert set(dest) == set(sizes) and set(dest.values()) <= {"train", "val", "test"}
+    total = sum(sizes.values())
+    for s in ("val", "test"):
+        share = sum(n for g, n in sizes.items() if dest[g] == s) / total
+        assert 0.07 <= share <= 0.12, (s, share)
+    assert dest == bd.split_groups(sizes, (0.8, 0.1, 0.1), seed=1, salt="x")  # deterministic
+
+
+def test_bharat_drive_split_keeps_drives_whole(tmp_path: Path):
+    """D16: the Roboflow export spreads one drive over train/valid/test; the build must not."""
+    interim = make_interim(tmp_path, n_india=9, n_foreign=0, n_neg=3, n_ey=4)
+    bh = interim / "bharatpothole"
+    rf_splits = ("train", "valid", "test")
+    for d in range(12):
+        for k in range(6):
+            split = rf_splits[(d + k) % 3]  # every drive spread over all three Roboflow splits
+            stem = f"2025010100{d:04d}_0060_frame_{k:05d}_jpg_rf_{d}{k}"
+            (bh / split / "images").mkdir(parents=True, exist_ok=True)
+            (bh / split / "labels").mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(bh / split / "images" / f"{stem}.jpg"), np.full((64, 64, 3), 20 * d + 3 * k, np.uint8))
+            (bh / split / "labels" / f"{stem}.txt").write_text("0 0.5 0.5 0.2 0.2\n")
+    (bh / "data_yaml.txt").write_text("names: ['pothole']\nnc: 1\n")
+    items = bd.collect_bharat(interim, {}, None, 7, __import__("collections").Counter(), "drive", (0.6, 0.2, 0.2))
+    by_drive: dict[str, set] = {}
+    for it in items:
+        by_drive.setdefault(it.group, set()).add(it.fixed_split)
+    assert len(by_drive) == 12 and all(len(v) == 1 for v in by_drive.values()), by_drive
+    assert {"train", "val", "test"} <= {next(iter(v)) for v in by_drive.values()}
+
+
+def test_include_webseg_human_polygons(tmp_path: Path):
+    interim = make_interim(tmp_path, n_india=9, n_foreign=0, n_neg=3, n_ey=4)
+    ws = interim / "pothole_seg_web"
+    rng = np.random.default_rng(3)
+    for split, n in (("train", 3), ("valid", 2)):
+        (ws / split / "images").mkdir(parents=True)
+        (ws / split / "labels").mkdir(parents=True)
+        for i in range(n):
+            cv2.imwrite(str(ws / split / "images" / f"{split}{i}.jpg"), rng.integers(0, 255, (80, 120, 3), np.uint8))
+            (ws / split / "labels" / f"{split}{i}.txt").write_text("0 0.2 0.2 0.6 0.2 0.6 0.7 0.2 0.7\n")
+    (ws / "data_yaml.txt").write_text("names: ['Pothole']\nnc: 1\n")
+    out = tmp_path / "ds"
+    st = run_build(interim, out, "--include-webseg")
+    assert st["splits"]["train"]["by_source"]["webseg"] == 3 and st["splits"]["test"]["by_source"]["webseg"] == 2
+    assert st["splits"]["test"]["mask_source"]["pothole"].get("gt_polygon", 0) >= 2  # human masks, not SAM2
+    assert "Apache-2.0" in st["licences"]["webseg"]
+    labels = read_labels(out, "test")
+    poly = [p for k, v in labels.items() if k.startswith("ws_") for _, p in v][0]
+    assert polygon_area(poly * np.array([120, 80])) > 0.15 * 120 * 80
+
+
+def test_test_near_duplicates_are_dropped_from_train():
+    """D16 guard: a train image that (nearly) equals a test image of another source is dropped; test is untouched."""
+    rng = np.random.default_rng(0)
+    base = rng.integers(0, 255, (64, 64), np.uint8)
+    imgs = {"t": base, "dup": np.clip(base.astype(int) + 2, 0, 255).astype(np.uint8),
+            "other": rng.integers(0, 255, (64, 64), np.uint8)}
+
+    class _It:
+        def __init__(self, uid, source):
+            self.uid, self.source, self.image = uid, source, Path(uid)
+
+    items = [_It("t", "rdd_india"), _It("dup", "webseg"), _It("other", "bharat")]
+    split = {"t": "test", "dup": "train", "other": "val"}
+    orig = bd.cv2.imread
+    try:
+        bd.cv2.imread = lambda p, flag=None: imgs[Path(p).name]
+        drop, info = bd.drop_test_near_duplicates(items, split, None, 24)
+    finally:
+        bd.cv2.imread = orig
+    assert drop == {"dup"} and info["by_source_pair"] == {"webseg->rdd_india": 1}
 
 
 def test_build_script_never_reads_data_raw():

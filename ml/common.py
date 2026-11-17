@@ -25,7 +25,7 @@ PROFILES_YAML = REPO_ROOT / "configs" / "model" / "train_profiles.yaml"
 RUNS_SEG = REPO_ROOT / "runs" / "seg"
 REPORTS = REPO_ROOT / "reports"
 REGISTRY_DIR = REPO_ROOT / "weights" / "registry"
-DEFAULT_SEG_WEIGHTS = "weights/bootstrap_pothole_yolo26m.pt"  # D9: used until a trained model is registered
+DEFAULT_SEG_WEIGHTS = "runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt"  # D24: best trained model (RDD-India AP50 0.2494)
 
 
 def ultralytics_env() -> None:
@@ -128,7 +128,7 @@ def _alias_table() -> dict[str, Optional[str]]:
 
 
 def canonical_class(raw_name: str) -> Optional[str]:
-    """Map a model's class name to the frozen class list; None if it has no meaning for GunthaMeter
+    """Map a model's class name to the frozen class list; None if it has no meaning for RoadFix
     (e.g. RDD 'Other', COCO 'person')."""
     return _alias_table().get(_norm(raw_name))
 
@@ -165,7 +165,7 @@ def resolve_dataset_root(cfg_path: str | Path = DATASET_CFG, cfg: Optional[dict[
             cands.append(p)
         else:
             cands += [(cfg_path.parent / p), (REPO_ROOT / p)]
-    cands.append(REPO_ROOT / "data" / "datasets" / (Path(raw).name if raw else "india_pothole_seg4"))
+    cands.append(REPO_ROOT / "data" / "datasets" / (Path(raw).name if raw else "india_pothole_seg4_v2"))
     for c in cands:
         c = c.resolve()
         if (c / str(cfg.get("train", "images/train"))).exists() or (c / "images").is_dir():

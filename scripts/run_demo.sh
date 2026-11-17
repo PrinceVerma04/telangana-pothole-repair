@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # WP12 end-to-end demo (make demo): seeded SQLite DB copy -> API (inline pipeline) -> web -> simulated TGSRTC fleet
-# -> tomorrow's indent + KPIs. All logic is in scripts/demo.py (same on Windows: .\scripts\windows\tasks.ps1 demo).
+# -> tomorrow's indent + KPIs. All logic is in scripts/demo.py.
 #   bash scripts/run_demo.sh            # keep API + web running until Ctrl-C
 #   bash scripts/run_demo.sh --exit     # stop after the summary (timing / CI)
 set -euo pipefail

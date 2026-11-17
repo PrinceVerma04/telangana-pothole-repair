@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gunthameter.local/schema/observation.schema.json",
-  "title": "GunthaMeter edge observation (PLAN 10 WP0)",
+  "title": "RoadFix edge observation (PLAN 10 WP0)",
   "description": "One keyframe from a vehicle (or a jolt / citizen / simulator event). Sent as a JSON batch to POST /v1/ingest/observations. Idempotent by client_uuid.",
   "type": "object",
   "additionalProperties": false,

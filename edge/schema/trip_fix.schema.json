@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gunthameter.local/schema/trip_fix.schema.json",
-  "title": "GunthaMeter 1 Hz trip telemetry batch",
+  "title": "RoadFix 1 Hz trip telemetry batch",
   "description": "POST /v1/ingest/trip-fixes. cam_active=true + no detection proves a clean pass (verification, archive of candidates, passes_total).",
   "type": "object",
   "additionalProperties": false,

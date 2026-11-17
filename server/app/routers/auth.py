@@ -42,7 +42,7 @@ def send_otp(body: OtpRequest, request: Request, db: DbDep, settings: SettingsDe
     code = _otp_store(request).issue(settings, body.phone)
     phone = OtpStore.normalise_phone(body.phone)
     # SMS adapter stub: production sends via the notification pipeline; never store the code itself
-    db.add(m.Notification(channel="sms", to_role=None, subject="GunthaMeter OTP",
+    db.add(m.Notification(channel="sms", to_role=None, subject="RoadFix OTP",
                           body=f"OTP sent to ******{phone[-4:]}", entity="otp", sent=False))
     db.commit()
     out: dict[str, Any] = {"sent": True, "ttl_s": settings.OTP_TTL_S}

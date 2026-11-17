@@ -1,1 +1,1 @@
-"""Data augmentation for GunthaMeter training (WP1: India photometric augmentations)."""
+"""Data augmentation for RoadFix training (WP1: India photometric augmentations)."""

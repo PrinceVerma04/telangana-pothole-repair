@@ -1,6 +1,6 @@
-# GunthaMeter validation report
+# RoadFix validation report
 
-Generated 2026-11-15T13:13:30+00:00 (UTC) = 2026-11-15 18:43 IST by `scripts/make_report.py`. Every number below is copied from an artefact file named in its section; nothing is typed in by hand.
+Generated 2026-11-17T09:40:42+00:00 (UTC) = 2026-11-17 15:10 IST by `scripts/make_report.py`. Every number below is copied from an artefact file named in its section; nothing is typed in by hand.
 
 **Nothing here is billing-grade.** All calibrations used so far are `certified=false` demo certificates; certified numbers need the depot calibration (docs/CALIBRATION_SOP.md) and a truth fit per device.
 
@@ -13,9 +13,9 @@ Generated 2026-11-15T13:13:30+00:00 (UTC) = 2026-11-15 18:43 IST by `scripts/mak
 | σ coverage (noisy synthetic) | 2σ coverage ≥ 0.90 (depth, volume, area, width) | min 1.00 | PASS |
 | k_sigma recovery | informative | 13.2 % relative error | - |
 | Staged targets: fused depth MAE / IRC class / volume MAPE | ≤ 10 mm / ≥ 90 % / ≤ 25 % | - | pending |
-| box mAP50, RDD-India D40 test | >= 0.7 (WP3 hard floor (target 0.75)) | 0.221 | FAIL |
-| box mAP50-95 | >= 0.45 (PLAN 3.4 target) | 0.072 | FAIL |
-| mask IoU, eYantra test | >= 0.65 (WP3 floor (PLAN 3.4 target 0.70)) | 0.689 | PASS |
+| box mAP50, RDD-India D40 test | >= 0.7 (WP3 hard floor (target 0.75)) | 0.249 | FAIL |
+| box mAP50-95 | >= 0.45 (PLAN 3.4 target) | 0.061 | FAIL |
+| mask IoU, eYantra test | >= 0.65 (WP3 floor (PLAN 3.4 target 0.70)) | 0.731 | PASS |
 | FP per 1,000 frames (after verifier) | <= 5 (PLAN 3.4 target) | not in file | - |
 | Real images | chain runs end to end; not a measurement | 6 measurements, 6 flagged (section 3) | demo only |
 
@@ -78,7 +78,7 @@ Heuristics used for the flags: scale outside the `scale_lock.clip` [0.5, 2] mean
 
 ## 4. Detector / segmenter metrics (`reports/model_eval.json`, WP3)
 
-Source: `reports/model_eval.json` (schema `gunthameter.model_eval/1`, updated 2026-11-15T13:10:14Z).
+Source: `reports/model_eval.json` (schema `gunthameter.model_eval/1`, updated 2026-11-17T09:40:41Z).
 
 | stage | weights | split (n images) | device | pothole n_gt | pothole box AP50 | AP50-95 | P / R @ conf 0.25 | best F1 | mask IoU | ms/img mean |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -86,6 +86,11 @@ Source: `reports/model_eval.json` (schema `gunthameter.model_eval/1`, updated 20
 | baseline_bootstrap | `weights/bootstrap_pothole_yolov8s.pt` | test (514) | NVIDIA GeForce MX330 | 1038 | 0.0043 | 0.0018 | 0.048 / 0.003 | 0.011 | n/a | 157 |
 | baseline_bootstrap_seg4 | `weights/bootstrap_pothole_yolo26m.pt` | test (1018) | NVIDIA GeForce MX330 | 1038 | 0.0478 | 0.0136 | 0.132 / 0.098 | 0.120 | n/a | 269 |
 | trained_y26n_seg_india_laptop | `runs/seg/y26n_seg_india_laptop/weights/best.pt` | test (1018) | NVIDIA GeForce MX330 | 1038 | 0.2174 | 0.0720 | 0.502 / 0.127 | 0.303 | 0.689 | 118 |
+| baseline_bootstrap_yolo26m_v2test | `weights/bootstrap_pothole_yolo26m.pt` | test (1843) | NVIDIA GeForce RTX 5080 | 3428 | 0.0651 | 0.0231 | 0.184 / 0.092 | 0.124 | n/a | 4 |
+| trained_y26n_laptop_v2test | `runs/seg/y26n_seg_india_laptop/weights/best.pt` | test (1843) | NVIDIA GeForce RTX 5080 | 3428 | 0.1074 | 0.0395 | 0.502 / 0.059 | 0.196 | 0.702 | 26 |
+| baseline_web_keremberke_yolov8s_seg | `weights/pretrained/keremberke_yolov8s_pothole_seg.pt` | test (1843) | NVIDIA GeForce RTX 5080 | 3428 | 0.0063 | 0.0045 | 0.023 / 0.008 | 0.016 | 0.717 | 19 |
+| trained_y26m_seg_india_v2 | `runs/seg/y26m_seg_india_v2/weights/best_pothole.pt` | test (1843) | NVIDIA GeForce RTX 5080 | 3428 | 0.1312 | 0.0516 | 0.490 / 0.083 | 0.209 | 0.743 | 20 |
+| trained_y26m_seg_india_v2ft_geo | `runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt` | test (1843) | NVIDIA GeForce RTX 5080 | 3428 | 0.1521 | 0.0607 | 0.499 / 0.102 | 0.238 | 0.731 | 26 |
 
 Run notes (from the file):
 - `baseline_bootstrap` / `weights/bootstrap_pothole_yolo26m.pt`: SEG_WEIGHTS default (D9): 1-class 'Pothole' detector, trained at imgsz 512; evaluated at 640
@@ -94,14 +99,18 @@ Run notes (from the file):
 - `baseline_bootstrap` / `weights/bootstrap_pothole_yolov8s.pt`: detection-only weights: mask metrics are n/a
 - `baseline_bootstrap_seg4` / `weights/bootstrap_pothole_yolo26m.pt`: 4-class dataset india_pothole_seg4 (D15): test = 514 RDD-India + 504 eYantra frames
 - `baseline_bootstrap_seg4` / `weights/bootstrap_pothole_yolo26m.pt`: detection-only weights: mask metrics are n/a
+- `baseline_bootstrap_yolo26m_v2test` / `weights/bootstrap_pothole_yolo26m.pt`: mfranzon/pothole-yolo26 (AGPL-3.0), detection only
+- `baseline_bootstrap_yolo26m_v2test` / `weights/bootstrap_pothole_yolo26m.pt`: detection-only weights: mask metrics are n/a
+- `trained_y26n_laptop_v2test` / `runs/seg/y26n_seg_india_laptop/weights/best.pt`: the 2026-11-15 laptop model (current SEG_WEIGHTS stopgap) on the v2 test split
+- `baseline_web_keremberke_yolov8s_seg` / `weights/pretrained/keremberke_yolov8s_pothole_seg.pt`: YOLOv8s-seg fine-tuned on a <1k-image Roboflow pothole set (2023); no licence stated: evaluation only
 
-PLAN WP3 acceptance (evaluated by `ml/eval.py` only on a full test-split run of a trained, non-baseline model): **evaluated (see *_ok flags)**; evaluated on `trained_y26n_seg_india_laptop (runs/seg/y26n_seg_india_laptop/weights/best.pt)`.
+PLAN WP3 acceptance (evaluated by `ml/eval.py` only on a full test-split run of a trained, non-baseline model): **evaluated (see *_ok flags)**; evaluated on `trained_y26m_seg_india_v2ft_geo (runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt)`.
 
 | metric | target | value | status |
 |---|---|---|---|
-| box mAP50, RDD-India D40 test | >= 0.7 (WP3 hard floor (target 0.75)) | 0.221 | BELOW TARGET |
-| box mAP50-95 | >= 0.45 (PLAN 3.4 target) | 0.072 | BELOW TARGET |
-| mask IoU, eYantra test | >= 0.65 (WP3 floor (PLAN 3.4 target 0.70)) | 0.689 | meets |
+| box mAP50, RDD-India D40 test | >= 0.7 (WP3 hard floor (target 0.75)) | 0.249 | BELOW TARGET |
+| box mAP50-95 | >= 0.45 (PLAN 3.4 target) | 0.061 | BELOW TARGET |
+| mask IoU, eYantra test | >= 0.65 (WP3 floor (PLAN 3.4 target 0.70)) | 0.731 | meets |
 | FP per 1,000 frames (after verifier) | <= 5 (PLAN 3.4 target) | not in file | - |
 
 Targets as recorded in the file (thresholds, not results): `box_map50_pothole_rdd_india_test` floor 0.7, target 0.75; `box_map50_95_pothole_rdd_india_test` target 0.45; `mask_iou` floor 0.65, target 0.7; `onnx_map50_delta` max_abs 0.02.

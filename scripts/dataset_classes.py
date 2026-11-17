@@ -1,6 +1,6 @@
 """Print the classes of the training dataset and how many labelled instances each split has.
 
-    python scripts/dataset_classes.py [--dataset data/datasets/india_pothole_seg4]
+    python scripts/dataset_classes.py [--dataset data/datasets/india_pothole_seg4_v2]
 
 Reads only ``data.yaml`` and ``stats.json`` written by ``data/build_dataset.py``; when ``stats.json`` is missing it
 counts the YOLO-seg label files itself.
@@ -44,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         d = a.dataset
     if not (d / "data.yaml").is_file():
-        print(f"no dataset at {d} (build it with: tasks.ps1 dataset / make dataset)")
+        print(f"no dataset at {d} (build it with: make dataset)")
         return 1
     cfg = yaml.safe_load((d / "data.yaml").read_text(encoding="utf-8"))
     names = {int(k): str(v) for k, v in (cfg.get("names") or {}).items()}

@@ -1,4 +1,4 @@
-"""Run the real GunthaMeter API for a simulator run, with a synthetic depth source that keeps it in budget.
+"""Run the real RoadFix API for a simulator run, with a synthetic depth source that keeps it in budget.
 
     python edge/sim/sim_server.py --db data/tmp_wp7/fleet.db --copy-from data/gunthameter.db \
         --store data/tmp_wp7/store --port 8002
@@ -148,7 +148,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     import uvicorn
 
     app = build_app(db, store, a.port, a.depth, a.host)
-    print(f"GunthaMeter sim API on http://{a.host}:{a.port}  db={db}  store={store}  depth={a.depth}", flush=True)
+    print(f"RoadFix sim API on http://{a.host}:{a.port}  db={db}  store={store}  depth={a.depth}", flush=True)
     uvicorn.run(app, host=a.host, port=a.port, log_level=a.log_level)
     return 0
 

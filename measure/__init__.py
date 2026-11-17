@@ -1,4 +1,4 @@
-"""GunthaMeter measurement core (pure library: no DB, no FastAPI imports).
+"""RoadFix measurement core (pure library: no DB, no FastAPI imports).
 
 Public contracts live in :mod:`measure.types`. Algorithms (surface fit, mask
 integral, fusion, IMU, IRC bins) are implemented in WP2 and must only exchange

@@ -23,8 +23,8 @@ export default defineConfig(({ mode }) => {
         },
         includeAssets: ['favicon.svg', 'robots.txt'],
         manifest: {
-          name: 'GunthaMeter — గుంత మీటర్',
-          short_name: 'GunthaMeter',
+          name: 'RoadFix — Pothole Detection & Maintenance',
+          short_name: 'RoadFix',
           description: 'Pothole measurement, prioritisation and repair operations for Telangana',
           lang: 'te',
           dir: 'ltr',

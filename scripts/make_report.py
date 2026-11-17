@@ -1,7 +1,7 @@
 """Validation report: reports/measure_demo + reports/model_eval.json + staged truth -> reports/REPORT.md (WP11).
 
 Reads only files other steps already wrote; runs no model and needs no database:
-  * ``reports/measure_demo/`` (``tasks.ps1 measure-demo``): summary.json, synthetic_accuracy.csv/json,
+  * ``reports/measure_demo/`` (``make measure-demo``): summary.json, synthetic_accuracy.csv/json,
     sigma_coverage.json, k_recovery.json, real/<image>.json
   * ``reports/model_eval.json`` (WP3 ``ml/eval.py``): any JSON; known metric names are matched against the PLAN
     targets, every scalar is listed. Missing -> the report says "pending" (and so does stdout).
@@ -95,7 +95,7 @@ def synthetic_section(md: Path) -> tuple[list[str], dict[str, Any]]:
         with open(md / "synthetic_accuracy.csv", newline="", encoding="utf-8") as f:
             rows = list(csv.DictReader(f))
     if not rows and not syn:
-        L += [f"**{PENDING}**: run `.\\scripts\\windows\\tasks.ps1 measure-demo` (writes `{_rel(md)}`).", ""]
+        L += [f"**{PENDING}**: run `make measure-demo` (writes `{_rel(md)}`).", ""]
         status["synthetic"] = PENDING
         return L, status
     if rows:
@@ -433,7 +433,7 @@ def build_report(measure_dir: Path, model_eval: Path, truth_summary: Path, rehea
             return "not in file", "-"
         return f"{e['value']:.3f}", pf(e["pass"])
 
-    head = ["# GunthaMeter validation report", "",
+    head = ["# RoadFix validation report", "",
             f"Generated {now.isoformat(timespec='seconds')} (UTC) = {now.astimezone(IST).strftime('%Y-%m-%d %H:%M')} "
             "IST by `scripts/make_report.py`. Every number below is copied from an artefact file named in its "
             "section; nothing is typed in by hand.", "",

@@ -1,4 +1,4 @@
-"""HTTP client for the GunthaMeter API as an edge device / staff user would use it (``edge/protocol.md``).
+"""HTTP client for the RoadFix API as an edge device / staff user would use it (``edge/protocol.md``).
 
 Works with a live server (``httpx.Client``) or in-process (``fastapi.testclient.TestClient``, an httpx client).
 Retries: idempotent calls (presign, PUT upload, observation batches keyed by ``client_uuid``, trip fixes keyed by

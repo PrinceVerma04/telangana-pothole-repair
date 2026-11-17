@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 class ApiException(val status: Int, body: String) : IOException("HTTP $status: ${body.take(300)}")
 
 /**
- * Minimal GunthaMeter API client (edge/protocol.md). Every call here is idempotent, so transport errors, 429 and
+ * Minimal RoadFix API client (edge/protocol.md). Every call here is idempotent, so transport errors, 429 and
  * 5xx are retried with exponential backoff, re-sending the same payload. Mirrors edge/sim/client.py.
  */
 class GmApi(baseUrl: String, private val retries: Int = 4) {
