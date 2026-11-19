@@ -1,7 +1,7 @@
 """Pseudo-labels for unlabelled road frames (WP3): current segmenter (+ optional second model) -> YOLO-seg labels
 that a human reviews before they are ever trained on.
 
-    python -m ml.pseudo_label --images app_data/store/frames --weights models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt \
+    python -m ml.pseudo_label --images app_data/store/frames --weights models/base_model/pothole_seg11n.pt \
         --out datasets/extracted/pseudo/bus_frames_2026w46 [--verifier <second model .pt>] \
         [--mask auto|sam2|grabcut|ellipse] [--limit 500]
 

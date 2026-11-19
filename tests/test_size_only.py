@@ -74,6 +74,18 @@ def test_mask_above_horizon_is_rejected(cert, cfg):
     assert fm.reject_reason == "above_horizon" and fm.quality == 0.0
 
 
+def test_outline_reaching_towards_the_horizon_is_rejected(cert, cfg):
+    """D51: most of the outline is below the horizon, but its far edge lies kilometres away."""
+    fm = measure_mask_ground(rect_mask(cert, -0.5, 0.5, 5.0, 400.0), cert.K_np(), cert, cfg)
+    assert fm.reject_reason == "outline_too_far" and fm.quality == 0.0
+    assert fm.extras["far_edge_m"] > 30
+
+
+def test_implausibly_large_area_is_rejected(cert, cfg):
+    fm = measure_mask_ground(rect_mask(cert, -4.0, 4.0, 3.5, 9.0), cert.K_np(), cert, cfg)  # 8 m x 5.5 m = 44 m2
+    assert fm.reject_reason == "implausible_area"
+
+
 def test_pipeline_routes_off_to_size_only(cert, cfg):
     img = np.full((H_IMG, W_IMG, 3), 110, np.uint8)
     img = cv2.add(img, np.random.default_rng(0).integers(0, 40, img.shape, dtype=np.uint8))

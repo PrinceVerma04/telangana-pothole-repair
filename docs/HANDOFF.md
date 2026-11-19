@@ -1,94 +1,62 @@
-# HANDOFF — RoadFix on the Linux RTX 5080 box (updated 2026-11-18)
+# HANDOFF — RoadFix on the Linux RTX 5080 box (updated 2026-11-19)
 
 This file is the single source of truth for "where did we stop". Claude Code memory does NOT travel between
-machines; this file and `CLAUDE.md` replace it. Read section 0 first, then `docs/DECISIONS.md` **D27-D38** (size-only
-measurement, phone capture, automatic processing, model choice, the D38 re-organisation). Everything below section 0
-is the earlier history.
+machines; this file and `CLAUDE.md` replace it. Read section 0 first, then `docs/DECISIONS.md` **D27-D50** (size-only
+measurement, phone capture, model choice, folders, merged training, failure review, model A in use). Everything below
+section 0 is the earlier history.
 
-## 0. Current state (D38, 2026-11-18; folders re-organised 2026-11-19, D43)
+## 0. Current state (D50, 2026-11-19)
 
-**Folders (D43, README "Project layout"):** all training data in `datasets/`, every test set in its own folder under
-`test_datasets/` (no test image inside a training folder), weights and runs in `models/`, what the app writes in
-`app_data/`, dataset code in `dataset_tools/`, web tools and scripts in `tools/`. Old -> new table: DECISIONS D43.
+**Model in use: model A** `models/base_model/pothole_seg11n.pt` (+ `.onnx`): YOLO11n-seg, box and outline in one pass,
+one class (pothole), `.env SEG_WEIGHTS`. Trained by `make train-merged ONLY=A` (backbone from the supplied model
+`models/supplied_original/weights/best.pt`) on `datasets/merged_pothole_seg` (`make merged-dataset`, 11,877 / 1,216
+images) with hard height / lens / night augmentation (`ml/augment/hard.py`). All other pothole models were deleted
+(D47, D50); their scores stay in `reports/` and DECISIONS. SAM2.1 stays (outlines for box-only data).
 
-**Organisation** (README "The model and the data"):
-- base model `models/base_model/civic_yolo11n.pt`: the user-supplied Nagar Netra civic_services YOLO11n, pothole = class 1.
-  It is in use (`.env SEG_WEIGHTS`).
-- base dataset `datasets/base_nagar_netra_pothole` (`make base-dataset`; leak-free 597 / 57 / 56 split, manifest
-  inside).
-- test sets `configs/datasets.yaml`; model registry `configs/models.yaml`.
-- the earlier YOLO26-seg pipeline is the archive: `make seg-*`, datasets used as test sets, nothing deleted.
-
-**Benchmark** (`make benchmark` -> `reports/BENCHMARK.md`), model in use:
+**Benchmark** (`make benchmark` -> `reports/BENCHMARK.md`, conf 0.25), model A:
 
 | Test set | Score |
 |---|---|
-| Nagar Netra test AP50 | 0.471 |
-| RDD-India locked | 0.055 |
-| BharatPotHole | 0.010 |
-| web photos | 0.378 |
-| eYantra false alarms | **2.8 %** (lowest of all models) |
-| phone walk | **11 / 13 found, 2 / 20 false** (best of all models) |
+| mean box AP50, 17 sets | 0.529 |
+| Nagar Netra test / RDD-India locked / BharatPotHole / Kaggle web | 0.649 / 0.334 / 0.098 / 0.781 |
+| eYantra false alarms, day / night | 0.2 % / 0.4 % |
+| night check (Nagar / web / phone) | 0.660 / 0.782 / 0.278 |
+| phone street walk: outlines AP50; photos found / clean flagged | 0.274; 11 / 26 · 4 / 13 |
 
-Downloaded models score higher on the public test sets they were probably trained on, and raise 12-27 % false alarms.
+Known gap: phone pothole photos found 11 / 26 (the old model found 14); A was made the model in use by user decision
+over the D38 adoption rule (D50). Fix: mark more phone drives and fine-tune A on them.
 
-**First fine-tune** (`make train`, `det_yolo11n_ft_v1`, 80 epochs): base test 0.507, but false alarms 24.9 % and
-phone false 8 / 20. **Not adopted** (the rule: not worse on any test set). Cause: the base dataset holds only
-potholes, with no clean roads and none of the other classes.
+**Folders (D43)**: training data `datasets/`, test sets `test_datasets/` (one folder each, `configs/datasets.yaml`;
+10 generated `check_*` night / zoom sets, `make check-sets`), weights and runs `models/`, app output `app_data/`,
+dataset code `dataset_tools/`, tools `tools/`. Each has a README.
 
-**D39 (ready, run by the user)**: `make combined-dataset` then `make train DATA=combined EPOCHS=60` (~35 min):
-base x5 + the earlier train/val (13,314 images, 3,819 without potholes); adopted only if not worse on any test set.
+**Ground truth**: the phone walk (`test_datasets/phone_street_20261118`, 26 pothole / 13 clean photos) uses the
+user's outlines. Corrections from the failure-review page (`make annotate`, "Failures of …" sets, D49) are applied by
+`make annotate-export`; originals kept in `labels_original/`, "not sure" photos in `excluded.txt`. Saves are logged in
+`datasets/labelling/annotate/events.jsonl`.
 
-**D39 result**: combined fine-tune `det_yolo11n_ft_20261118_1717` NOT adopted. Base test 0.604, RDD 0.368,
-eYantra 1.5 % (all better), but the phone walk found 5 / 13 frames (base 11 / 13). Registered in `configs/models.yaml`
-(archive).
+**Dashboards**: pipeline `make e2e-dashboard` (:8795), annotation / failure review `make annotate` (:8775), test
+results `make results` (:8785), training `make dashboard` (:8765), project control `make control` (:8790), model test
+`make playground` (:8780), phone capture `make capture-public` (:8443 / ngrok). LAN pages open on a phone on the same
+Wi-Fi.
 
-**D41 (now)**: `make annotate` (or `<capture link>/annotate`): the user outlines potholes on the 39 phone-walk frames
-(and future drives); then `make annotate-export && make benchmark` scores every model against those outlines
-(`phone_street_marked`). Decide base vs combined vs retrain from that.
+**End to end**: `make e2e-demo` runs a dummy phone drive (public test photos along Banjara Hills Road No. 10) through
+model A, the API on a demo DB copy (`app_data/demo/`), plans, work orders, a repair run and KPIs; real test: `make api`
++ `make capture-public`, record on the phone, then `make e2e-dashboard`.
 
-**D41 result (2026-11-18)**: the user marked all 39 frames: 25 with potholes (41 outlines), 14 clean. Found at
-conf 0.25 (an outline counts when a box has IoU >= 0.3 with it or lies inside it):
-
-| Model | outlines found | boxes on a marked pothole | clean photos flagged |
-|---|---|---|---|
-| ft_v1 (base data only) | 25 / 41 | 26 / 27 | 4 / 14 |
-| base (in use) | 14 / 41 | 14 / 15 | 4 / 14 |
-| combined (D39) | 7 / 41 | 7 / 10 | 3 / 14 |
-
-The earlier dashcam pothole labels pull phone recall down; base-only training lifts it but costs clean-road
-discipline (eYantra 24.9 %). Proposed next run: base x5 + only the earlier CLEAN-road images (no earlier pothole
-labels), plus more marked phone drives.
-
-**D42 (ready, run by the user)**: `make train DATA=base_neg EPOCHS=80` (dataset already built: 4,235 train images, 30 %
-background; rebuild with `make negatives-dataset`). Next walk: two phones side by side (A = capture page, B = camera
-app video), then `make compare-video TRIP=<id> VIDEO=<mp4>` says whether misses come from the phone frames, the
-keyframe spacing or the model.
-
-**D42 result (2026-11-19)**: `det_yolo11n_ft_20261118_1845` (base_neg, early stop at epoch 68, best 43, 8.4 min) NOT
-adopted: far too cautious. eYantra false alarms 0.9 % and 0 / 14 clean phone photos flagged, but only 5 / 41 phone
-outlines found (phone-marked AP50 0.16 vs 0.327). Confidence sweep, phone outlines found / clean phone flagged /
-eYantra false alarms:
-
-| Model | conf 0.25 | conf 0.35 | conf 0.45 |
-|---|---|---|---|
-| base (in use) | 14 / 4 / 2.8 % | 13 / 1 / 1.9 % | 12 / 0 / 0.9 % |
-| ft_v1 | 25 / 4 / 24.9 % | 21 / 2 / 17.4 % | 18 / 2 / 12.9 % |
-| base_neg | 5 / 0 / 0.9 % | 4 / 0 / 0.6 % | 3 / 0 / 0.4 % |
-
-Every data mix so far trades phone recall against clean-road false alarms, so the broken / gravel patches marked as
-potholes on these streets look like what the public sets call clean road. Next: check whether ft_v1's eYantra "false
-alarms" are really clean (user marks a sample), and collect + mark target-domain phone / bus frames (two-phone walk).
+**Experiment history (models deleted, results in DECISIONS)**: D38 base-data fine-tune (ft_v1; best phone outlines,
+24.9 % false alarms) · D39 combined fine-tune (good public scores, poor phone) · D42 clean-roads fine-tune (too
+cautious) · D44 / D45 Kaggle notebook and its recipe on our data (worse than ours) · D48 candidate B (YOLO11s-seg,
+mean 0.521).
 
 **Next**
-1. Collect phone / bus drives on roads with real potholes (`make capture-public`; results at `<link>/dashboard`).
-2. Label those frames, plus clean-road frames as negatives, and add them to the base dataset (review: `make review`).
-3. `make train` again: the rule adopts the result only when it beats the base everywhere.
-4. Known gaps: tiny distant potholes (RDD-India 0.055) and repaired patches taken for potholes.
+1. Record real drives (`make capture-public`), mark them in `make annotate`, `make annotate-export`, fine-tune A.
+2. Make an int8 TFLite of model A for the phone / bus box (needs TensorFlow).
+3. Staged real-camera size check (`make truth`); every calibration is still `certified=false`.
 
-**Run**: `make api`, `make web`, `make capture-public` (each in its own terminal); `make help` lists everything. Shells
-that once sourced .env export old SEG_WEIGHTS / DEPTH_BACKEND. The make targets ignore those exports; for anything
-else, `unset` them first.
+**Run**: `make api`, `make web`, `make capture-public` (each in its own terminal); `make help` lists everything.
+Shells that once sourced .env export old SEG_WEIGHTS / DEPTH_BACKEND; the make targets ignore them, otherwise
+`unset` them first. Restart `make api` / `make capture-public` after changing the model.
 
 ---
 

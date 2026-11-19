@@ -1,7 +1,7 @@
 """Benchmark (D38): every model on every test set of configs/datasets.yaml.
 
     make benchmark                                   # all models of configs/models.yaml + the model in use
-    .venv/bin/python -m ml.benchmark --models models/base_model/civic_yolo11n.pt models/training_runs/detect/x/weights/best.pt
+    .venv/bin/python -m ml.benchmark --models models/base_model/pothole_seg11n.pt models/training_runs/detect/x/weights/best.pt
 
 Box test sets are scored with the same COCO matching and 101-point AP as ml.eval (ml.metrics): pothole AP50,
 AP50-95, precision / recall at confidence 0.25 and the best F1. Only the model's pothole class counts, whatever it is
@@ -83,11 +83,21 @@ def load_testset(spec: dict[str, Any], root: Path = REPO) -> dict[str, Any]:
     elif kind == "frames":
         lab = json.loads((root / spec["labels"]).read_text(encoding="utf-8"))
         want = set(lab["pothole"]) | set(lab["clean"])
-        items = [(p, None) for p in _images(img_dir) if p.name in want]
+        items = drop_excluded([(p, None) for p in _images(img_dir) if p.name in want], img_dir)
         return {"kind": kind, "items": items, "pothole": set(lab["pothole"]), "clean": set(lab["clean"])}
     else:
         raise ValueError(f"unknown test-set kind {kind!r}")
-    return {"kind": kind, "items": items}
+    return {"kind": kind, "items": drop_excluded(items, img_dir)}
+
+
+def drop_excluded(items: list, img_dir: Path) -> list:
+    """D49: photos listed in <test set>/excluded.txt (corrected as "not sure", or a "clean road" that has a pothole)
+    are not scored."""
+    f = img_dir.parent / "excluded.txt"
+    if not f.is_file():
+        return items
+    out = set(f.read_text(encoding="utf-8").split())
+    return [it for it in items if it[0].name not in out]
 
 
 # ================================================================================================ scoring

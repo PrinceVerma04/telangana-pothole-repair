@@ -1,11 +1,14 @@
 # app_data/ — what the running app writes (D43)
 
+Not in git (drives can show faces and number plates: keep them local).
+
 | Path | What |
 |---|---|
-| `gunthameter.db` | the demo SQLite database (`DATABASE_URL` in `.env`) |
+| `gunthameter.db` | the seeded demo SQLite database used by `make api` (`DATABASE_URL` in `.env`) |
 | `store/` | stored frames and files (`STORAGE_ROOT`) |
-| `capture/` | phone drives from `make capture` (frames may show faces / plates: keep local) |
+| `capture/` | real phone drives from `make capture` / `make capture-public`, with per-frame results |
+| `demo/` | demo runs: `make demo` (simulated fleet) and `make e2e-demo` (dummy phone drive); each uses its own copy of the database, so `gunthameter.db` is never changed |
 | `playground/` | uploads to the model test page |
-| `demo/`, `fleet_sim/` | simulated demo and fleet runs |
+| `fleet_sim/` | simulated fleet runs |
 | `backups/` | database backups made before schema refreshes |
-| `tiles/` | map tiles (`gis/build_tiles.sh`) |
+| `restructure_moves.json`, `restructure_undo.sh` | record of the D43 folder move and its undo script |

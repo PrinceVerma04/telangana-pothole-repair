@@ -108,7 +108,7 @@ def test_repo_registries_are_consistent():
     assert ds["base"]["pothole_id"] == 1 and {t["kind"] for t in ds["tests"]} <= {"yolo", "rdd_locked", "negatives",
                                                                                   "frames"}
     ids = [m["id"] for m in B.load_yaml(B.MODELS)["models"]]
-    assert len(ids) == len(set(ids)) and "civic_yolo11n_base" in ids
+    assert len(ids) == len(set(ids)) and "pothole_seg11n" in ids
     assert B.pothole_class_ids({0: "garbage_pile", 1: "pothole", 2: "Potholes", 3: "D40"}) == [1, 2, 3]
 
 

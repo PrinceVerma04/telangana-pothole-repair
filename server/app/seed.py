@@ -333,7 +333,7 @@ def seed_devices(db: Session) -> dict[str, Any]:
 
 def seed_model_registry(db: Session) -> int:
     n = 0
-    for name, rel, task in (("y26m_seg_india_v2ft_geo", "models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt", "seg"),):  # D24: bootstraps deleted
+    for name, rel, task in (("pothole_seg11n", "models/base_model/pothole_seg11n.pt", "seg"),):  # D50: the model in use
         path = PROJECT_ROOT / rel
         if not path.is_file():
             continue
@@ -343,8 +343,10 @@ def seed_model_registry(db: Session) -> int:
         with path.open("rb") as fh:
             for chunk in iter(lambda: fh.read(1 << 20), b""):
                 h.update(chunk)
-        db.add(m.ModelRegistry(name=name, version="v2ft_geo", task=task, format="pt", sha256=h.hexdigest(),
-                               metrics={"rdd_india_pothole_box_ap50": 0.2494, "note": "trained 2026-11-17 (D21/D24)"},
+        db.add(m.ModelRegistry(name=name, version="2026-11-19", task=task, format="pt", sha256=h.hexdigest(),
+                               metrics={"mean_box_ap50_17_sets": 0.529, "eyantra_false_alarm_rate": 0.002,
+                                        "phone_outlines_box_ap50": 0.274,
+                                        "note": "model A, YOLO11n-seg, merged data + hard aug (D48), in use (D50)"},
                                path=rel,
                                active=False, created_at=now_utc()))
         n += 1

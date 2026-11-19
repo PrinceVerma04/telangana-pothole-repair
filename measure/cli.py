@@ -1,7 +1,7 @@
 """RoadFix measurement CLI.
 
   python -m measure.cli run  --image X.jpg --calib configs/cameras/phone_demo.json \\
-                             [--mask m.png | --detect models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt] --json out.json
+                             [--mask m.png | --detect models/base_model/pothole_seg11n.pt] --json out.json
   python -m measure.cli demo --out reports/measure_demo
 
 ``run`` writes a JSON with the ``server.app.schemas.api.MeasureResponse`` shape (measurements,

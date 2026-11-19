@@ -37,6 +37,7 @@ for p in (str(REPO), str(Path(__file__).resolve().parent)):
         sys.path.insert(0, p)
 
 import dataset_review as auth  # noqa: E402  (name check, signed cookie, LAN address)
+import failure_review as fr  # noqa: E402  (D49: photo sets of model failures with editable ground truth)
 import phone_capture as pc  # noqa: E402  (access code shared with the capture page)
 
 STATE = REPO / "datasets" / "labelling" / "annotate"
@@ -115,8 +116,27 @@ def save_mark(con: sqlite3.Connection, collection: str, image: str, annotator: s
 
 # ================================================================================================ collections
 def collections(capture_root: Path = pc.STATE, phone_test: Path = PHONE_TEST,
-                video_sets: Optional[Path] = None) -> list[dict[str, Any]]:
+                video_sets: Optional[Path] = None, con: Optional[sqlite3.Connection] = None,
+                results: Optional[Path] = None) -> list[dict[str, Any]]:
     out = []
+    # D49: failures of each model on each test set (needs the test-results cache, make results)
+    res = results if results is not None else (fr.RESULTS if capture_root.resolve() == pc.STATE.resolve() else None)
+    if res is not None and fr.index(res) is not None:
+        for m in fr.models(res):
+            for set_id in fr.FAIL_SETS:
+                t = fr.testset(set_id, res)
+                if t is None:
+                    continue
+                fails = fr.failures(m["id"], set_id, res)
+                # photos corrected here stay listed (the phone walk's marks ARE its ground truth, so not there)
+                fixed = set(latest(con, fr.mark_cid(set_id))) if con is not None and set_id != "phone_street_marked" \
+                    else set()
+                d = fr.image_dir(set_id, res)
+                names = sorted(set(fails) | (fixed & {Path(it["img"]).name for it in t["items"]}))
+                out.append({"id": f"fail:{m['id']}:{set_id}", "kind": "fail", "dir": d, "names": names,
+                            "set": set_id, "model": m["id"], "fails": fails, "results": res,
+                            "group": f"Failures of {m['label']}",
+                            "name": f"{t['name'][:60]} — {len(fails)} failing photo(s)"})
     if (phone_test / "images").is_dir():
         out.append({"id": phone_test.name, "name": "Phone street walk 2026-11-18 (test set)", "kind": "test",
                     "dir": phone_test / "images"})
@@ -148,7 +168,9 @@ def find_collection(cid: str, **kw: Any) -> dict[str, Any]:
 
 def images_of(c: dict[str, Any]) -> list[str]:
     """Photos of a collection; black/blank drive frames (camera not delivering, D33) are left out."""
-    if not c["dir"].is_dir():
+    if c["kind"] == "fail":
+        return list(c["names"])
+    if not c["dir"] or not c["dir"].is_dir():
         return []
     names = sorted(p.name for p in c["dir"].iterdir() if p.suffix.lower() in IMG_EXT)
     if c["kind"] == "drive":
@@ -202,7 +224,8 @@ class Suggester:
         return [m for m in ms if m.get("suggest") and (REPO / m["path"]).is_file()]
 
     def run(self, c: dict[str, Any], name: str) -> list[dict[str, Any]]:
-        cache = STATE / "suggest" / c["id"].replace(":", "_") / f"{Path(name).stem}.json"
+        tag = "+".join(sorted(m["id"] for m in self.entries()))  # D47: guesses are cached per model set
+        cache = STATE / "suggest" / tag / c["id"].replace(":", "_") / f"{Path(name).stem}.json"
         if cache.is_file():
             return json.loads(cache.read_text())
         img = upright(c, name)
@@ -320,6 +343,9 @@ def export(con: sqlite3.Connection, capture_root: Path = pc.STATE, phone_test: P
                 lines = yolo_lines(json.loads(r["shapes"]))
                 (phone_train / "labels" / "train" / f"{stem}.txt").write_text("\n".join(lines) + ("\n" if lines else ""))
         rep[c["id"]] = counts
+    gt_sets = [r[0] for r in con.execute("SELECT DISTINCT collection FROM marks WHERE collection LIKE 'gt:%'")]
+    if gt_sets:
+        rep["test_corrections"] = fr.export_corrections({c.split(":", 1)[1]: latest(con, c) for c in gt_sets})
     if (phone_train / "images" / "train").is_dir():
         names = ["garbage_pile", "pothole", "encroachment", "billboard_hoarding", "cow", "manhole_closed",
                  "manhole_open", "manhole_broken", "streetlight_working", "streetlight_not_working", "cat", "horse",
@@ -333,7 +359,8 @@ def export(con: sqlite3.Connection, capture_root: Path = pc.STATE, phone_test: P
 
 # ================================================================================================ web app
 def make_app(state: Path = pc.STATE, capture_root: Path = pc.STATE, phone_test: Path = PHONE_TEST,
-             db_path: Optional[Path] = None, suggester: Optional[Any] = None) -> Any:
+             db_path: Optional[Path] = None, suggester: Optional[Any] = None, results: Optional[Path] = None,
+             events: Optional[Path] = None) -> Any:
     from fastapi import FastAPI, HTTPException, Request
     from fastapi.responses import HTMLResponse, JSONResponse, Response
 
@@ -352,9 +379,13 @@ def make_app(state: Path = pc.STATE, capture_root: Path = pc.STATE, phone_test: 
             raise HTTPException(401, "sign in first")
         return name
 
+    def mcid(c: dict[str, Any]) -> str:
+        """Collection the marks are stored under (failure sets share one ground truth per test set)."""
+        return fr.mark_cid(c["set"]) if c["kind"] == "fail" else c["id"]
+
     def coll(cid: str) -> dict[str, Any]:
         try:
-            return find_collection(cid, capture_root=capture_root, phone_test=phone_test)
+            return find_collection(cid, capture_root=capture_root, phone_test=phone_test, con=con, results=results)
         except ValueError as e:
             raise HTTPException(404, str(e)) from None
 
@@ -389,14 +420,23 @@ def make_app(state: Path = pc.STATE, capture_root: Path = pc.STATE, phone_test: 
         r.set_cookie(COOKIE, auth.sign(name, key), httponly=True, samesite="strict", max_age=30 * 86400)
         return r
 
+    @app.post("/api/logout")
+    def logout() -> Response:
+        r = JSONResponse({"ok": True})
+        r.delete_cookie(COOKIE)
+        return r
+
     @app.get("/api/collections")
     def cols(req: Request) -> dict:
         me = who(req)
         out = []
-        for c in collections(capture_root, phone_test):
-            marks = latest(con, c["id"])
-            n = len(images_of(c))
-            out.append({"id": c["id"], "name": c["name"], "kind": c["kind"], "images": n, "marked": len(marks),
+        for c in collections(capture_root, phone_test, con=con, results=results):
+            names = images_of(c)
+            marks = latest(con, mcid(c))
+            if c["kind"] == "fail":
+                marks = {k: v for k, v in marks.items() if k in set(names)}
+            out.append({"id": c["id"], "name": c["name"], "kind": c["kind"], "images": len(names),
+                        "marked": len(marks), "group": c.get("group"),
                         "by_status": {s: sum(1 for r in marks.values() if r["status"] == s) for s in STATUSES}})
         return {"me": me, "collections": out}
 
@@ -404,9 +444,12 @@ def make_app(state: Path = pc.STATE, capture_root: Path = pc.STATE, phone_test: 
     def items(cid: str, req: Request) -> dict:
         who(req)
         c = coll(cid)
-        marks = latest(con, cid)
+        marks = latest(con, mcid(c))
+        fails = c.get("fails", {})
         return {"items": [{"image": n, "status": marks[n]["status"] if n in marks else None,
-                           "by": marks[n]["annotator"] if n in marks else None} for n in images_of(c)]}
+                           "by": marks[n]["annotator"] if n in marks else None, **({"fail": fails[n]} if n in fails
+                                                                                    else {})} for n in images_of(c)],
+                "kind": c["kind"], "model": c.get("model"), "set": c.get("set")}
 
     @app.get("/api/item")
     def item(cid: str, image: str, req: Request) -> dict:
@@ -414,15 +457,25 @@ def make_app(state: Path = pc.STATE, capture_root: Path = pc.STATE, phone_test: 
         c = coll(cid)
         if image not in images_of(c):
             raise HTTPException(404, "unknown image")
-        r = latest(con, cid).get(image)
+        r = latest(con, mcid(c)).get(image)
+        if r is None and c["kind"] == "fail":  # not corrected yet: start from the test set's own labels
+            st, shapes = fr.original_shapes(c["set"], image, c["results"])
+            return {"image": image, "status": None, "by": None, "at": None, "shapes": shapes,
+                    "source": f"original labels ({'potholes' if st == 'potholes' else 'no pothole'})",
+                    "fail": c["fails"].get(image)}
         return {"image": image, "status": r["status"] if r else None, "by": r["annotator"] if r else None,
-                "at": r["created_at"] if r else None, "shapes": json.loads(r["shapes"]) if r else []}
+                "at": r["created_at"] if r else None, "shapes": json.loads(r["shapes"]) if r else [],
+                "source": "your correction" if (r and c["kind"] == "fail") else None,
+                "fail": c.get("fails", {}).get(image)}
 
     @app.get("/api/suggest")
     def suggest(cid: str, image: str, req: Request) -> dict:
         who(req)
+        c = coll(cid)
+        if c["kind"] == "fail":
+            return {"models": fr.suggestions(c["set"], image, c["results"])}
         try:
-            return {"models": sug.run(coll(cid), image)}
+            return {"models": sug.run(c, image)}
         except ValueError as e:
             raise HTTPException(404, str(e)) from None
 
@@ -434,9 +487,14 @@ def make_app(state: Path = pc.STATE, capture_root: Path = pc.STATE, phone_test: 
         if b.get("image") not in images_of(c):
             raise HTTPException(404, "unknown image")
         try:
-            return save_mark(con, c["id"], b["image"], me, str(b.get("status")), b.get("shapes", []))
+            out = save_mark(con, mcid(c), b["image"], me, str(b.get("status")), b.get("shapes", []))
         except ValueError as e:
             raise HTTPException(400, str(e)) from None
+        fr.log_event({"who": me, "cid": c["id"], "set": c.get("set"), "model": c.get("model"), "image": b["image"],
+                      "status": out["status"], "shapes": len(out["shapes"]),
+                      "was": (c.get("fails") or {}).get(b["image"])}, events or (
+            fr.EVENTS if capture_root.resolve() == pc.STATE.resolve() else capture_root / "events.jsonl"))
+        return out
 
     @app.get("/media")
     def media(cid: str, image: str, req: Request) -> Response:

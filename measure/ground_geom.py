@@ -27,7 +27,8 @@ from measure.pothole_geom import _erode, _rect_lw, image_gates, range_gate, spec
 from measure.surface import intersect_rays, road_frame
 from measure.types import CalibCert, DepthQuality, FrameMeasurement, Method, SurfaceFit, SurfaceModel
 
-DEFAULTS = {"height_sigma_m": 0.02, "pitch_sigma_deg": 0.75, "min_valid_frac": 0.9}
+DEFAULTS = {"height_sigma_m": 0.02, "pitch_sigma_deg": 0.75, "min_valid_frac": 0.9, "max_far_m": 30.0,
+            "max_area_m2": 25.0}
 
 
 def ground_surface(h_m: float, pitch_deg: float, roll_deg: float = 0.0, yaw_deg: float = 0.0) -> SurfaceFit:
@@ -57,9 +58,12 @@ def _footprint(mask: np.ndarray, K: np.ndarray, surf: SurfaceFit) -> Optional[di
     C = C.reshape(-1, 4, 3)
     okc = np.all(np.isfinite(C[..., 0]), axis=1)
     L, W, ell_x, ell_z, perim = _rect_lw(C[okc])
+    # far edge from the outline's boundary (pixels under-sample the far part): 98th pct. of corner distances
+    far = float(np.percentile(np.linalg.norm(C[okc].reshape(-1, 3), axis=1), 98)) if okc.any() else float("inf")
     return {"area": float(a[valid].sum()), "L": L, "W": W, "ell_x": ell_x, "ell_z": ell_z, "perim": perim,
             "a_bnd": float(a[valid & bnd[vs, us]].sum()), "valid_frac": float(valid.mean()),
-            "range": float(np.median(tA[valid])), "lane": float(np.median(A[valid, 0])),
+            "range": float(np.median(tA[valid])), "range_far": far,
+            "lane": float(np.median(A[valid, 0])),
             "gxz": (float(np.median(A[valid, 0])), float(np.median(A[valid, 2])))}
 
 
@@ -112,6 +116,10 @@ def measure_mask_ground(mask: np.ndarray, K: np.ndarray, cert: CalibCert, cfg: O
         reject = f"mask_px<{cfg['mask']['min_mask_px']}"
     elif gates["q_range"] == 0.0:
         reject = "range_outside_gate"
+    elif fp["range_far"] > float(g["max_far_m"]):  # D51: the far edge near the horizon blows the area up
+        reject = "outline_too_far"
+    elif fp["area"] > float(g["max_area_m2"]):  # D51: no single pothole is this big; a wrong outline or pose
+        reject = "implausible_area"
 
     # water: no depth to test shallowness, so only the verifier class decides; the specular score is kept as a hint
     water = verifier_cls == "pothole_water"
@@ -121,7 +129,8 @@ def measure_mask_ground(mask: np.ndarray, K: np.ndarray, cert: CalibCert, cfg: O
         "assumptions": "flat road; outline = rim at road level; camera at its calibrated height and pitch",
         "sigma_parts": {"pose_area_m2": pose["area"], "pose_length_m": pose["L"], "pose_width_m": pose["W"],
                         "height_sigma_m": dh, "pitch_sigma_deg": dp, "boundary_px": b_px},
-        "perimeter_m": fp["perim"], "valid_px_frac": fp["valid_frac"], "gates": gates, "water": water_info,
+        "perimeter_m": fp["perim"], "valid_px_frac": fp["valid_frac"], "far_edge_m": fp["range_far"],
+        "gates": gates, "water": water_info,
         "offset_from_vehicle_centre_m": fp["lane"] + cert.lateral_offset_m,
     }
     return FrameMeasurement(

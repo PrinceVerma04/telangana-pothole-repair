@@ -25,7 +25,7 @@ PROFILES_YAML = REPO_ROOT / "configs" / "model" / "train_profiles.yaml"
 RUNS_SEG = REPO_ROOT / "models" / "training_runs" / "seg"
 REPORTS = REPO_ROOT / "reports"
 REGISTRY_DIR = REPO_ROOT / "models" / "registry"
-DEFAULT_SEG_WEIGHTS = "models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt"  # D24: best trained model (RDD-India AP50 0.2494)
+DEFAULT_SEG_WEIGHTS = "models/base_model/pothole_seg11n.pt"  # D50: model A (was civic_yolo11n, D47)
 
 
 def ultralytics_env() -> None:

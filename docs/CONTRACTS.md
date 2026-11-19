@@ -14,7 +14,7 @@ Any work package that needs to change one of these files updates this document i
 | IRC constants | `configs/irc_rules.yaml` | WP2 (`measure/irc.py`), WP8 |
 | Priority weights | `configs/priority.default.yaml` | WP5 |
 | Rate card | `configs/rate_card.ghmc_fy2026.yaml` | WP8 |
-| Measurement parameters | `configs/measure.yaml` | WP2, WP6 |
+| Measurement parameters | `configs/measure.yaml`. D51 added `ground.max_far_m` (30) and `ground.max_area_m2` (25): a size-only outline whose far edge lies beyond 30 m, or whose area exceeds 25 m², is rejected (`outline_too_far` / `implausible_area`) instead of producing a size | WP2, WP6 |
 | Camera certificates | `configs/cameras/*.json` (`CalibCert`) | WP2, WP6, WP7 |
 
 ## Units (never mixed)

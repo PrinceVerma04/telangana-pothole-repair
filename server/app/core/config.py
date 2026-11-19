@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     REDIS_URL: Optional[str] = None
 
     # models
-    SEG_WEIGHTS: str = "models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt"  # D24
+    SEG_WEIGHTS: str = "models/base_model/pothole_seg11n.pt"  # D50 (.env sets it too)
     VERIFIER_WEIGHTS: str = ""  # D24: no second model
     VERIFIER: str = "off"
     DEPTH_BACKEND: str = "off"  # D27: size-only (no depth model); da2_metric to measure depth again

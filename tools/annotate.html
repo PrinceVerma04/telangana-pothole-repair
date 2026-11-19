@@ -60,6 +60,7 @@ kbd{font:11px ui-monospace,monospace;border:1px solid var(--line);border-radius:
   <span id="prog" class="mute"></span>
   <span style="flex:1"></span>
   <span id="who" class="mute small"></span>
+  <button id="relog" class="small" title="Sign in again under another name">change name</button>
 </header>
 <main>
   <div id="stage">
@@ -109,8 +110,12 @@ kbd{font:11px ui-monospace,monospace;border:1px solid var(--line);border-radius:
         <span class="sw" style="background:var(--clean);margin-left:8px"></span>no pothole
         <span class="sw" style="background:var(--unsure);margin-left:8px"></span>not sure</div>
     </div>
-    <div class="small mute">Mark the whole broken area of each pothole (not cracks, not patched repairs). Keys:
-      <kbd>N</kbd>/<kbd>P</kbd> next/prev, <kbd>Esc</kbd> cancel shape, <kbd>Del</kbd> delete the last shape.</div>
+    <div class="small mute">Failure sets: the photo opens with its current labels as red outlines; drag a red corner
+      to correct it, × to delete one, draw what is missing, then save. Dashed = what each model found.<br>
+      <b>Delete a red shape</b>: point at it and press Delete, or × in the list. Dashed boxes are only the models'
+      guesses (never saved): hide them with G or the tick box per model.<br>
+      Mark the whole broken area of each pothole (not cracks, not patched repairs). Keys:
+      <kbd>N</kbd>/<kbd>P</kbd> next/prev, <kbd>Esc</kbd> cancel shape, <kbd>Del</kbd> delete the shape under the pointer.</div>
   </aside>
 </main>
 <div id="login"><form id="lf">
@@ -125,7 +130,7 @@ kbd{font:11px ui-monospace,monospace;border:1px solid var(--line);border-radius:
 "use strict";
 const $ = id => document.getElementById(id);
 const COLORS = ["#ff9f1a", "#22d3ee", "#a78bfa", "#f472b6"];
-const S = {cid: null, items: [], i: 0, img: null, shapes: [], saved: "[]", status: null, sug: [], tool: "poly",
+const S = {hidden: new Set(), hoverShape: null, cid: null, items: [], i: 0, img: null, shapes: [], saved: "[]", status: null, sug: [], tool: "poly",
   draft: null, view: {s: 1, x: 0, y: 0}, hover: null, pan: null, space: false};
 
 async function api(path, opts = {}) {
@@ -137,6 +142,8 @@ async function api(path, opts = {}) {
   return j;
 }
 function showLogin() { $("login").style.display = "flex"; $("lname").focus(); }
+$("relog").onclick = async () => { await leave(); await fetch("api/logout", {method: "POST", credentials: "same-origin"});
+  $("lname").value = ""; showLogin(); };
 $("lf").onsubmit = async e => {
   e.preventDefault(); $("lerr").textContent = "";
   try {
@@ -149,9 +156,13 @@ async function start() {
   const j = await api("api/collections");
   $("who").textContent = "signed in as " + j.me;
   const sel = $("coll"); sel.innerHTML = "";
+  const groups = {};
   for (const c of j.collections) {
     const o = document.createElement("option"); o.value = c.id;
-    o.textContent = `${c.name} — ${c.marked}/${c.images} marked`; sel.appendChild(o);
+    o.textContent = c.kind === "fail" ? `${c.name} · ${c.marked} corrected` : `${c.name} — ${c.marked}/${c.images} marked`;
+    const g = c.group || "Photo sets";
+    if (!groups[g]) { groups[g] = document.createElement("optgroup"); groups[g].label = g; sel.appendChild(groups[g]); }
+    groups[g].appendChild(o);
   }
   if (!j.collections.length) { $("hint").textContent = "No photos yet."; return; }
   const want = new URLSearchParams(location.hash.slice(1)).get("c");
@@ -176,7 +187,9 @@ function strip() {
     const b = document.createElement("button");
     b.textContent = t.image.replace(/\.[a-z]+$/i, "").replace(/^0+(?=\d)/, "");
     b.className = (t.status || "") + (k === S.i ? " cur" : "");
-    b.title = t.image + (t.status ? ` — ${t.status} (${t.by})` : " — not marked");
+    b.title = t.image + (t.status ? ` — ${t.status} (${t.by})` : " — not marked") +
+      (t.fail ? ` — model missed ${t.fail.missed}, false alarms ${t.fail.false}` : "");
+    if (t.fail && !t.status) b.style.borderStyle = "dashed";
     b.onclick = async () => { await leave(); await go(k); };
     s.appendChild(b);
   });
@@ -198,8 +211,9 @@ async function go(i) {
   })]);
   if (S.items[S.i] !== t) return;
   S.img = img; S.shapes = it.shapes; S.saved = JSON.stringify(it.shapes); S.status = it.status;
-  $("last").textContent = it.status ? `Saved: ${it.status} by ${it.by} (${(it.at || "").replace("T", " ").slice(0, 16)} UTC)`
-    : "Not marked yet.";
+  const fl = it.fail ? ` · model: missed ${it.fail.missed}${it.fail.gt ? "/" + it.fail.gt : ""}, false alarms ${it.fail.false}` : "";
+  $("last").textContent = (it.status ? `Saved: ${it.status} by ${it.by} (${(it.at || "").replace("T", " ").slice(0, 16)} UTC)`
+    : (it.source ? `Showing the ${it.source} — correct them and save` : "Not marked yet.")) + fl;
   $("busy").style.display = "none"; fit(); strip(); statusButtons(); shapeList(); msg("");
   api("api/suggest?" + q).then(j => { if (S.items[S.i] === t) { S.sug = j.models; renderSug(); draw(); } })
     .catch(x => { $("sug").textContent = "model guesses unavailable: " + x.message; });
@@ -236,7 +250,9 @@ function renderSug() {
   const d = $("sug"); d.innerHTML = "";
   S.sug.forEach((m, k) => {
     const row = document.createElement("div"); row.className = "shape";
-    row.innerHTML = `<span><span class="sw" style="background:${COLORS[k % 4]}"></span></span>`;
+    row.innerHTML = `<label style="display:flex;align-items:center;gap:4px"><input type="checkbox" ${S.hidden.has(m.model) ? "" : "checked"}
+      title="show / hide this model's boxes"><span class="sw" style="background:${COLORS[k % 4]}"></span></label>`;
+    row.firstChild.querySelector("input").onchange = (e) => { e.target.checked ? S.hidden.delete(m.model) : S.hidden.add(m.model); draw(); };
     row.firstChild.append(`${m.label}: ${m.boxes.length} box${m.boxes.length === 1 ? "" : "es"}`);
     if (m.boxes.length) {
       const b = document.createElement("button"); b.textContent = "accept all"; b.title = "Add all of them as potholes";
@@ -247,7 +263,8 @@ function renderSug() {
   });
 }
 function acceptBox(bx) {
-  const s = {type: "box", pts: bx.pts.map(p => p.slice())};
+  const s = bx.poly && bx.poly.length >= 3 ? {type: "polygon", pts: bx.poly.map(p => p.slice())}
+    : {type: "box", pts: bx.pts.map(p => p.slice())};
   if (!S.shapes.some(x => JSON.stringify(x.pts) === JSON.stringify(s.pts))) S.shapes.push(s);
   shapeList(); draw();
 }
@@ -291,18 +308,22 @@ function draw() {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.setTransform(d, 0, 0, d, 0, 0);
   if (!S.img) return;
   ctx.drawImage(S.img, S.view.x, S.view.y, S.img.width * S.view.s, S.img.height * S.view.s);
-  if ($("showSug").checked) S.sug.forEach((m, k) => m.boxes.forEach(b => {
+  if ($("showSug").checked) S.sug.forEach((m, k) => !S.hidden.has(m.model) && m.boxes.forEach(b => {
     ctx.setLineDash([6, 4]); ctx.lineWidth = 2; ctx.strokeStyle = COLORS[k % 4];
-    path(boxPts(b.pts), true); ctx.stroke(); ctx.setLineDash([]);
+    path(boxPts(b.pts), true); ctx.stroke();
+    if (b.poly) { ctx.setLineDash([2, 3]); path(b.poly, true); ctx.stroke(); }
+    ctx.setLineDash([]);
     const [x, y] = toScr(Math.min(b.pts[0][0], b.pts[1][0]), Math.min(b.pts[0][1], b.pts[1][1]));
     ctx.fillStyle = COLORS[k % 4]; ctx.font = "12px system-ui"; ctx.fillText(b.conf.toFixed(2), x + 3, y - 4);
   }));
   S.shapes.forEach((s, k) => {
     path(s.type === "box" ? boxPts(s.pts) : s.pts, true);
-    ctx.fillStyle = k === S.hover ? "rgba(255,45,85,.45)" : "rgba(255,45,85,.22)"; ctx.fill();
+    ctx.fillStyle = k === S.hover || k === S.hoverShape ? "rgba(255,45,85,.45)" : "rgba(255,45,85,.22)"; ctx.fill();
     ctx.lineWidth = 2; ctx.strokeStyle = "#ff2d55"; ctx.stroke();
     const [x, y] = toScr(s.pts[0][0], s.pts[0][1]);
     ctx.fillStyle = "#fff"; ctx.font = "bold 12px system-ui"; ctx.fillText("#" + (k + 1), x + 3, y - 4);
+    if (!S.draft && (k === S.hoverShape || k === S.hover)) handles(s).forEach(([u, v]) => { const [hx, hy] = toScr(u, v);
+      ctx.fillStyle = "#fff"; ctx.fillRect(hx - 3, hy - 3, 6, 6); ctx.strokeStyle = "#ff2d55"; ctx.strokeRect(hx - 3, hy - 3, 6, 6); });
   });
   if (S.draft) {
     const pts = S.draft.type === "box" ? boxPts(S.draft.pts) : S.draft.pts.concat(S.draft.cursor ? [S.draft.cursor] : []);
@@ -318,6 +339,27 @@ function draw() {
     : "Box: drag from one corner to the other";
 }
 
+function inside(s, u, v) {   // point in polygon / box (normalised coordinates)
+  const P = s.type === "box" ? boxPts(s.pts) : s.pts; let c = false;
+  for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+    const [xi, yi] = P[i], [xj, yj] = P[j];
+    if ((yi > v) !== (yj > v) && u < (xj - xi) * (v - yi) / ((yj - yi) || 1e-9) + xi) c = !c; }
+  return c;
+}
+function handles(s) { return s.type === "box" ? boxPts(s.pts) : s.pts; }
+function hitVertex(x, y) {   // nearest shape corner within 9 px -> {k, i}
+  let best = null, bd = 9;
+  S.shapes.forEach((s, k) => (k === S.hoverShape || k === S.hover || s.type === "box" || s.pts.length <= 12) && handles(s).forEach(([u, v], i) => { const [hx, hy] = toScr(u, v);
+    const d = Math.hypot(hx - x, hy - y); if (d < bd) { bd = d; best = {k, i}; } }));
+  return best;
+}
+function moveVertex(h, u, v) {
+  const s = S.shapes[h.k];
+  if (s.type === "polygon") { s.pts[h.i] = [u, v]; return; }
+  const [[a, b], [c, d]] = s.pts;   // box corner i: 0 (a,b) 1 (c,b) 2 (c,d) 3 (a,d)
+  const xs = [a, c], ys = [b, d], xi = h.i === 0 || h.i === 3 ? 0 : 1, yi = h.i < 2 ? 0 : 1;
+  xs[xi] = u; ys[yi] = v; s.pts = [[xs[0], ys[0]], [xs[1], ys[1]]];
+}
 function closeDraft() {
   const d = S.draft; S.draft = null;
   if (d && d.type === "polygon" && d.pts.length >= 3) { S.shapes.push({type: "polygon", pts: d.pts}); }
@@ -325,7 +367,7 @@ function closeDraft() {
 }
 function hitSuggestion(u, v) {
   if (!$("showSug").checked) return null;
-  for (const m of S.sug) for (const b of m.boxes) {
+  for (const m of S.sug) for (const b of (S.hidden.has(m.model) ? [] : m.boxes)) {
     const [[a, c], [e, f]] = b.pts, pad = 6 / (S.view.s * S.img.width);
     const onEdge = (Math.abs(u - a) < pad || Math.abs(u - e) < pad) && v > c - pad && v < f + pad ||
       (Math.abs(v - c) < pad || Math.abs(v - f) < pad) && u > a - pad && u < e + pad;
@@ -343,6 +385,7 @@ cv.addEventListener("pointerdown", e => {
   if (e.button === 1 || e.button === 2 || S.space) { S.pan = {x, y, vx: S.view.x, vy: S.view.y}; return; }
   const [u, v] = toImg(x, y);
   down = {x, y, u: clamp(u), v: clamp(v), moved: false, t: Date.now()};
+  if (!S.draft) { const h = hitVertex(x, y); if (h) { down.vertex = h; return; } }   // correct an outline corner
   if (S.tool === "box") S.draft = {type: "box", pts: [[down.u, down.v], [down.u, down.v]]};
 });
 cv.addEventListener("pointermove", e => {
@@ -351,6 +394,13 @@ cv.addEventListener("pointermove", e => {
   if (S.pan) { S.view.x = S.pan.vx + x - S.pan.x; S.view.y = S.pan.vy + y - S.pan.y; draw(); return; }
   const [u, v] = toImg(x, y);
   if (down && Math.hypot(x - down.x, y - down.y) > 5) down.moved = true;
+  if (down && down.vertex) { moveVertex(down.vertex, clamp(u), clamp(v)); draw(); return; }
+  if (!down && !S.draft) {   // show the corner handles of the outline under the pointer
+    const hv = hitVertex(x, y);
+    const k = hv ? hv.k : S.shapes.findIndex((s) => inside(s, u, v));
+    const nk = k >= 0 ? k : null;
+    if (nk !== S.hoverShape) { S.hoverShape = nk; draw(); }
+  }
   if (S.tool === "box" && down && S.draft) { S.draft.pts[1] = [clamp(u), clamp(v)]; draw(); return; }
   if (S.tool === "poly") {
     if (down && down.moved) {        // freehand trace while the button is held
@@ -366,6 +416,7 @@ cv.addEventListener("pointerup", e => {
   if (S.pan) { S.pan = null; return; }
   if (!down || !S.img) return;
   const d = down; down = null;
+  if (d.vertex) { if (d.moved) shapeList(); draw(); return; }
   if (S.tool === "box") {
     const b = S.draft; S.draft = null;
     if (b && d.moved) {
@@ -421,7 +472,8 @@ document.addEventListener("keydown", async e => {
   if (k === "Escape") { S.draft = null; draw(); return; }
   const lk = k.toLowerCase();
   const act = {o: () => tool("poly"), b: () => tool("box"), z: undo, backspace: undo, f: fit,
-    delete: () => { S.shapes.pop(); shapeList(); draw(); },
+    delete: () => { const k = S.hoverShape !== null && S.hoverShape !== undefined ? S.hoverShape : S.shapes.length - 1;
+      if (k >= 0) { S.shapes.splice(k, 1); S.hoverShape = null; shapeList(); draw(); } },
     g: () => { $("showSug").checked = !$("showSug").checked; draw(); },
     s: () => save("potholes"), c: () => save("clean"), u: () => save("unsure"),
     n: async () => { await leave(); await go(S.i + 1); }, p: async () => { await leave(); await go(S.i - 1); },

@@ -73,11 +73,11 @@ areas:
     items:
       - id: export.onnx
         title: ONNX of the model in use
-        gate: models/base_model/civic_yolo11n.onnx (supplied) or an export of an adopted fine-tune
+        gate: models/base_model/pothole_seg11n.onnx (model A, D50)
         check: {kind: file, glob: "models/base_model/*.onnx"}
       - id: export.litert
         title: LiteRT (TFLite) of the model in use for Android
-        gate: models/base_model/civic_yolo11n_int8.tflite (supplied)
+        gate: an int8 .tflite export of model A in models/base_model/ (needs TensorFlow; not made yet)
         check: {kind: file, glob: "models/base_model/*.tflite"}
       - id: export.prune_v1
         title: Delete the v1 datasets and laptop run

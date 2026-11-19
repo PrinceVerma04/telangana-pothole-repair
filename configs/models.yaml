@@ -1,38 +1,11 @@
 # D38 model registry for the benchmark. The model IN USE is whatever .env SEG_WEIGHTS points to (the benchmark marks
-# it). role: base = the starting point for training; candidate = trained from the base; archive = earlier models kept
-# for comparison (nothing is deleted).
+# it). D50 (2026-11-19): only model A is kept (user decision); every other pothole model was deleted permanently
+# (D47, D50). Their scores stay in reports/ and docs/DECISIONS.md. The user's original upload stays untouched in
+# models/supplied_original/ (not a benchmark entry).
 models:
-  - id: civic_yolo11n_base
-    path: models/base_model/civic_yolo11n.pt
+  - id: pothole_seg11n
+    path: models/base_model/pothole_seg11n.pt
     role: base
     suggest: true
-    label: "your model (base)"
-    note: "user-supplied Nagar Netra civic_services YOLO11n (16 classes, pothole = 1), trained 2026-09-07"
-  - id: logesshhh_pothole_yolov8
-    path: models/downloaded_pretrained/hf_logesshhh_pothole_yolov8.pt
-    role: archive
-    note: "D35 pretrained (HF Logesshhh/road-anomaly-pothole-yolov8m)"
-  - id: engjameso_yolov11
-    path: models/downloaded_pretrained/hf_engjameso_yolov11.pt
-    role: archive
-    note: "best HF candidate on the supplied test (public-set overlap, D36)"
-  - id: samdutse
-    path: models/downloaded_pretrained/hf_samdutse_best.pt
-    role: archive
-  - id: harisanth
-    path: models/downloaded_pretrained/hf_harisanth_best.pt
-    role: archive
-  - id: y26m_seg_india_v2ft_geo
-    path: models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt
-    role: archive
-    note: "our trained YOLO26m-seg (D21/D24)"
-  - id: det_yolo11n_ft_v1
-    path: models/training_runs/detect/det_yolo11n_ft_v1/weights/best.pt
-    role: archive
-    note: "D38 fine-tune of the base on the base dataset, NOT adopted: base test 0.507 (+0.04) but false alarms 2.8 % -> 24.9 % on eYantra and 2 -> 8 on the phone walk (pothole-only training data)"
-  - id: det_yolo11n_ft_20261118_1717
-    path: models/training_runs/detect/det_yolo11n_ft_20261118_1717/weights/best.pt
-    role: archive
-    suggest: true
-    label: "combined fine-tune"
-    note: "D39/D40 fine-tune on base x5 + earlier train/val, NOT adopted: much better on dashcam/far views and false alarms (base test 0.604, RDD 0.368, eYantra 1.5 %) but finds 5/13 phone-walk frames vs 11/13"
+    label: "model A (in use)"
+    note: "D48 YOLO11n-seg from the supplied model's backbone, merged dataset + hard height / lens / night augmentation; in use since D50: mean AP50 0.529 over 17 test sets, eYantra false alarms 0.2 %, phone outlines 0.274"

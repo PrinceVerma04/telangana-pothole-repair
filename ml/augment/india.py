@@ -7,7 +7,7 @@ in the Ultralytics hyper-parameters (PLAN 3.4).
 Use with Ultralytics 8.4 (custom transforms go through the ``augmentations`` train argument)::
 
     from ml.augment.india import india_transforms
-    YOLO("models/yolo_starting_points/yolo26n-seg.pt").train(data=..., augmentations=india_transforms())
+    YOLO("models/base_model/pothole_seg11n.pt").train(data=..., augmentations=india_transforms())
 
 Use standalone (e.g. previews, other trainers)::
 

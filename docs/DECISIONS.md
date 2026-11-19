@@ -974,3 +974,262 @@ to an archive folder, nothing deleted; a git checkpoint commit first; running se
   records (`replay.json`, `model_eval.json`, `model_registry` rows) keeps the old paths as written at the time.
 - The data moves are listed in `app_data/restructure_moves.json`, with `app_data/restructure_undo.sh` to reverse them.
 
+
+## D44. Kaggle notebook cubeai/pothole-segmentation-with-yolov8 imported and benchmarked (user request 2026-11-19)
+- **What it is**: 4 cells, run on 2024-04-07 (Ultralytics 8.1.44, Tesla P100):
+  - `YOLO('yolov8n-seg.pt').train(data=farzadnekouei pothole-image-segmentation-dataset, seed=42, epochs=100)`;
+  - all other settings default (imgsz 640, batch 16, optimizer auto, standard augmentation);
+  - its dataset is already in RoadFix (D16): train 720 = the `ws_` images of `datasets/earlier_india_pothole_v2`;
+    valid 60 = `test_datasets/web_pothole_photos`.
+- **Download**: `kaggle kernels pull` gives the code only. `kaggle kernels output` gives the 32 output files (37 MB):
+  weights, `results.csv`, `args.yaml`, plots and the run log. All are in
+  `datasets/downloads/kaggle_cubeai_pothole_seg_yolov8/` (untrusted, nothing executed; `NOTE.md`).
+- **Checkpoint safety (D17)**:
+  - `best.pt` / `last.pt` were saved with dill. The scan flags `dill._dill._load_type`, used once, for
+    `_load_type('set')`;
+  - `best.pt` was re-saved without dill through a restricted unpickler: project allow-list, plus `_load_type` mapped
+    to the allowed builtin types only;
+  - the copy `models/downloaded_pretrained/kaggle_cubeai_yolov8n_seg.pt` scans clean (`tools/undill_checkpoint.py`).
+- **Author's results** (its valid = our web test; best epoch 99 of 100, so selecting on it barely matters):
+  box mAP50 0.734, mask mAP50 0.747, P 0.76, R 0.67.
+- **RoadFix benchmark** (conf 0.25), compared with the model in use:
+
+  | Test set | Kaggle model | Model in use |
+  |---|---|---|
+  | web photos AP50 | 0.715 | 0.378 |
+  | base test AP50 | 0.512 | 0.471 |
+  | RDD-India AP50 | 0.012 | 0.055 |
+  | eYantra false alarms | 13.5 % | 2.8 % |
+  | phone walk, frames found / false | 8 / 25, 5 / 14 | 13 / 25, 4 / 14 |
+  | phone outlines AP50 | **0.059** | 0.327 |
+
+- Registered in `configs/models.yaml` as archive; not adopted. Close-range web photos alone do not transfer to the
+  phone street walk (same finding as the combined fine-tune, D39).
+
+## D45. Kaggle recipe vs ours on our data (user request 2026-11-19)
+`make kaggle-vs-ours` (`ml/kaggle_vs_ours.py`):
+1. The base dataset's boxes become SAM2 outlines (1,386 SAM2, 3 GrabCut, 5 ellipse; 64 s) ->
+   `datasets/base_nagar_netra_pothole_seg`, same images and split.
+2. Two runs with the Kaggle author's `args.yaml` settings (100 epochs, batch 16, SGD auto, seed 42), 2.8 min each:
+   - `kaggle_recipe_on_base`: from COCO yolov8n-seg;
+   - `kaggle_model_ft_on_base`: from the author's pothole model.
+3. One benchmark of all five models and `reports/KAGGLE_VS_OURS.md`.
+
+| Model | base test | eYantra false alarms | phone frames found / false | phone outlines AP50 | mean AP50 |
+|---|---|---|---|---|---|
+| in use (civic YOLO11n) | 0.471 | **2.8 %** | 13/25 · 4/14 | 0.327 | 0.248 |
+| our recipe, base data (ft_v1) | 0.507 | 24.9 % | 20/25 · 4/14 | **0.348** | **0.263** |
+| Kaggle model as downloaded | **0.512** | 13.5 % | 8/25 · 5/14 | 0.059 | 0.262 |
+| Kaggle recipe on our data | 0.421 | 36.5 % | 22/25 · 8/14 | 0.184 | 0.238 |
+| Kaggle model + our data | 0.479 | 35.2 % | 22/25 · 8/14 | 0.203 | 0.261 |
+
+- **The Kaggle side's outright wins are not useful**: web photos (its own training source), and RDD-India /
+  BharatPotHole, where every model scores 0.01–0.06.
+- **On the same data, our recipe beats the Kaggle recipe** where RoadFix needs it: base test, phone outlines, half the
+  clean-road false alarms, half the false phone frames.
+- **No model passes the adoption rule; the model in use stays.** Both Kaggle runs registered as archive.
+
+## D46. Test-results dashboard with images and detections (user request 2026-11-19)
+`make results` (`tools/test_results.py` + `.html`, LAN :8785, phone too; same access code as the capture page,
+because the test sets hold street photos).
+- **Build** (about 1 min on the RTX 5080):
+  - 7 models (in use, ft_v1, combined D39, clean roads D42, Kaggle as downloaded, Kaggle recipe / Kaggle model on
+    our data, D45) run once on all 7 test sets (about 2,000 images) at confidence 0.05;
+  - boxes, confidences and segmentation outlines are cached in `reports/test_results/preds/<model>/<set>.json`,
+    keyed by the weights' size and time;
+  - ground truth (boxes, polygons, frame labels) goes to `reports/test_results/index.json`.
+- **Page**:
+  - choose a test set, a model or two side by side, and a confidence slider;
+  - counts at that confidence (matched at IoU 0.5, highest confidence first): correct, false alarms, missed,
+    precision, recall; plus the benchmark AP50 (from `reports/*.json`);
+  - filters: missed, false alarms, correct, models disagree;
+  - large view: true potholes dashed (blue, orange when missed), correct boxes green, false alarms red, outlines
+    filled.
+- **Known effect, now visible**: on the hand-drawn phone outlines, a box inside a large broken area covers less than
+  half of it, so it counts as a false alarm plus a miss (IoU < 0.5). The AP50 on that set is strict for large areas.
+
+## D47. Only the two best models kept; every other model deleted permanently (user decision 2026-11-19)
+- **Kept**:
+  - `models/base_model/civic_yolo11n.pt`, in use, fewest false alarms (eYantra 2.8 %), phone outlines 0.327;
+    its .onnx / int8 .tflite / last.pt and `models/supplied_original/`;
+  - `det_yolo11n_ft_v1`: best on the phone outlines (0.348) and the phone photos, but 24.9 % false alarms on clean
+    roads.
+- **Deleted permanently** (user chose permanent deletion and whole run folders; about 1 GB):
+  - all 17 models in `models/downloaded_pretrained/` (HF baselines D35, the Kaggle model D44);
+  - the starting files `models/yolo_starting_points/` (yolo26n/s/m-seg, yolov8n-seg);
+  - the runs `det_yolo11n_ft_20261118_1717` (D39), `det_yolo11n_ft_20261118_1845` (D42), `kaggle_recipe_on_base`,
+    `kaggle_model_ft_on_base` (D45) and `y26m_seg_india_v2ft_geo` (D21/D24).
+- **No dataset touched.** The Kaggle download folder `datasets/downloads/kaggle_cubeai_pothole_seg_yolov8/` also
+  stays; it still holds the author's weights.
+- **Code and config updated**:
+  - `configs/models.yaml` lists the two kept models, both `suggest: true` for the annotation page; that page caches
+    guesses per model set now;
+  - default weights in `ml/common.py` and `server/app/core/config.py` are the model in use; the demo seed registers
+    it instead of the deleted y26m model;
+  - `tools/test_results.py` shows the two models.
+- **Consequences**:
+  - `make kaggle-vs-ours STAGES=train` and the archived `make seg-*` training need their starting files downloaded
+    again; `ml/kaggle_vs_ours.py` says so;
+  - `make benchmark` and `make results` now compare the two kept models;
+  - scores of the deleted models remain in `reports/` and D35–D46.
+
+## D48. Merged dataset, hard height / lens / night augmentation, two segmentation models (user request 2026-11-19)
+User: merge all datasets; Sathwik's walk and the Kaggle test data as tests; the rest split into train / val; make the
+model invariant to camera height and lens, with hard on-the-fly augmentation, working at night; plan first, then
+retrain. User choices: keep every current test set too (comparability, RDD-India lock); train both candidates.
+- **Data** `make merged-dataset` (`dataset_tools/build_merged_dataset.py`) -> `datasets/merged_pothole_seg`:
+  - sources: base (SAM2 outlines, D45) + earlier train/val (RDD-India, RDD other countries, BharatPotHole, Kaggle web,
+    eYantra);
+  - one class (pothole); cracks / manholes / clean roads are background;
+  - groups (dHash <= 24, BharatPotHole drive, eYantra sequence, Roboflow variants) never straddle train / val;
+    ~10 % of every source to val;
+  - 7 near-copies of test images left out; base ×3 and web ×2 in train;
+  - result: 11,877 train / 1,216 val images, 16,821 potholes.
+- **Augmentation** `ml/augment/hard.py`:
+  - geometry: zoom 0.3–1.7, perspective 0.0008, roll ±10°, shift ±20 %, shear 2, mixup 0.15, copy-paste 0.3,
+    close_mosaic 15;
+  - `LensDistort` (barrel / pincushion k -0.25..0.15, field of view 0.85–1.25; outlines move with the image;
+    inserted after Ultralytics' geometry by a callback that restarts the loader);
+  - pixel-only: `NightDrive` (p 0.25: linear-light exposure 1.5–12 %, shot / read noise, headlight cone, sodium /
+    LED lamps, bloom, vignetting), chromatic aberration, defocus, ISO noise, gamma, plus the India set at "strong".
+- **Check sets** `make check-sets` (`dataset_tools/build_check_sets.py`):
+  - night / zoom-out 0.6 / zoom-in 0.7 variants of the Nagar Netra test, web test and phone outlines, plus night
+    eYantra;
+  - 10 sets in `test_datasets/check_*`, registered in `configs/datasets.yaml`;
+  - the night effect is a separate implementation from training (no "teaching to the test"); the headlight pool
+    stays below daylight (phone night mean brightness 67 vs 154).
+- **Training** `make train-merged` (`ml/train_merged.py`), gentle mode, AutoBatch ~55 % GPU, 100 epochs, patience 30:
+  - A `seg11n_from_base_hard`: YOLO11n-seg, 493 / 561 weights from the model in use;
+  - B `seg11s_coco_hard`: YOLO11s-seg from COCO (`models/yolo_starting_points/yolo11s-seg.pt`, downloaded from the
+    Ultralytics releases, scan clean);
+  - then all test + check sets for A, B, the model in use and ft_v1; D38 rule; `reports/MERGED_TRAINING.md`.
+- **Result (2026-11-19 16:00)**: A 100 epochs / 1.64 h (still improving at the end); B 100 epochs / 1.60 h.
+
+  | Test (AP50 unless noted) | in use | ft_v1 | A (11n-seg) | B (11s-seg) |
+  |---|---|---|---|---|
+  | mean AP50 (all 17 sets) | 0.314 | 0.358 | **0.530** | 0.520 |
+  | Nagar Netra test | 0.471 | 0.507 | 0.649 | **0.674** |
+  | RDD-India locked | 0.055 | 0.042 | 0.334 | **0.340** |
+  | web (Kaggle) | 0.378 | 0.411 | **0.781** | 0.779 |
+  | eYantra false alarms (day / night) | 2.8 % / 0.6 % | 24.9 % / 17.2 % | **0.2 % / 0.4 %** | 1.1 % / 0.8 % |
+  | Nagar night / zoom-out / zoom-in | 0.42 / 0.48 / 0.47 | 0.48 / 0.53 / 0.52 | **0.66** / 0.69 / 0.68 | 0.63 / **0.70 / 0.70** |
+  | phone photos found / clean flagged | 13/25 · 4/14 | **20/25** · 4/14 | 12/25 · 3/14 | 15/25 · **2/14** |
+  | phone outlines | 0.327 | **0.348** | 0.283 | 0.261 |
+  | phone night / zoom-out / zoom-in | 0.21 / 0.23 / 0.32 | **0.33 / 0.31** / 0.27 | 0.28 / 0.28 / **0.33** | 0.22 / 0.27 / 0.29 |
+
+- **Rule**: both fail, on the phone walk only.
+  - A: phone frames 12 < 13; phone outlines 0.283 < 0.327.
+  - B: phone outlines 0.261; phone zoom-in 0.286 < 0.318.
+  - The model in use is kept automatically.
+- **Phone outlines, by area** (conf 0.25):
+
+  | | in use | ft_v1 | A | B |
+  |---|---|---|---|---|
+  | outlined area covered | 33 % | 51 % | 55 % | 53 % |
+  | detected area inside the outlines | 62 % | 56 % | 53 % | **67 %** |
+  | separate outlines found | 14 / 41 | **25 / 41** | 12 / 41 | 13 / 41 |
+
+  The new models cover the broken surface better but merge or miss the smaller separate patches.
+- **Failure analysis on the phone walk** (lenient matching; the test-results page now has a "lenient matching"
+  switch). Photos with a failure: in use 24, A 23, B 22, ft_v1 14. A's failures fall into three groups:
+  1. stone / gravel-filled broken strips and whole broken patches (011, 017, 021, 022, 027, 015, 020): the public
+     data rarely calls these "pothole";
+  2. small or distant patches (008, 010, 016, 023, 024, 029, 030, 037, the far ones in 013);
+  3. false alarms on smooth dusty or cement patches (003, 004, 028, 038).
+  Larger inference size does not help A / B: A finds 12 / 11 / 10 of the 41 outlines at 640 / 960 / 1280. It helps
+  the model in use slightly: 14 / 15 / 17 outlines, but eYantra false alarms rise from 2.8 to 4.5 %. Fixing this
+  needs labelled photos of these street types (phone drives marked in `make annotate`).
+
+## D49. Failure review with editable ground truth, monitored live (user request 2026-11-19)
+- **Where**: the annotation page (`tools/annotate.py` + `tools/failure_review.py`), now running on **:8776**. The
+  other session's older copy still runs on :8775; ending it was denied by this session's permissions. Both use the
+  same marks DB.
+- **Photo sets** "Failures of <model>": one per test set (phone walk, Nagar Netra test, web, BharatPotHole, eYantra
+  clean roads) for each model in the test-results cache.
+  - Each set lists the photos where that model misses a true pothole or raises a false alarm (conf 0.25, lenient
+    matching).
+  - At build time for model A: phone 23, Nagar 26, web 33, BharatPotHole 540, eYantra 1.
+- **On each photo**:
+  - the current labels open as editable outlines; drag a corner (handles show on the outline under the pointer),
+    delete, draw, or accept a model's outline;
+  - all models' detections (and seg outlines) are shown dashed;
+  - the photo panel says how the chosen model failed.
+- **Storage and export**:
+  - corrections are saved per test set (`gt:<set>`; the phone walk keeps `phone_street_20261118`);
+  - `make annotate-export` writes the labels (originals kept once in `labels_original/`; crack / manhole lines
+    kept);
+  - "not sure" photos, and clean-road photos marked as potholes, go to `<set>/excluded.txt`, which
+    `ml.benchmark.load_testset` skips;
+  - RDD-India (lock) and the check sets are not editable; rebuild the check sets after corrections.
+- **Monitoring**: every save is appended to `datasets/labelling/annotate/events.jsonl`; the session watches it live.
+  After a batch of corrections it runs export + re-scoring and reports the change.
+- **First corrections (2026-11-19 10:37-10:49 UTC)**: 6 saves, 5 phone-walk photos, all recorded under "Claude check",
+  the test login left in this PC's browser (a "change name" button was added).
+
+  | Photo | Before | After |
+  |---|---|---|
+  | 005 | clean | 2 potholes |
+  | 007 | clean | 1 pothole |
+  | 009 | 2 potholes | clean |
+  | 011 | 4 strips | 1 patch |
+  | 028 | 1 pothole | 2 potholes |
+
+  Exported: the phone walk now has 26 pothole photos and 13 clean; the phone check sets were rebuilt.
+- **Phone outline AP50 after the corrections**: in use 0.275, ft_v1 0.287, A 0.274, B 0.263.
+- **Rule**:
+  - A now fails only on the phone frames: found 11 < 14, and false 4 > 3;
+  - B fails on the phone outlines: 0.263 < 0.275;
+  - not adopted; the model in use stays.
+
+## D50. Model A is the model in use; every other pothole model deleted (user decision 2026-11-19)
+- **The switch**:
+  - user: "keep that model and remove rest" (model A); this overrides the D38 adoption rule, which A missed only on
+    the phone-photo counts (found 11 / 26 vs 14, false 4 / 13 vs 3);
+  - `models/base_model/pothole_seg11n.pt` = A's best.pt, plus an ONNX export (11 MB);
+  - `.env` SEG_WEIGHTS, the defaults in `ml/common.py` / `server/app/core/config.py`, the demo seed and
+    `configs/models.yaml` all point to it;
+  - checked in the live capture detector (`tools/capture_replay.default_detector`): A returns outlines directly,
+    with no SAM2.
+- **Deleted permanently** (models/ 174 -> 69 MB):
+  - civic_yolo11n .pt / .onnx / int8 .tflite / last.pt (the working copy);
+  - the ft_v1 run; the B run (seg11s_coco_hard); yolo11s-seg.pt;
+  - the Depth Anything V2 cache folders (config only, 48 KB each).
+- **Kept**:
+  - `models/supplied_original/` (the user's upload; the training starting point for `make train` /
+    `make train-merged` model A);
+  - A's training run; SAM2.1 (dataset tools outline box-only labels with it).
+- **Side effects**:
+  - the ONNX export made Ultralytics install onnx 1.23.2, onnxslim, ml_dtypes and colorama into .venv; torch
+    2.11.0+cu128 is unchanged;
+  - an int8 TFLite export of A needs TensorFlow (not installed; roadmap item open);
+  - re-training candidate B needs yolo11s-seg.pt downloaded again.
+- **Benchmark of the model in use**: mean AP50 0.529 over 17 sets; reports/BENCHMARK.md.
+
+## D51. Dummy-data end-to-end demo, pipeline dashboard, measurement plausibility gates (user request 2026-11-19)
+- **`make e2e-demo`** (`tools/e2e_demo.py`):
+  - two dummy phone drives ("bus A" morning, "bus B" afternoon), because the server confirms a pothole only after
+    >= 2 passes from >= 2 trips;
+  - route: the first 600 m of Banjara Hills Road No. 10 (OSM way 28197080, CRMP contract road, from the seeded DB);
+    1280x720 keyframes every 4 m at ~22 km/h, 1 Hz fixes, an uncertified calibration (1.30 m, 10 deg, 67 deg);
+  - keyframes are public test photos: 7 pothole photos the demo camera can measure (0.05-5 m², from Kaggle web and
+    Nagar Netra test), eYantra clean roads in between; data in `app_data/demo/capture/`, separate from real drives;
+  - production code path: model A -> measurement -> `replay_trip` -> API (sim_server on a copy of the seeded DB,
+    :8010, size-only) -> confirmation, priority, IRC severity, repair plan -> work orders + repair run
+    (`tools/demo.py tomorrows_work`) -> KPIs;
+  - result: 8 potholes on the road (7 confirmed, 1 single-pass candidate), 7 work orders (CRMP Package 4), 1 repair
+    run, 62-71 bags; about 10 s; `app_data/demo/e2e_summary.json`.
+- **`make e2e-dashboard`** (`tools/e2e_dashboard.py` + `.html`, LAN :8795; e2e-demo also serves it):
+  - per drive, demo or real: a stage funnel (keyframes -> processed -> with pothole -> potholes -> measured ->
+    distinct RoadFix potholes -> confirmed -> repair plan -> work order);
+  - an OSM map; a card per pothole (outline crop, size ± σ, severity, API status, priority, bags range and ₹, work
+    order and run);
+  - the demo's work orders, repair runs and KPIs; same access code.
+- **Bug found by the demo**:
+  - web photos projected with the demo camera gave 7.7 km² and 174 m² potholes, i.e. plans of up to 72 million bags;
+    the median-range gate did not see an outline whose far edge sits just below the horizon;
+  - `measure/ground_geom.py` now rejects `outline_too_far` (98th pct. of the outline's boundary distance >
+    `ground.max_far_m` 30 m) and `implausible_area` (> `ground.max_area_m2` 25 m²); `configs/measure.yaml` and
+    `docs/CONTRACTS.md` updated, 2 tests;
+  - such potholes now stay "not measured" (no plan) instead of producing absurd quantities.
+- **GitHub**: `.gitignore` now excludes `reports/test_results/` (thumbnails of test photos, including the user's
+  street walk) and `reports/phone_vs_video/`. No access code or key pattern is in any file to be committed.

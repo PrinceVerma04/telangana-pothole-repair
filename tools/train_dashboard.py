@@ -1,7 +1,7 @@
 """Live training dashboard for the segmenter runs (models/training_runs/seg/<name>), read-only, local machine only.
 
     make dashboard                      # http://127.0.0.1:8765  (newest run selected)
-    .venv/bin/python tools/train_dashboard.py --port 8765 --run y26m_seg_india_v2ft_geo
+    .venv/bin/python tools/train_dashboard.py --port 8765 --run seg11n_from_base_hard
 
 Run it in its own terminal next to the training terminal; Ctrl+C stops it. It never touches the training: it only
 reads files the run already writes (gm_live.json every 2 s, results.csv, gm_timing.json, gm_run.json, models/training_runs/logs/*.log)

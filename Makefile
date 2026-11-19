@@ -1,5 +1,5 @@
 # RoadFix - see README.md. All Python runs from .venv (Python 3.11, torch 2.11.0+cu128 for the RTX 5080).
-# D38 layout: BASE model models/base_model/civic_yolo11n.pt + BASE dataset datasets/base_nagar_netra_pothole (training);
+# D50: model in use models/base_model/pothole_seg11n.pt (model A, D48); BASE dataset datasets/base_nagar_netra_pothole (training);
 # every earlier dataset is a TEST set (configs/datasets.yaml). `make help` lists the targets by section.
 PY      := .venv/bin/python
 DASH_PORT ?= 8765
@@ -8,6 +8,8 @@ PLAY_PORT ?= 8780
 CONTROL_PORT ?= 8790
 LAN_HOST ?= 0.0.0.0   # read-only pages open on the office Wi-Fi (phone); LAN_HOST=127.0.0.1 = this PC only
 ANNOTATE_PORT ?= 8775
+RESULTS_PORT ?= 8785
+BUILD ?= 1
 CAPTURE_PORT ?= 8443
 API ?= http://127.0.0.1:8000
 EPOCHS ?= 80
@@ -21,9 +23,9 @@ export PYTHONPATH := $(CURDIR)
 NOENV   := env -u SEG_WEIGHTS -u DEPTH_BACKEND
 
 .PHONY: help setup lock test test-fast lint \
-        base-dataset combined-dataset negatives-dataset benchmark train dashboard \
-        api web worker ops-tick tick capture capture-public capture-replay playground annotate annotate-export compare-video review review-export control \
-        demo demo-lite measure-demo truth report db seed fleet sim-api clean \
+        base-dataset combined-dataset negatives-dataset merged-dataset check-sets train-merged kaggle-vs-ours benchmark train dashboard \
+        api web worker ops-tick tick capture capture-public capture-replay playground annotate annotate-export compare-video results review review-export control \
+        e2e-demo e2e-dashboard demo demo-lite measure-demo truth report db seed fleet sim-api clean \
         data seg-dataset seg-derive-dataset seg-derive-dataset-reviewed seg-retrain seg-train-gpu seg-retrain-smoke \
         seg-train-check seg-baselines seg-train seg-train-resume seg-eval seg-export seg-prune-v1 pseudo-label
 
@@ -56,8 +58,20 @@ base-dataset:     ## build datasets/base_nagar_netra_pothole from the supplied s
 combined-dataset: ## D39 training set: base train x5 + earlier train/val (test parts never included) -> datasets/finetune_base_plus_earlier
 	$(PY) dataset_tools/build_combined_dataset.py --overwrite
 
+merged-dataset:   ## D48 all training sources merged (potholes only, outlines), leak-free train/val -> datasets/merged_pothole_seg
+	$(PY) dataset_tools/build_merged_dataset.py --overwrite
+
+check-sets:       ## D48 night / zoom-out / zoom-in variants of the test sets (height, lens, night checks) -> test_datasets/check_*
+	$(PY) dataset_tools/build_check_sets.py
+
 negatives-dataset: ## D42 training set: base train x5 + ONLY earlier images without potholes (clean roads, cracks, manholes) -> datasets/finetune_base_plus_clean_roads
 	$(PY) dataset_tools/build_combined_dataset.py --earlier negatives --out datasets/finetune_base_plus_clean_roads --overwrite
+
+kaggle-vs-ours:   ## D45 Kaggle notebook recipe on OUR base data (2 runs) + our models -> one benchmark + reports/KAGGLE_VS_OURS.md [STAGES=seg-data,train,bench]
+	$(NOENV) $(PY) -m ml.kaggle_vs_ours $(if $(STAGES),--stages $(STAGES),)
+
+train-merged:     ## D48 train segmentation models A (11n from your model) + B (11s COCO) on the merged set, hard aug, benchmark incl. night/zoom checks, adopt only if not worse anywhere [ONLY=A|B EPOCHS SMOKE=1]
+	$(NOENV) $(PY) -m ml.train_merged $(if $(ONLY),--only $(ONLY),) $(if $(filter-out 80,$(EPOCHS)),--epochs $(EPOCHS),) $(if $(SMOKE),--smoke,)
 
 benchmark:        ## every model (configs/models.yaml + the one in use) on every test set -> reports/BENCHMARK.md
 	$(NOENV) $(PY) -m ml.benchmark
@@ -93,6 +107,9 @@ annotate:         ## D41 draw the potholes yourself (outline/box, model guesses 
 compare-video:    ## D42 phone keyframes vs a video of the same walk: make compare-video TRIP=<id> VIDEO=<mp4> [OFFSET=s] [MODELS=a,b]
 	$(NOENV) $(PY) tools/phone_vs_video.py $(TRIP) "$(VIDEO)" $(if $(OFFSET),--offset $(OFFSET),) $(if $(MODELS),--models $(MODELS),)
 
+results:          ## D46 test-results dashboard: every model on every test photo with detections / outlines, LAN :$(RESULTS_PORT) (phone too) [BUILD=0 = serve only]
+	$(NOENV) $(PY) tools/test_results.py --build $(BUILD) --port $(RESULTS_PORT)
+
 annotate-export:  ## your marks -> phone test-set labels (phone_street_marked) + datasets/finetune_phone_marked (train set 'phone')
 	$(PY) tools/annotate.py export
 
@@ -114,6 +131,12 @@ ops-tick:         ## run the ops ticks once (cron)
 tick: ops-tick
 
 ## --- demo, reports, database
+e2e-demo:         ## D51 dummy data end to end: 2 dummy drives -> model A -> measurement -> API (demo DB copy, :8010) -> plans, work orders, KPIs; then the pipeline dashboard :8795 [ARGS=--exit]
+	$(NOENV) $(PY) tools/e2e_demo.py $(ARGS)
+
+e2e-dashboard:    ## D51 pipeline dashboard LAN :8795 (phone too): demo drives + real drives, camera -> work order
+	$(NOENV) $(PY) tools/e2e_dashboard.py
+
 demo:             ## end-to-end demo with simulated buses (API :8000 + web :5173)
 	bash tools/run_demo.sh
 

@@ -1,6 +1,6 @@
 """Model evaluation -> ``reports/model_eval.json`` (PLAN 3.4 eval metrics, WP3 acceptance).
 
-    python -m ml.eval --weights models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt --stage trained_y26m_seg_india_v2ft_geo
+    python -m ml.eval --weights models/base_model/pothole_seg11n.pt --stage trained_y26m_seg_india_v2ft_geo
     python -m ml.eval --weights models/training_runs/seg/<name>/weights/best.pt --stage smoke --compare runs/.../best.onnx --limit 50
 
 Ground truth

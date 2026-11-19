@@ -14,6 +14,8 @@ ground:                               # D27 size-only mode (depth.backend off): 
   height_sigma_m: 0.02                # camera height 1-sigma on a moving bus (tape 1 cm + load/suspension)
   pitch_sigma_deg: 0.75               # pitch 1-sigma (braking, road grade)
   min_valid_frac: 0.9                 # reject when > 10 % of the outline lies above the horizon
+  max_far_m: 30.0                     # D51: reject when the outline's far edge (95th pct.) is beyond this distance
+  max_area_m2: 25.0                   # D51: reject a single pothole larger than this (wrong outline / pose)
 
 road_candidates:
   lower_frac: 0.65                    # lower 65 % of the image

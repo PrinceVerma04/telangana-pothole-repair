@@ -1,6 +1,6 @@
 # RoadFix — how the system works
 
-RoadFix finds potholes from cameras on buses, measures how deep and how big they are, decides how urgent each one is,
+RoadFix finds potholes from cameras on buses (and phones), measures how big they are, decides how urgent each one is,
 plans the repair (cold-mix bags and cost) and follows the repair until a later bus pass proves it was fixed.
 
 This page explains the flow from the camera to the closed work order, and which AI model is used at which step.
@@ -16,7 +16,7 @@ flowchart TD
     subgraph BUS["On the bus (phone or edge box)"]
         A1["Camera 1280x720, fixed mount<br/>+ GPS 1 Hz + IMU 100 Hz"] --> A2{"Bus moved >= 4 m<br/>and speed >= 5 km/h?"}
         A2 -- no --> A1
-        A2 -- yes --> A3["Pothole detector<br/>(MODEL 1: YOLO26n-seg, on device)"]
+        A2 -- yes --> A3["Pothole detector<br/>(MODEL 1: model A, YOLO11n-seg;<br/>phone capture: runs on the PC)"]
         A3 -- no pothole --> A1
         A3 -- pothole --> A4["Tracker (BoT-SORT)<br/>max 3 keyframes per pothole"]
         A4 --> A5["Observation:<br/>keyframe JPEG + masks + GPS + IMU"]
@@ -57,13 +57,13 @@ flowchart TD
 | # | Where | What happens | Why | Code |
 |---|---|---|---|---|
 | 1 | Bus | The camera runs all the time, but a frame is only taken every **4 m of travel** above 5 km/h | Equal road coverage at any speed; nothing is sent while the bus waits at a stop | `edge/protocol.md` |
-| 2 | Bus | **MODEL 1** looks for potholes in each frame | Only frames with potholes are uploaded; video is never uploaded | `edge/` |
+| 2 | Bus / PC | **MODEL 1** (model A) finds potholes and draws their outlines in each frame. With the phone capture (D28) the phone uploads every keyframe and the PC runs the model (`tools/capture_worker.py`) | Only keyframes are sent; video is never uploaded | `edge/`, `tools/capture_worker.py` |
 | 3 | Bus | The tracker follows each pothole and keeps **at most 3 keyframes**: first sight (about 10 m), middle, nearest (about 3 m) | Several views make the size more accurate; 3 limits data | `edge/protocol.md` |
 | 4 | Bus | Each keyframe is sent with masks, confidence, GPS (position, speed, heading) and IMU (vertical shake) | GPS places the pothole on the road; IMU feels the wheel hitting it | `edge/schema/` |
 | 5 | Bus | A 1 Hz trip log says where the bus drove with a working camera | Proves "a bus passed here and saw nothing" (needed to close repairs) | `trip_fix.schema.json` |
 | 6 | Server | **Verify**: detections below the confidence gate are dropped; MODEL 3 can double-check (off now) | Removes false alarms (shadows, patches, wet road) | `server/workers/stages.py` |
 | 7 | Server | **Size** (D27, default): the pothole outline is projected onto the road plane known from the camera height and tilt -> width, length, area in metres with σ. Depth (MODEL 2) is **off**; `DEPTH_BACKEND=da2_metric` turns it back on | Monocular depth on bus frames was unproven; IRC:82 can grade by width | `measure/ground_geom.py` (`measure/depth_backends/` when depth is on) |
-| 8 | Server | **Measure**: fit the flat road around the pothole, lock the scale to the camera height, measure how far the pothole surface lies below the road | Gives depth (p95 and max, mm), area (m²), volume (litres), length and width (m), each with σ and a quality score; bad frames are rejected with a reason | `measure/surface.py`, `measure/pothole_geom.py` |
+| 8 | Server | **Measure**: size-only by default (D27): area (m²), length and width (m) from the outline on the road plane, each with σ and a quality score. With depth on, the road around the pothole is fitted and depth (p95, max mm) and volume (litres) are added | Bad frames are rejected with a reason | `measure/surface.py`, `measure/pothole_geom.py` |
 | 9 | Server | **Locate + map-match**: GPS fix moved forward by the measured distance, snapped to the OSM road and direction | Two potholes in opposite lanes stay separate | `geo/` |
 | 10 | Server | **Fuse + cluster**: frames of the same pothole are combined (inverse-variance); detections within 6 m on the same road and lane become one pothole | One pothole = one record, however many buses see it | `measure/fuse.py`, `geo/cluster.py` |
 | 11 | Server | **Confirm**: a pothole becomes *confirmed* after 2 passes from 2 trips, or 1 pass + citizen report, or 1 pass + IMU jolt with good quality | A single false alarm never creates a work order | `docs/CONTRACTS.md` |
@@ -82,21 +82,24 @@ Units everywhere: depth mm, area m², volume litres, lengths m, money INR; times
 
 | # | Model | Used at | What it does | Status today |
 |---|---|---|---|---|
-| **1** | **Since D38: the base model `models/base_model/civic_yolo11n.pt`** (user-supplied Nagar Netra civic_services YOLO11n, pothole = class 1) + SAM2 outline from its box; fine-tunes via `make train`, scores in `reports/BENCHMARK.md`. Before: D35 pretrained YOLOv8m, earlier **YOLO26m-seg, fine-tuned on Indian roads** (`models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt`, Ultralytics 8.4.211) | Server detection, the model test page, and the starting point for the bus model | Finds potholes and draws their outline (mask). Classes: pothole, alligator crack, crack, manhole (only potholes are measured) | Trained 2026-11-17: 80 epochs, 640 px, AdamW, camera height / angle augmentation. **RDD-India pothole AP50 0.2494** (target 0.70, not met yet). Set as `SEG_WEIGHTS` in `.env` |
-| 1-edge | **YOLO26n-seg** (the small version), exported to LiteRT (Android) or TensorRT (Jetson) | On the bus | Same job, small enough for a ₹10–12k phone | Planned: train from the same data, then export. Android app is a skeleton |
-| **2** | **Depth Anything V2 Metric Outdoor Base** (`depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf`) | Server, step 7 | Distance of every pixel in metres from one photo. The road-plane fit and the known camera height correct its scale | **Off since 2026-11-18 (D27, `DEPTH_BACKEND=off`)**: severity comes from the width instead. Code kept; options: `da3_metric` (DA3 METRIC-LARGE), `metric3d_onnx` for Jetson, `stereo_sgbm` for stereo vans |
-| **3** | **Verifier: RF-DETR-Seg-Small** (second, different detector) | Server, step 6 | Double-checks each detection; weak ones it does not confirm are dropped | **Off** (`VERIFIER=off`): the trained verifier scored 0.004 and was deleted. Turn on only with a model that scores well |
-| 4 | **SAM2.1 Hiera Small** (`facebook/sam2.1-hiera-small`) | Dataset building only | Turns pothole boxes from RDD2022 into pothole outlines for training | Used when the dataset is rebuilt (`make dataset`) |
-| 5 | **BoT-SORT tracker** (not a neural model) | On the bus | Gives each pothole one id across frames | Part of Ultralytics |
+| **1** | **Model A** `models/base_model/pothole_seg11n.pt` (YOLO11n-seg, one class: pothole; D48, in use since D50) | Phone-capture processing on the PC, server detection, model test page, test dashboards | Finds potholes and draws each outline in **one pass**: the network gives a box, a confidence and 32 mask numbers per pothole, plus 32 shape patterns per photo; the outline is the mix of the patterns, cut to the box | Mean box AP50 0.529 over 17 test sets (`reports/BENCHMARK.md`), clean-road false alarms 0.2 %; gap: phone photos found 11 / 26. `.env SEG_WEIGHTS` |
+| 1-edge | Model A exported (`pothole_seg11n.onnx`; int8 TFLite needs TensorFlow, not made yet) | On the bus / phone | Same job on the device | Android app is a skeleton |
+| **2** | **Depth Anything V2 Metric** | Server, step 7 | Distance per pixel from one photo | **Off** (D27, `DEPTH_BACKEND=off`); its cached files were deleted (D50); code kept |
+| **3** | Verifier (second detector) | Server, step 6 | Double-checks detections | **Off** (`VERIFIER=off`) |
+| 4 | **SAM2.1 Hiera Small** (`facebook/sam2.1-hiera-small`) | Dataset building; box-only detectors | Turns a box into an outline (the photo + the box go in, the object inside comes out) | Kept for outlining box-only labels (D45); not needed for detection with model A |
+| 5 | BoT-SORT tracker (not a neural model) | On the bus | Gives each pothole one id across frames | Part of Ultralytics |
 
-Non-AI methods that matter as much as the models: RANSAC road plane + local quadratic fit, scale lock to the
-tape-measured camera height, σ propagation, inverse-variance fusion, IMU jolt check, OSM map-matching.
+Box detectors (like the supplied civic YOLO11n in `models/supplied_original/`) give boxes only; RoadFix then gets the
+outline in a second step from SAM2, falling back to GrabCut and then an ellipse (`measure/detect.py`). Model A needs
+no second step. The size measurement needs the outline, because a box includes good road around the pothole.
 
-### Model 1 training data (`datasets/earlier_india_pothole_v2`)
-8,911 train / 1,722 val / 1,843 test images; 14,564 training potholes, 70 % on Indian roads (RDD2022 India,
-BharatPotHole, eYantra, human-drawn masks). The 514 RDD-India test images are locked, so every model is scored on the
-same images. Next accuracy gain comes from data, not more epochs: review the dataset (`make review`) and add real
-frames from bus-mounted cameras.
+### Model A's training data (`datasets/merged_pothole_seg`, D48)
+11,877 train / 1,216 val images, 16,821 potholes: the supplied Nagar Netra set (outlined with SAM2) plus RDD-India,
+RDD other countries, BharatPotHole, Kaggle web photos and eYantra; cracks, manholes and clean roads are background. The
+split keeps near-duplicates, drives and photo variants together, and leaves out near-copies of test photos. On-the-fly
+augmentation (`ml/augment/hard.py`): zoom 0.3–1.7, perspective, roll (camera height and pitch), lens distortion and
+field of view, night driving (headlights, street lamps, noise), weather. The night / zoom check sets
+(`make check-sets`) measure those invariances. The next gain comes from marked photos of the target streets.
 
 ---
 
@@ -120,15 +123,18 @@ always a range, never an exact count.
 
 | Tool | Command | Address | For |
 |---|---|---|---|
-| Phone as bus camera + Drives dashboard | `make capture` (office LAN) or `make capture-public` (any network, ngrok); processing is automatic | https://&lt;pc-ip&gt;:8443 or the printed ngrok URL; results at `/dashboard` | A phone in a mount records keyframes every 4 m, GPS and jolts; upload on Wi-Fi; the PC runs the model and sends the trip to the API (D28) |
-| Project control | `make control` | http://127.0.0.1:8790 | Everything left to finish the project: gates, progress, next actions, commands; tick manual items (D26) |
-| Model test page | `make playground` | http://&lt;pc-ip&gt;:8780 | Upload photos or videos; see detection, depth, size, severity, repair estimate, plain-English summary |
-| Dataset review | `make review` | http://&lt;pc-ip&gt;:8770 | Several people mark training images keep / reject / fix |
-| Benchmark | `make benchmark` | `reports/BENCHMARK.md` | Every model on every test set (configs/datasets.yaml): base test, RDD-India, BharatPotHole, web, false alarms, phone walk (D38) |
-| Fine-tune | `make train` | terminal | Fine-tune the base model on the base dataset; adopted only if not worse on any test set (D38) |
-| Training dashboard | `make dashboard` | http://127.0.0.1:8765 | Watch training live (loss, accuracy, GPU, time left) |
-| Full demo | `make demo` | API :8000, web :5173 | 3 simulated buses over 2 days: survey, repair, bus verification, DLP |
-| Old segmentation pipeline (archive) | `make seg-retrain`, `make seg-train-gpu` | terminal | YOLO26-seg training (D17-D24), kept runnable |
+| Pipeline dashboard | `make e2e-dashboard` | http://&lt;pc-ip&gt;:8795 | One drive (the dummy demo drive or a real one) through every stage: frames, detections, sizes, severity, plans, work orders |
+| Dummy end-to-end run | `make e2e-demo` | terminal, then the pipeline dashboard | Dummy phone drive (public test photos along Banjara Hills Road No. 10) -> model A -> API on a demo DB copy -> plans, work orders, repair run, KPIs. Not field data |
+| Phone as bus camera + Drives dashboard | `make capture` (office LAN) or `make capture-public` (any network, ngrok) | https://&lt;pc-ip&gt;:8443 or the ngrok URL; `/dashboard`, `/annotate` | A phone records keyframes every 4 m, GPS and jolts; the PC runs model A and sends the drive to the API (D28) |
+| Annotation + failure review | `make annotate` | http://&lt;pc-ip&gt;:8775 | Draw potholes on drives; "Failures of …" sets show test photos where the model fails, with the labels editable (D41, D49); `make annotate-export` writes them |
+| Test results | `make results` | http://&lt;pc-ip&gt;:8785 | Every test photo with the model's boxes / outlines; strict or lenient matching; night and zoom check sets (D46) |
+| Benchmark | `make benchmark` | `reports/BENCHMARK.md` | The model in use on all 17 test sets |
+| Train | `make merged-dataset`, `make train-merged ONLY=A` | terminal | Retrain model A; adopted only if not worse on any test set |
+| Training dashboard | `make dashboard` | http://&lt;pc-ip&gt;:8765 | Watch training live |
+| Project control | `make control` | http://&lt;pc-ip&gt;:8790 | What is left to finish |
+| Model test page | `make playground` | http://&lt;pc-ip&gt;:8780 | Upload photos or videos; detection, size, severity, repair estimate |
+| Dataset review | `make review` | http://&lt;pc-ip&gt;:8770 | Mark training images keep / reject / fix |
+| Simulated fleet demo | `make demo` | API :8000, web :5173 | Simulated buses over 2 days: survey, repair, bus verification, DLP |
 
 ---
 
@@ -136,11 +142,12 @@ always a range, never an exact count.
 
 | Part | State |
 |---|---|
-| Detection model, training pipeline, dashboards | Real, running on the RTX 5080 |
-| Measurement core (depth, surface, σ, fusion, IRC, repair plan) | Real code, tested on synthetic scenes; real-camera accuracy check (`make truth`) still to do |
-| Server pipeline, operations, web app | Real code, run end-to-end with simulated buses |
+| Detection model (A), training pipeline, dashboards | Real, running on the RTX 5080 |
+| Phone capture -> processing -> API | Real code, run on real phone walks; `make e2e-demo` runs the same code on dummy photos |
+| Measurement core (size, σ, fusion, IRC, repair plan) | Real code; real-camera accuracy check (`make truth`) still to do |
+| Server pipeline, operations, web app | Real code, run end-to-end with simulated buses and the dummy drive |
 | Bus app | Simulator works (`edge/sim`); Android and Jetson apps are skeletons |
 | Database | SQLite for the demo; PostGIS for production is designed, not run |
 
-Model weights are **not in git** (`models/` is ignored, D43). After cloning, retrain with `make retrain`
-or copy `best_pothole.pt` into `models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/`.
+Model weights and data are **not in git** (D43): copy `models/base_model/pothole_seg11n.pt` from the project machine,
+or rebuild the data and retrain (`make merged-dataset`, `make train-merged ONLY=A`).

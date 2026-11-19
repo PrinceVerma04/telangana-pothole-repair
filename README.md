@@ -1,36 +1,19 @@
 # RoadFix — Pothole Detection & Maintenance
 
-Phones or bus cameras record the road → a pothole detector finds potholes → their **size** (width, length, area with
-σ) is measured from the outline and the camera height → IRC:82 severity and priority → IRC:116 / SP:100 cold-mix
-repair plan (bags as a low–high range, ₹) → work orders, SLA escalation, bus-verified repair and DLP tracking.
-Built for the Telangana R&B / Municipal Administration challenge; India-only data and standards.
+RoadFix finds potholes in photos from phones or bus cameras, outlines each one, measures its **size** (width, length,
+area in m², each with σ) from the outline and the camera height, grades it by IRC:82, ranks it by priority, plans the
+IRC:116 / SP:100 cold-mix repair (bags as a low–high range, cost in ₹), and tracks the work order until a later pass
+shows the repair held. Built for Telangana roads; India-only data and standards.
 
-- **How it works: [`docs/WORKFLOW.md`](docs/WORKFLOW.md)** · where work stopped: [`docs/HANDOFF.md`](docs/HANDOFF.md)
-- Decisions (newest at the end): [`docs/DECISIONS.md`](docs/DECISIONS.md) · plan: [`docs/PLAN.md`](docs/PLAN.md) ·
-  contracts: [`docs/CONTRACTS.md`](docs/CONTRACTS.md) · latest benchmark: [`reports/BENCHMARK.md`](reports/BENCHMARK.md)
+- How it works: [`docs/WORKFLOW.md`](docs/WORKFLOW.md) · where work stopped: [`docs/HANDOFF.md`](docs/HANDOFF.md)
+- Decisions (newest at the end, D1–D50): [`docs/DECISIONS.md`](docs/DECISIONS.md) · plan: [`docs/PLAN.md`](docs/PLAN.md)
+  · frozen interfaces: [`docs/CONTRACTS.md`](docs/CONTRACTS.md) · latest benchmark: [`reports/BENCHMARK.md`](reports/BENCHMARK.md)
 - Operations: [`docs/CALIBRATION_SOP.md`](docs/CALIBRATION_SOP.md), [`docs/DEPLOYMENT_TSRTC.md`](docs/DEPLOYMENT_TSRTC.md),
   [`docs/LICENCES.md`](docs/LICENCES.md), [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md), edge protocol
   [`edge/protocol.md`](edge/protocol.md)
 
-## The model and the data (D38)
-| What | Where | Notes |
-|---|---|---|
-| **Base model** (in use) | `models/base_model/civic_yolo11n.pt` (+ `.onnx`, `_int8.tflite`) | the supplied Nagar Netra *civic_services* YOLO11n: 16 classes, **pothole = class 1**; boxes, outlines from SAM2 |
-| **Base dataset** (training) | `datasets/base_nagar_netra_pothole/` | the supplied pothole set (710 images), re-split **leak-free** by `make base-dataset` (597 / 57 / 56) |
-| **Test sets** | `configs/datasets.yaml` | Nagar Netra test · RDD-India locked 514 · BharatPotHole · web photos · eYantra roads without potholes (false alarms) · a real phone street walk |
-| **Model registry** | `configs/models.yaml` | base, adopted fine-tunes, archived models (earlier trained / downloaded) |
-| **Model in use** | `.env` `SEG_WEIGHTS` | changed only by `make train` when its candidate passes the benchmark rule, or by hand |
-
-```bash
-make base-dataset   # build datasets/base_nagar_netra_pothole from "datasets/supplied_original/..."
-make benchmark      # every model on every test set -> reports/BENCHMARK.md (+ benchmark.json)
-make train          # fine-tune the base on the base dataset, benchmark, adopt ONLY if not worse on any test set
-make combined-dataset && make train DATA=combined EPOCHS=60   # D39: + the earlier train/val (test parts never used)
-make dashboard      # watch training live (http://127.0.0.1:8765)
-make negatives-dataset && make train DATA=base_neg   # D42: base + earlier images WITHOUT potholes (clean roads)
-make compare-video TRIP=<id> VIDEO=<mp4>          # D42: phone keyframes vs a video of the same walk
-make annotate       # D41: draw the potholes yourself (http://<pc>:8775 or <capture link>/annotate); make annotate-export
-```
+Measurements are size-only (depth off, D27). Every calibration in the repo is `certified=false`, so no number is
+billing-grade, and bags are always a range, never an exact count. Times are stored in UTC and shown in IST.
 
 ## Quickstart (Linux)
 Python **3.11** in `.venv` (never reinstall torch casually), Node 22 for the web app, an NVIDIA GPU for training.
@@ -42,44 +25,92 @@ python3.11 -m venv .venv
 .venv/bin/python -m pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu128
 .venv/bin/python -m pip install -r requirements-lock.txt
 make setup          # checks the venv, writes LOCKFILE.md
-make test           # CPU tests, ~1 min
+make test           # CPU tests
 cd web && npm ci    # once, for the web app
 ```
+Model weights and data are not in git (`.gitignore`, D43): copy `models/base_model/pothole_seg11n.pt` and the
+`datasets/` / `test_datasets/` folders from the project machine, or rebuild them (see "Training and benchmark").
 
-## Run it end to end (each in its own terminal)
+## Try it end to end with dummy data
 ```bash
-make api              # RoadFix API          http://localhost:8000
-make web              # web app              http://localhost:5173
-make capture-public   # phone page + Drives dashboard + automatic processing (prints the link + access code)
+make e2e-demo        # dummy phone drive -> model A -> size -> API (demo DB copy) -> plans, work orders, KPIs
+make e2e-dashboard   # pipeline dashboard, http://<this-pc>:8795 (phone too, same Wi-Fi)
 ```
-On a phone: open the printed link, sign in, tap **Start recording**, drive (or tick *Testing on foot*), tap Stop.
-Frames upload by themselves; the PC detects potholes, measures them, places them on the map and sends finished drives
-to the API. Results: `<link>/dashboard`; confirmed potholes, repair plans and work orders: the web app. Other tools:
-`make playground` (test a model on your own photos/videos), `make review` (review the base dataset), `make control`
-(what is left to do). `make help` lists every target by section.
+`make e2e-demo` builds a dummy drive along Banjara Hills Road No. 10 from public test photos (Kaggle web and Nagar
+Netra pothole photos about 40 m apart, eYantra clean roads in between), runs it through the real capture processing
+with model A, sends it to an API running on a copy of the demo database (`app_data/demo/`; the main database is not
+touched) and lets that API create potholes, repair plans, work orders, a repair run and KPIs. The dashboard shows every
+stage: a funnel from frames to work orders, the route and potholes on a map, and a card per pothole (photo with
+outline, size, severity, plan, work order). **Dummy data: the photos were not taken with the assumed camera, so the
+sizes, bags and costs show the flow, not field measurements.**
 
-Measurements are size-only (depth model off, D27); every calibration in the repo is `certified=false`, so nothing is
-billing-grade. The simulated end-to-end demo (`make demo`, ~12 min, logins with password `demo1234`: `admin`,
-`zonal_khairatabad`, `engineer1`, `contractor1`, `contractor2`, `citizen1`) still works for presentations.
+## Test on your real data
+```bash
+make api              # RoadFix API on :8000 (each command in its own terminal)
+make capture-public   # phone page + automatic processing; prints a link and an access code
+make e2e-dashboard    # open the real drive in the pipeline dashboard
+```
+On the phone: open the printed link, sign in, mount the phone facing the road, tap **Start recording**, drive (or tick
+*Testing on foot*), tap Stop. Keyframes upload by themselves; the PC detects, outlines and measures potholes and sends
+the drive to the API. Drives also appear at `<link>/dashboard`; confirmed potholes, plans and work orders in the web
+app (`make web`, :5173). Restart `make api` / `make capture-public` after the model changes: they load it at start.
+
+## The model and the data
+| What | Where | Notes |
+|---|---|---|
+| **Model in use: A** | `models/base_model/pothole_seg11n.pt` (+ `.onnx`) | YOLO11n-seg: box **and** outline in one pass (no SAM2 step); one class, pothole; `.env SEG_WEIGHTS` points to it (D50) |
+| How A was made | `make merged-dataset`, `make train-merged` | backbone from the supplied model, trained on the merged dataset with hard height / lens / night augmentation (`ml/augment/hard.py`, D48) |
+| Supplied original | `models/supplied_original/` | the Nagar Netra civic YOLO11n exactly as delivered (16 classes, pothole = 1); starting point for training |
+| Training data | `datasets/merged_pothole_seg` | 11,877 train / 1,216 val images, potholes only, leak-free split by near-duplicate groups (D48); sources in `datasets/README.md` |
+| Test data | `test_datasets/`, listed in `configs/datasets.yaml` | 7 test sets + 10 generated night / zoom check sets; never used for training |
+| Model registry | `configs/models.yaml` | only model A (all other pothole models were deleted, D47 / D50; their scores stay in `reports/`) |
+
+Model A on the benchmark (`reports/BENCHMARK.md`, confidence 0.25): mean box AP50 0.529 over 17 test sets; Nagar
+Netra test 0.649, RDD-India locked 0.334, Kaggle web 0.781, eYantra clean-road false alarms 0.2 %, night versions
+0.66–0.78 on the Nagar Netra and web sets, phone outlines 0.274. Known gap: on the phone street walk it finds a
+pothole in 11 of 26 pothole photos.
+
+## Dashboards and tools
+| Tool | Command | Address | For |
+|---|---|---|---|
+| Pipeline dashboard | `make e2e-dashboard` | :8795 | one drive (demo or real) through every stage |
+| Phone capture + Drives | `make capture` / `make capture-public` | https :8443 or the ngrok link; `/dashboard`, `/annotate` | phone as the bus camera, automatic processing |
+| Annotation + failure review | `make annotate` | :8775 (`ANNOTATE_PORT=` to change) | draw potholes; correct test labels where a model fails (D41, D49) |
+| Test results | `make results` (`BUILD=0` = serve only) | :8785 | every test photo with the model's boxes and outlines, strict or lenient matching (D46) |
+| Training dashboard | `make dashboard` | :8765 | training progress, live |
+| Project control | `make control` | :8790 | what is left to do |
+| Model test page | `make playground` | :8780 | try the model on your own photos and videos |
+| API / web app | `make api` / `make web` | :8000 / :5173 | operations: potholes, plans, work orders, KPIs |
+| Simulated fleet demo | `make demo` | API :8000, web :5173 | the WP12 demo with simulated buses |
+
+The LAN pages work on a phone on the same Wi-Fi at `http://<this-pc-ip>:<port>`; the ones showing street photos ask
+for the capture access code. `make help` lists every target by section.
+
+## Training and benchmark
+```bash
+make merged-dataset      # rebuild datasets/merged_pothole_seg from the base and earlier sets (leak-free)
+make check-sets          # rebuild the night / zoom check sets (after correcting test labels)
+make train-merged ONLY=A # retrain model A (~1.6 h on the RTX 5080, PC stays usable); adopts only if not worse anywhere
+make benchmark           # the registry + the model in use on every test set -> reports/BENCHMARK.md
+make results             # refresh the test-results dashboard
+make annotate-export     # write your corrections / outlines into the test labels
+```
+`make train` (box-detector fine-tune of the supplied model, `DATA=base|combined|base_neg|phone`) still works.
+Candidate B of `make train-merged` needs `yolo11s-seg.pt` downloaded again (deleted in D50).
 
 ## Project layout
-Every folder name says what is in it (D43). Data and models are not in git; each data folder has a README.
-
 | Path | What |
 |---|---|
-| `datasets/` | **all training data**: `base_nagar_netra_pothole/` (the base dataset, train + val), `finetune_*` (fine-tuning sets built from it), `earlier_india_pothole_v2/` (earlier train + val), `archive/` (v1 and all-class builds), `supplied_original/` (the dataset as delivered), `downloads/` (raw downloads, untrusted), `extracted/` (unpacked downloads, OSM/GTFS road data), `splits/` (split lists, in git), `labelling/` (review and annotation decisions) |
-| `test_datasets/` | **all test data, never trained on**: `nagar_netra_test/`, `rdd_india_locked/`, `bharatpothole_dashcam/`, `web_pothole_photos/`, `eyantra_clean_roads/`, `phone_street_20261118/`, `phone_videos/`, `video_compare/`, `staged_measurement_truth/` |
-| `models/` | `base_model/` (the model in use), `adopted_finetunes/`, `downloaded_pretrained/` (archive), `supplied_original/` (as delivered), `yolo_starting_points/` (COCO YOLO26-seg), `training_runs/` (`detect/` fine-tunes, `seg/` archive, `logs/`), `exported/`, `registry/` |
-| `app_data/` | what the running app writes: `gunthameter.db`, `store/` (frames), `capture/` (phone drives), `playground/` (model test uploads), `demo/`, `fleet_sim/`, `backups/`, `tiles/` |
-| `dataset_tools/` | code that builds datasets: `build_base_dataset.py`, `build_combined_dataset.py`, `test_split.py` (moves test splits to `test_datasets/`), archive builders (`download.py`, `build_dataset.py`, `derive_dataset.py`, SAM2 outlines) |
-| `tools/` | web tools and scripts: phone capture (`phone_capture.py`, `capture_worker.py`, `capture_replay.py`), model test page, annotation, dataset review, project control, training dashboard, demo, reports |
-| `ml/` | `benchmark.py` (all models × all test sets), `train_det.py` (fine-tune + adoption rule), detector interface (`segmenter.py`), metrics; archive: the YOLO26-seg pipeline (`pipeline.py`, `train_seg.py`, `eval.py`, `export.py`) |
-| `measure/`, `repair/`, `priority/`, `geo/`, `gis/` | size measurement (ground plane), IRC severity; repair planner; priority score; map-matching and clustering; map layers and tiles |
+| `ml/` | benchmark, training (`train_merged.py`, `train_det.py`), augmentation (`augment/`), detector interface, metrics; archive segmentation pipeline |
+| `dataset_tools/` | dataset builders (base, merged, check sets, earlier sets) |
+| `tools/` | web tools: phone capture, worker, dashboards, annotation, test results, demos |
+| `measure/`, `repair/`, `priority/`, `geo/`, `gis/` | size measurement, IRC severity, repair planner, priority, map-matching, admin layers |
 | `server/`, `web/`, `edge/` | FastAPI app and pipeline stages; React PWA; bus protocol, simulator, Android / Jetson skeletons |
-| `configs/` | `datasets.yaml`, `models.yaml`, `roadmap.yaml`, frozen contracts (classes, IRC rules, priority, rate card, cameras) |
-| `reports/`, `docs/`, `tests/` | benchmark, training and demo reports; design, decisions, handoff; tests (`make test`) |
+| `configs/` | datasets, models, roadmap, frozen contracts (classes, IRC rules, priority, rate card, cameras) |
+| `datasets/`, `test_datasets/`, `models/`, `app_data/` | data, weights and app output; not in git, each has a README |
+| `reports/` | benchmark, training, test-result and demo reports |
 
 ## Archive
-The earlier YOLO26 segmentation pipeline (D15–D24) is kept and runnable under `make seg-*` targets; its datasets
-(`datasets/earlier_india_pothole_v2`) are now the source of the RDD-India, BharatPotHole, web and eYantra test sets.
-Earlier trained and downloaded models are listed in `configs/models.yaml` with role `archive`. Nothing was deleted.
+The YOLO26 segmentation pipeline (D15–D24) is kept under `make seg-*`; its starting weights were deleted (D47), so it
+needs them downloaded before it can train again. The D39–D45 experiments (combined / clean-roads fine-tunes, the
+Kaggle notebook, `make kaggle-vs-ours`) are recorded in `docs/DECISIONS.md` and `reports/`; their models were deleted.

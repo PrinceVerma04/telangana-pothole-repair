@@ -39,3 +39,7 @@ CLAUDE.md
 
 # phone capture (D28): drives (frames with faces/plates), TLS key, per-phone calibrations
 configs/cameras/phonecap_*.json
+
+# D51: generated reports that hold photos (test photos incl. the user's street walk) or large caches
+reports/test_results/
+reports/phone_vs_video/

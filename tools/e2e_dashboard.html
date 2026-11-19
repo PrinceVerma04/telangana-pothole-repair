@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoadFix Pipeline</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+<style>
+:root{--bg:#f3f4f2;--panel:#fff;--ink:#1c201e;--mute:#5d6762;--line:#d7dcd8;--acc:#c98a00;
+  --small:#2f9e5b;--medium:#d08a00;--large:#d4380d;--unk:#7b8794;--api:#3b6fd8}
+@media (prefers-color-scheme:dark){:root{--bg:#121513;--panel:#1b1f1d;--ink:#e7ebe8;--mute:#9aa59f;--line:#2e3532;--acc:#e8a92a;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1000}
+header h1{font-size:17px;margin:0}
+select,button,input{font:inherit;color:inherit}
+select,input{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px;max-width:100%}
+button{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
+main{max-width:1400px;margin:0 auto;padding:14px 16px 40px;display:flex;flex-direction:column;gap:16px}
+.mute{color:var(--mute)} .small{font-size:12px}
+.banner{padding:10px 14px;border-radius:8px;border:1px solid var(--acc);background:color-mix(in srgb,var(--acc) 12%,var(--panel))}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+h2{font-size:15px;margin:0 0 10px}
+.funnel{display:flex;flex-direction:column;gap:6px}
+.frow{display:grid;grid-template-columns:minmax(0,1.6fr) 3fr 44px;gap:8px;align-items:center;font-size:13px}
+.bar{height:14px;background:var(--bg);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--acc);border-radius:4px}
+.bar i.api{background:var(--api)}
+.frow b{text-align:right;font-variant-numeric:tabular-nums}
+.where{font-size:11px;color:var(--mute)}
+#map{height:420px;border-radius:8px}
+.pcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.pc{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.pc img{width:100%;height:170px;object-fit:cover;background:#000;display:block}
+.pc .b{padding:10px;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:600;color:#fff;width:max-content}
+.sev-small{background:var(--small)} .sev-medium{background:var(--medium)} .sev-large{background:var(--large)} .sev-none{background:var(--unk)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:1px 10px}
+.kv span:nth-child(odd){color:var(--mute)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+td,th{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left}
+th{color:var(--mute);font-weight:500}
+.tw{overflow-x:auto}
+#login{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;padding:16px;z-index:3000}
+#login form{background:var(--panel);padding:20px;border-radius:10px;max-width:340px;width:100%;display:flex;flex-direction:column;gap:10px}
+.err{color:var(--large)}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>RoadFix · pipeline</h1>
+  <select id="drive" aria-label="Drive"></select>
+  <button id="reload">Refresh</button>
+  <span style="flex:1"></span><span id="who" class="mute small"></span>
+</header>
+<main>
+  <div id="banner" class="banner" hidden></div>
+  <div class="grid2">
+    <div class="card"><h2>From camera to work order</h2><div class="funnel" id="funnel"></div>
+      <p class="small mute" id="apinote" style="margin:10px 0 0"></p></div>
+    <div class="card"><h2>Route and potholes <span class="small mute">(colour = severity; click a dot)</span></h2><div id="map"></div></div>
+  </div>
+  <div class="card"><h2>Potholes found on this drive <span id="pcount" class="mute small"></span></h2><div class="pcards" id="cards"></div></div>
+  <div class="card" id="workcard" hidden><h2>Demo run: work orders, repair runs and KPIs</h2><div id="work"></div></div>
+</main>
+<div id="login"><form id="lf">
+  <strong>Sign in</strong><span class="small mute">Same access code as the phone capture page.</span>
+  <input id="lname" placeholder="Your name" autocomplete="name" required>
+  <input id="lcode" placeholder="Access code" autocomplete="off" required>
+  <button type="submit">Sign in</button><span id="lerr" class="err small"></span>
+</form></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const SEV = {small: "var(--small)", medium: "var(--medium)", large: "var(--large)"};
+const sevCol = (s) => getComputedStyle(document.documentElement).getPropertyValue("--" + (SEV[s] ? s : "unk")).trim() || "#888";
+let map, layer, drives = [];
+
+async function api(p, o = {}) {
+  const r = await fetch(p, {credentials: "same-origin", ...o, headers: {"Content-Type": "application/json"}});
+  if (r.status === 401) { $("login").style.display = "flex"; throw new Error("sign in first"); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || r.statusText);
+  return j;
+}
+$("lf").onsubmit = async (e) => { e.preventDefault(); $("lerr").textContent = "";
+  try { await api("api/login", {method: "POST", body: JSON.stringify({name: $("lname").value, code: $("lcode").value})});
+    $("login").style.display = "none"; start(); } catch (x) { $("lerr").textContent = x.message; } };
+
+async function start() {
+  const j = await api("api/drives");
+  drives = j.drives; $("who").textContent = j.me;
+  const lab = (d) => `${d.src === "demo" ? "DEMO · " : ""}${(d.started_at || "").slice(0, 16).replace("T", " ")} · ${d.user} · ${d.frames} keyframes`;
+  $("drive").innerHTML = ["demo", "real"].map((s) => { const ds = drives.filter((d) => d.src === s);
+    return ds.length ? `<optgroup label="${s === "demo" ? "Demo drives (dummy data)" : "Real drives"}">${ds.map((d) =>
+      `<option value="${d.src}|${d.trip_id}">${esc(lab(d))}</option>`).join("")}</optgroup>` : ""; }).join("");
+  if (!drives.length) { $("banner").hidden = false; $("banner").textContent = "No drives yet: run make e2e-demo (dummy data) or record one with the phone."; return; }
+  const want = location.hash.slice(1);
+  if (want && [...$("drive").options].some((o) => o.value === want)) $("drive").value = want;
+  await load();
+  if (j.demo) loadWork();
+}
+$("drive").onchange = () => load(); $("reload").onclick = () => load();
+
+async function load() {
+  const [src, trip] = $("drive").value.split("|");
+  location.hash = `${src}|${trip}`;
+  const v = await api(`api/drive?src=${src}&trip=${trip}`);
+  $("banner").hidden = src !== "demo";
+  if (src === "demo") $("banner").innerHTML = "<b>Dummy data.</b> Public test photos placed along Banjara Hills Road No. 10 and run through the real pipeline (model A → measurement → RoadFix API). The photos were not taken with this camera, so sizes, bags and costs only illustrate the flow.";
+  funnel(v); drawMap(v); cards(v);
+}
+
+function funnel(v) {
+  const max = Math.max(1, ...v.funnel.map((s) => s.n));
+  $("funnel").innerHTML = v.funnel.map((s) => `<div class="frow"><span>${esc(s.stage)}<br><span class="where">${esc(s.where)}</span></span>
+    <div class="bar"><i class="${s.where === "API" ? "api" : ""}" style="width:${(100 * s.n / max).toFixed(1)}%"></i></div><b>${s.n}</b></div>`).join("");
+  const a = v.api_link || {};
+  $("apinote").textContent = a.state === "ok" ? `RoadFix API ${a.base}: ${a.potholes_on_road} pothole(s) on this road in its database. Upload: ${v.api.state}${v.api.observations != null ? ", " + v.api.observations + " observations" : ""}.`
+    : `RoadFix API: ${a.state || "?"}${a.note ? " (" + a.note + ")" : ""}. Upload state: ${v.api.state}.`;
+}
+
+function drawMap(v) {
+  if (!map) { map = L.map("map"); L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19, referrerPolicy: "strict-origin-when-cross-origin", attribution: "© OpenStreetMap contributors"}).addTo(map); }
+  if (layer) layer.remove();
+  layer = L.layerGroup().addTo(map);
+  const pts = v.route.length ? v.route : v.potholes.map((p) => [p.lat, p.lon]);
+  if (v.route.length) L.polyline(v.route, {color: "#3b6fd8", weight: 4, opacity: .7}).addTo(layer);
+  v.potholes.forEach((p, k) => {
+    const sev = (p.api && p.api.severity) || p.severity;
+    L.circleMarker([p.lat, p.lon], {radius: 8, color: "#000", weight: 1, fillColor: sevCol(sev), fillOpacity: .9}).addTo(layer)
+      .bindPopup(`<b>#${k + 1}</b> ${esc(sev || "not measured")}<br>${p.area_m2 != null ? p.area_m2.toFixed(2) + " m²" : ""}` +
+        (p.api ? `<br>API #${p.api.id}: ${esc(p.api.status)}` : ""));
+  });
+  if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.15));
+}
+
+function money(x) { return x == null ? "–" : "₹" + Math.round(x).toLocaleString("en-IN"); }
+function cards(v) {
+  const [src, trip] = $("drive").value.split("|");
+  $("pcount").textContent = `(${v.potholes.length})`;
+  $("cards").innerHTML = v.potholes.map((p, k) => {
+    const a = p.api || {}, plan = a.plan, wo = (a.work_orders || [])[0];
+    const sev = a.severity || p.severity;
+    const crop = p.crop ? `media?src=${src}&trip=${trip}&name=${encodeURIComponent(p.crop)}` : "";
+    const rows = [
+      ["Size", p.width_m != null ? `${p.width_m.toFixed(2)} × ${p.length_m.toFixed(2)} m` : "–"],
+      ["Area", p.area_m2 != null ? `${p.area_m2.toFixed(2)} ± ${(p.area_sigma_m2 || 0).toFixed(2)} m²` : "–"],
+      ["Found", `conf ${p.conf.toFixed(2)} · ${p.frames.length} keyframe(s)`],
+      ["Position", `±${p.pos_sigma_m} m, ${esc(p.placed)}`],
+      ["RoadFix", a.id ? `#${a.id} ${esc(a.status)} · priority ${a.priority != null ? a.priority.toFixed(0) : "–"} · seen ${a.passes_seen}×` : "not in the API yet"],
+      ["Repair plan", plan ? `${plan.bags_low}–${plan.bags_high} bags (${plan.bag_kg} kg) · ${money(plan.est_cost_inr)}` : (a.id ? "after confirmation (2 passes)" : "–")],
+      ["Work order", wo ? `#${wo.id} ${esc(wo.status)}${wo.contractor_name ? " · " + esc(wo.contractor_name) : ""}${wo.run_id ? " · run " + wo.run_id : ""}` : "–"]];
+    return `<div class="pc">${crop ? `<img loading="lazy" src="${crop}" alt="pothole crop with its outline">` : ""}
+      <div class="b"><div style="display:flex;justify-content:space-between;gap:6px"><b>#${k + 1}</b>
+      <span class="pill sev-${SEV[sev] ? sev : "none"}">${esc(sev || (p.reliable ? "unknown" : "not measured"))}</span></div>
+      ${!p.reliable && p.why ? `<span class="small mute">${esc(p.why)}</span>` : ""}
+      <div class="kv">${rows.map(([k2, v2]) => `<span>${k2}</span><span>${v2}</span>`).join("")}</div></div></div>`; }).join("") ||
+    `<p class="mute">No potholes found on this drive.</p>`;
+}
+
+async function loadWork() {
+  const j = await api("api/work");
+  if (!j.work) return;
+  $("workcard").hidden = false;
+  const w = j.work;
+  $("work").innerHTML = `<p class="small mute">From the demo API ${esc(j.api)} (model ${esc(j.model)}).
+    ${w.work_orders.length} work order(s); cold-mix ${w.bags_low}–${w.bags_high} bags in total (a range, never exact).</p>
+    <div class="tw"><table><tr><th>Work order</th><th>Pothole</th><th>Admin unit</th><th>Severity</th><th>Priority</th><th>Bags</th><th>Estimated cost</th></tr>
+    ${w.work_orders.map((x) => `<tr><td>#${x.work_order_id}</td><td>#${x.pothole_id}</td><td>${esc(x.admin_unit)}</td><td>${esc(x.severity)}</td>
+      <td>${x.priority != null ? x.priority.toFixed(0) : "–"}</td><td>${x.bags_low}–${x.bags_high}</td><td>${money(x.est_cost_inr)}</td></tr>`).join("")}</table></div>
+    <h2 style="margin-top:14px">Repair runs (tomorrow's indent)</h2>
+    <div class="tw"><table><tr><th>Run</th><th>Circle</th><th>Stops</th></tr>${(w.runs || []).map((r) => `<tr><td>#${r.run_id}</td><td>${esc(r.circle)}</td><td>${r.stops}</td></tr>`).join("") || "<tr><td colspan=3>none</td></tr>"}</table></div>
+    <h2 style="margin-top:14px">KPIs per zone (last 30 days)</h2>
+    <div class="tw"><table><tr><th>Zone</th><th>Open potholes</th><th>Confirmed new</th><th>Estimated cost</th></tr>${(j.kpis || []).map((k) =>
+      `<tr><td>${esc(k.name || k.zone)}</td><td>${k.open_potholes ?? "–"}</td><td>${k.confirmed_new ?? "–"}</td><td>${money(k.est_cost_inr)}</td></tr>`).join("") || "<tr><td colspan=4>none</td></tr>"}</table></div>`;
+}
+start().catch((x) => { if (x.message !== "sign in first") { $("banner").hidden = false; $("banner").textContent = x.message; } });
+</script>
+</body>
+</html>

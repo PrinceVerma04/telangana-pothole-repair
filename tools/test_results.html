@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoadFix Test Results</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#1d232b;--mute:#66707c;--line:#d9dde3;--acc:#1f6feb;
+  --tp:#1a9e4b;--fp:#e03131;--fn:#f08c00;--gt:#3b82f6}
+@media (prefers-color-scheme:dark){:root{--bg:#14171c;--panel:#1d2128;--ink:#e6e9ee;--mute:#9aa3ae;--line:#323844;--acc:#4c8dff}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:10px 16px;background:var(--panel);
+  border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header h1{font-size:16px;margin:0 8px 0 0}
+select,button,input{font:inherit;color:inherit}
+select{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px;max-width:100%}
+button{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
+button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+label.inl{display:flex;align-items:center;gap:6px}
+.mute{color:var(--mute)} .small{font-size:12px}
+main{padding:12px 16px;max-width:1500px;margin:0 auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;margin-bottom:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+.card h3{margin:0 0 8px;font-size:14px}
+.stats{display:flex;flex-wrap:wrap;gap:6px 16px}
+.stat .k{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.03em}
+.stat .v{font-size:20px;font-weight:650;font-variant-numeric:tabular-nums}
+.tp{color:var(--tp)} .fp{color:var(--fp)} .fn{color:var(--fn)}
+.filters{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px;align-items:center}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer}
+.tile .pics{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px}
+.tile .cap{display:flex;justify-content:space-between;padding:4px 8px;font-size:12px;gap:6px}
+.cv{position:relative;width:100%}
+.cv img{display:block;width:100%;height:auto}
+.cv svg{position:absolute;inset:0;width:100%;height:100%}
+.pager{display:flex;gap:8px;align-items:center;justify-content:center;margin:14px 0}
+#view{position:fixed;inset:0;background:#000d;display:none;z-index:20;flex-direction:column}
+#view .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 12px;color:#eee}
+#view .bar button{background:#222;color:#eee;border-color:#444}
+#view .bar button.on{background:var(--acc)}
+#view .pics{flex:1;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px;padding:0 12px 12px;
+  align-items:start;overflow:auto}
+#view .pics .lab{color:#eee;font-size:13px;margin:4px 0}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:4px}
+#login{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;padding:16px;z-index:30}
+#login form{background:var(--panel);padding:20px;border-radius:10px;max-width:340px;width:100%;display:flex;
+  flex-direction:column;gap:10px}
+#login input{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.err{color:var(--fp)}
+@media (max-width:700px){#view .pics{grid-auto-flow:row}}
+</style>
+</head>
+<body>
+<header>
+  <h1>RoadFix · test results</h1>
+  <select id="ts" aria-label="Test set"></select>
+  <select id="mA" aria-label="Model"></select>
+  <select id="mB" aria-label="Compare with"></select>
+  <label class="inl small">confidence <input type="range" id="conf" min="0.05" max="0.9" step="0.05" value="0.25">
+    <b id="confv">0.25</b></label>
+  <label class="inl small" title="Lenient: a box counts as finding a true pothole when it overlaps it by IoU 0.3 or lies at least half inside it (large broken areas). Strict: IoU 0.5, as the benchmark."><input type="checkbox" id="lenient"> lenient matching</label>
+  <span style="flex:1"></span><span id="who" class="mute small"></span>
+</header>
+<main>
+  <p id="tsnote" class="mute small"></p>
+  <div class="cards" id="cards"></div>
+  <div class="legend mute">
+    <span><i style="background:var(--gt)"></i>true pothole (dashed)</span>
+    <span><i style="background:var(--tp)"></i>correct detection</span>
+    <span><i style="background:var(--fp)"></i>false alarm</span>
+    <span><i style="background:var(--fn)"></i>missed pothole</span>
+    <span>filled = outline from a segmentation model</span>
+  </div>
+  <div class="filters" id="filters"></div>
+  <div id="grid"></div>
+  <div class="pager"><button id="prevp">◀</button><span id="pinfo" class="small mute"></span><button id="nextp">▶</button></div>
+</main>
+<div id="view">
+  <div class="bar">
+    <button id="vclose">✕ Close</button><button id="vprev">◀ Prev</button><button id="vnext">Next ▶</button>
+    <span id="vname"></span><span style="flex:1"></span>
+    <button id="tGt" class="on">true potholes</button><button id="tDet" class="on">detections</button>
+    <button id="tMask" class="on">outlines</button>
+  </div>
+  <div class="pics" id="vpics"></div>
+</div>
+<div id="login"><form id="lf">
+  <strong>Sign in</strong>
+  <span class="small mute">Same access code as the phone capture page.</span>
+  <input id="lname" placeholder="Your name" autocomplete="name" required>
+  <input id="lcode" placeholder="Access code" autocomplete="off" required>
+  <button class="on" type="submit">Sign in</button><span id="lerr" class="err small"></span>
+</form></div>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const S = {idx: null, ts: null, items: [], preds: {}, filter: "all", page: 0, per: 48, view: -1, show: {gt: 1, det: 1, mask: 1}};
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+
+async function api(p, o = {}) {
+  const r = await fetch(p, {credentials: "same-origin", ...o, headers: {"Content-Type": "application/json"}});
+  if (r.status === 401) { $("login").style.display = "flex"; throw new Error("sign in first"); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || r.statusText);
+  return j;
+}
+$("lf").onsubmit = async (e) => {
+  e.preventDefault(); $("lerr").textContent = "";
+  try { await api("api/login", {method: "POST", body: JSON.stringify({name: $("lname").value, code: $("lcode").value})});
+    $("login").style.display = "none"; start(); } catch (x) { $("lerr").textContent = x.message; }
+};
+
+async function start() {
+  S.idx = await api("api/index");
+  $("who").textContent = `${S.idx.me} · built ${S.idx.built_at || "?"}`;
+  $("ts").innerHTML = S.idx.testsets.map((t) => `<option value="${esc(t.id)}">${esc(t.name)} (${t.n})</option>`).join("");
+  const opts = S.idx.models.map((m) => `<option value="${esc(m.id)}">${esc(m.label)}</option>`).join("");
+  $("mA").innerHTML = opts; $("mB").innerHTML = `<option value="">— compare with —</option>` + opts;
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get("ts")) $("ts").value = h.get("ts");
+  if (h.get("a")) $("mA").value = h.get("a");
+  if (h.get("b") !== null) $("mB").value = h.get("b") || "";
+  if (h.get("c")) { $("conf").value = h.get("c"); $("confv").textContent = h.get("c"); }
+  if (h.get("l") === "1") $("lenient").checked = true;
+  if (h.get("f")) S.filter = h.get("f");
+  await load();
+}
+const models = () => [$("mA").value, $("mB").value].filter((m, i, a) => m && a.indexOf(m) === i);
+const conf = () => parseFloat($("conf").value);
+const kind = () => S.idx.testsets.find((t) => t.id === S.ts).kind;
+
+async function load() {
+  S.ts = $("ts").value; S.page = 0;
+  history.replaceState(null, "", `#ts=${S.ts}&a=${$("mA").value}&b=${$("mB").value}&c=${$("conf").value}`);
+  const t = S.idx.testsets.find((x) => x.id === S.ts);
+  $("tsnote").textContent = t.note || "";
+  const j = await api(`api/set?ts=${encodeURIComponent(S.ts)}&models=${encodeURIComponent(models().join(","))}`);
+  S.items = j.items; S.preds = j.preds; render();
+}
+
+function iou(a, b) {
+  const ix = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])), iy = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  const i = ix * iy, u = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - i;
+  return u > 0 ? i / u : 0;
+}
+function judge(it, preds) {   // -> {dets:[{...d, ok}], missed:[gt idx], tp, fp, fn, flag}
+  const dets = (preds || []).filter((d) => d.c >= conf()).sort((a, b) => b.c - a.c).map((d) => ({...d}));
+  const gt = it.gt || [], used = new Set();
+  for (const d of dets) {   // greedy, highest confidence first, IoU >= 0.5 (pixel IoU: aspect from w/h)
+    let best = -1, bi = 0.5;
+    const db = [d.b[0] * it.w, d.b[1] * it.h, d.b[2] * it.w, d.b[3] * it.h];
+    const len = $("lenient").checked;
+    gt.forEach((g, k) => { if (used.has(k) && !len) return; const gb = [g[0] * it.w, g[1] * it.h, g[2] * it.w, g[3] * it.h];
+      let v = iou(db, gb);
+      if (len) { const ix = Math.max(0, Math.min(db[2], gb[2]) - Math.max(db[0], gb[0])) * Math.max(0, Math.min(db[3], gb[3]) - Math.max(db[1], gb[1]));
+        const inside = ix / Math.max(1e-9, (db[2] - db[0]) * (db[3] - db[1])); v = (v >= 0.3 || inside >= 0.5) ? 1 + v : 0; }
+      if (v >= bi && (!len || !used.has(k) || best < 0)) { bi = v; best = k; } });
+    d.ok = best >= 0; if (best >= 0) used.add(best);
+    if ($("lenient").checked && !d.ok) {   // lenient: a box on an already-found pothole is not a false alarm
+      d.ok = gt.some((g) => { const gb = [g[0] * it.w, g[1] * it.h, g[2] * it.w, g[3] * it.h];
+        const ix = Math.max(0, Math.min(db[2], gb[2]) - Math.max(db[0], gb[0])) * Math.max(0, Math.min(db[3], gb[3]) - Math.max(db[1], gb[1]));
+        return iou(db, gb) >= 0.3 || ix / Math.max(1e-9, (db[2] - db[0]) * (db[3] - db[1])) >= 0.5; }); }
+  }
+  const tp = dets.filter((d) => d.ok).length;
+  const missed = gt.map((_, k) => k).filter((k) => !used.has(k));
+  return {dets, missed, tp, fp: dets.length - tp, fn: missed.length, flag: dets.length > 0};
+}
+function status(it, r) {   // per image class for the filter
+  const k = kind();
+  if (k === "negatives") return r.flag ? "fp" : "ok";
+  if (k === "frames") return it.frame === "pothole" ? (r.flag ? "ok" : "fn") : (r.flag ? "fp" : "ok");
+  if (r.fn) return "fn"; if (r.fp) return "fp"; return "ok";
+}
+
+function summary(mid) {
+  const k = kind(), P = S.preds[mid];
+  const m = S.idx.models.find((x) => x.id === mid), b = (m.bench || {})[S.ts] || {};
+  if (!P) return `<div class="card"><h3>${esc(m.label)}</h3><span class="mute">no predictions for this test set yet (make results)</span></div>`;
+  let tp = 0, fp = 0, fn = 0, flagged = 0, found = 0, fals = 0, npot = 0, ncl = 0;
+  S.items.forEach((it, i) => { const r = judge(it, P[i]); tp += r.tp; fp += r.fp; fn += r.fn; flagged += r.flag;
+    if (it.frame === "pothole") { npot++; found += r.flag; } else if (it.frame === "clean") { ncl++; fals += r.flag; } });
+  const st = (k2, v, c = "") => `<div class="stat"><div class="k">${k2}</div><div class="v ${c}">${v}</div></div>`;
+  let body = "";
+  if (k === "negatives") body = st("images", S.items.length) + st("false alarms", `${flagged} (${(100 * flagged / Math.max(1, S.items.length)).toFixed(1)}%)`, "fp") +
+    (b.false_alarm_rate !== undefined ? st("benchmark @0.25", (100 * b.false_alarm_rate).toFixed(1) + "%") : "");
+  else if (k === "frames") body = st("pothole photos found", `${found}/${npot}`, "tp") + st("clean photos flagged", `${fals}/${ncl}`, "fp");
+  else body = st("correct", tp, "tp") + st("false alarms", fp, "fp") + st("missed", fn, "fn") +
+    st("precision", tp + fp ? (tp / (tp + fp)).toFixed(2) : "–") + st("recall", tp + fn ? (tp / (tp + fn)).toFixed(2) : "–") +
+    (b.ap50 !== undefined ? st("AP50 (benchmark)", b.ap50.toFixed(3)) : "");
+  return `<div class="card"><h3>${esc(m.label)}</h3><div class="stats">${body}</div></div>`;
+}
+
+function overlay(it, r, big) {
+  const W = it.w, H = it.h, lw = Math.max(2, W / (big ? 400 : 180));
+  const pts = (p) => p.map(([x, y]) => `${(x * W).toFixed(1)},${(y * H).toFixed(1)}`).join(" ");
+  const rect = (b, col, dash, fill = "none") => `<rect x="${b[0] * W}" y="${b[1] * H}" width="${(b[2] - b[0]) * W}" height="${(b[3] - b[1]) * H}" fill="${fill}" stroke="${col}" stroke-width="${lw}" ${dash ? `stroke-dasharray="${lw * 3} ${lw * 2}"` : ""}/>`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">`;
+  if (S.show.gt) {
+    (it.gt || []).forEach((g, k) => { const miss = r.missed.includes(k);
+      const poly = (it.gt_poly || [])[k];
+      s += poly ? `<polygon points="${pts(poly)}" fill="none" stroke="${miss ? "var(--fn)" : "var(--gt)"}" stroke-width="${lw}" stroke-dasharray="${lw * 3} ${lw * 2}"/>` : rect(g, miss ? "var(--fn)" : "var(--gt)", true); });
+  }
+  for (const d of r.dets) {
+    const col = kind() === "negatives" || (kind() === "frames" && it.frame === "clean") ? "var(--fp)" : (it.gt ? (d.ok ? "var(--tp)" : "var(--fp)") : "var(--tp)");
+    if (S.show.mask && d.p) s += `<polygon points="${pts(d.p)}" fill="${col}" fill-opacity="0.28" stroke="${col}" stroke-width="${lw * 0.6}"/>`;
+    if (S.show.det) { s += rect(d.b, col, false);
+      if (big) s += `<text x="${d.b[0] * W + lw * 2}" y="${d.b[1] * H + lw * 9}" fill="${col}" font-size="${lw * 8}" font-weight="700" stroke="#000" stroke-width="${lw * 0.4}">${d.c.toFixed(2)}</text>`; }
+  }
+  return s + "</svg>";
+}
+
+function render() {
+  $("cards").innerHTML = models().map(summary).join("");
+  const ms = models(), A = ms[0];
+  const res = S.items.map((it, i) => ms.map((m) => S.preds[m] ? judge(it, S.preds[m][i]) : {dets: [], missed: [], tp: 0, fp: 0, fn: 0, flag: false}));
+  const cls = S.items.map((it, i) => status(it, res[i][0]));
+  const counts = {all: S.items.length, fn: cls.filter((c) => c === "fn").length, fp: cls.filter((c) => c === "fp").length, ok: cls.filter((c) => c === "ok").length};
+  const diff = S.items.map((_, i) => ms.length > 1 && status(S.items[i], res[i][0]) !== status(S.items[i], res[i][1]));
+  counts.diff = diff.filter(Boolean).length;
+  const names = {all: "all", fn: "missed potholes", fp: "false alarms", ok: "correct", diff: "models disagree"};
+  $("filters").innerHTML = Object.keys(names).filter((k) => k !== "diff" || ms.length > 1).map((k) =>
+    `<button data-f="${k}" class="${S.filter === k ? "on" : ""}">${names[k]} (${counts[k]})</button>`).join("") +
+    `<span class="small mute">filters use ${esc((S.idx.models.find((m) => m.id === A) || {}).label)}</span>`;
+  $("filters").querySelectorAll("button").forEach((b) => b.onclick = () => { S.filter = b.dataset.f; S.page = 0; render(); });
+  S.shown = S.items.map((_, i) => i).filter((i) => S.filter === "all" || (S.filter === "diff" ? diff[i] : cls[i] === S.filter));
+  S.res = res;
+  const pages = Math.max(1, Math.ceil(S.shown.length / S.per));
+  S.page = Math.min(S.page, pages - 1);
+  const slice = S.shown.slice(S.page * S.per, (S.page + 1) * S.per);
+  $("grid").innerHTML = slice.map((i) => { const it = S.items[i];
+    const pics = ms.map((m, k) => `<div class="cv"><img loading="lazy" src="img?ts=${S.ts}&i=${i}" alt="">${overlay(it, res[i][k], false)}</div>`).join("");
+    const r = res[i][0], tag = kind() === "frames" ? it.frame : kind() === "negatives" ? "no pothole" : `${(it.gt || []).length} pothole(s)`;
+    return `<div class="tile" data-i="${i}"><div class="pics">${pics}</div><div class="cap"><span class="mute">${esc(it.name)} · ${tag}</span>
+      <span><span class="tp">${r.tp || ""}</span> <span class="fp">${r.fp ? "✗" + r.fp : ""}</span> <span class="fn">${r.fn ? "○" + r.fn : ""}</span></span></div></div>`; }).join("") ||
+    `<p class="mute">Nothing here at this confidence.</p>`;
+  $("grid").querySelectorAll(".tile").forEach((t) => t.onclick = () => openView(+t.dataset.i));
+  $("pinfo").textContent = `page ${S.page + 1} / ${pages} · ${S.shown.length} photos`;
+}
+
+function openView(i) {
+  S.view = i; const it = S.items[i], ms = models();
+  $("vname").textContent = `${it.name} · ${S.shown.indexOf(i) + 1}/${S.shown.length}`;
+  $("vpics").innerHTML = ms.map((m, k) => { const r = judge(it, S.preds[m] ? S.preds[m][i] : []);
+    const lab = (S.idx.models.find((x) => x.id === m) || {}).label;
+    return `<div><div class="lab">${esc(lab)} — <span class="tp">${r.tp} correct</span> · <span class="fp">${r.fp} false</span>${it.gt ? ` · <span class="fn">${r.fn} missed</span>` : ""}</div>
+      <div class="cv"><img src="img?ts=${S.ts}&i=${i}&w=1600" alt="">${overlay(it, r, true)}</div></div>`; }).join("");
+  $("view").style.display = "flex";
+}
+function step(d) { const k = S.shown.indexOf(S.view) + d; if (k >= 0 && k < S.shown.length) openView(S.shown[k]); }
+$("vclose").onclick = () => { $("view").style.display = "none"; S.view = -1; };
+$("vprev").onclick = () => step(-1); $("vnext").onclick = () => step(1);
+for (const [id, key] of [["tGt", "gt"], ["tDet", "det"], ["tMask", "mask"]]) $(id).onclick = () => {
+  S.show[key] ^= 1; $(id).classList.toggle("on", !!S.show[key]); if (S.view >= 0) openView(S.view); render(); };
+document.addEventListener("keydown", (e) => { if (S.view < 0) return;
+  if (e.key === "Escape") $("vclose").onclick(); if (e.key === "ArrowRight") step(1); if (e.key === "ArrowLeft") step(-1); });
+$("ts").onchange = $("mA").onchange = $("mB").onchange = () => load().catch((x) => { $("tsnote").textContent = x.message; });
+$("lenient").onchange = () => { render(); if (S.view >= 0) openView(S.view); };
+$("conf").oninput = () => { $("confv").textContent = $("conf").value; render(); };
+$("conf").onchange = () => history.replaceState(null, "", `#ts=${S.ts}&a=${$("mA").value}&b=${$("mB").value}&c=${$("conf").value}`);
+$("prevp").onclick = () => { if (S.page > 0) { S.page--; render(); scrollTo(0, 0); } };
+$("nextp").onclick = () => { S.page++; render(); scrollTo(0, 0); };
+start().catch((x) => { if (x.message !== "sign in first") $("tsnote").textContent = x.message; });
+</script>
+</body>
+</html>

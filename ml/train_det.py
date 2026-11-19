@@ -6,7 +6,7 @@
     make train DATA=combined SMOKE=1         # ~3 min trial: 1 epoch on 10 % of the data, nothing adopted
     .venv/bin/python -m ml.train_det --name det_try --data combined --epochs 60 [--no-adopt]
 
-1. Train: start from models/base_model/civic_yolo11n.pt (YOLO11n, 16 Nagar Netra classes, pothole = 1) on
+1. Train: start from models/supplied_original/weights/best.pt (the supplied civic YOLO11n, 16 classes, pothole = 1) on
    datasets/base_nagar_netra_pothole (leak-free split). Same head, so nothing is re-initialised. AdamW, low learning
    rate (fine-tune), cosine schedule, batch sized by AutoBatch to `--gpu-frac` of the free GPU memory (D17; the
    display keeps the rest, D20). Output in models/training_runs/detect/<name>/ with the live files the training dashboard reads
@@ -27,7 +27,7 @@ quarter of the CPU threads, PyTorch CPU threads at 4, images are not cached in R
 training GPU 3 GiB of GPU memory stay free for the desktop (D20 display reserve, ml.train_seg.apply_display_reserve).
 
 Note: the base dataset holds only potholes, so a fine-tuned copy forgets the other 15 civic classes. RoadFix only
-uses the pothole class; the user's original multi-class model stays untouched in models/base_model/.
+uses the pothole class; the user's original multi-class model stays untouched in models/supplied_original/.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ from typing import Any, Optional
 from ml import benchmark as B
 
 REPO = Path(__file__).resolve().parents[1]
-BASE_WEIGHTS = REPO / "models" / "base_model" / "civic_yolo11n.pt"
+BASE_WEIGHTS = REPO / "models" / "supplied_original" / "weights" / "best.pt"  # D50: the supplied civic YOLO11n
 RUNS = REPO / "models" / "training_runs" / "detect"
 CANDIDATES = REPO / "models" / "adopted_finetunes"
 ENV = REPO / ".env"
