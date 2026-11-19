@@ -28,6 +28,8 @@ from urllib.parse import parse_qs, urlparse
 
 REPO = Path(__file__).resolve().parents[1]
 RUNS_SEG = REPO / "runs" / "seg"
+RUNS_DET = REPO / "runs" / "detect"  # D38: detection fine-tunes (ml.train_det)
+RUN_ROOTS = (RUNS_DET, RUNS_SEG)
 LOGS = REPO / "runs" / "logs"
 PAGE = Path(__file__).with_name("train_dashboard.html")
 LIVE_FRESH_S = 120.0  # gm_live.json older than this while the process lives -> "no progress" warning
@@ -51,10 +53,20 @@ def read_json(path: Path) -> dict[str, Any]:
         return {}
 
 
-def list_runs(root: Path = RUNS_SEG) -> list[dict[str, Any]]:
-    """Runs newest first (by the last write of any run file); folders starting with '_' are internal."""
+def run_dir(run: str, roots: tuple[Path, ...] = RUN_ROOTS) -> Path:
+    """The folder of a run in runs/detect (D38) or runs/seg (first match)."""
+    for r in roots:
+        if (r / run).is_dir():
+            return r / run
+    return roots[0] / run
+
+
+def list_runs(root: Optional[Path] = None) -> list[dict[str, Any]]:
+    """Runs newest first (by the last write of any run file); folders starting with '_' are internal.
+    Default: runs/detect and runs/seg together (D38)."""
     out = []
-    for d in sorted(root.glob("*")) if root.is_dir() else []:
+    dirs = [d for r in ((root,) if root else RUN_ROOTS) for d in (sorted(r.glob("*")) if r.is_dir() else [])]
+    for d in dirs:
         if not d.is_dir() or d.name.startswith((".", "_")):
             continue
         mt = [f.stat().st_mtime for f in (d / n for n in RUN_FILES) if f.exists()]
@@ -159,8 +171,8 @@ def log_tail(run: str, logs: Path = LOGS, n: int = 40, max_bytes: int = 96_000) 
     return {"file": str(f.relative_to(REPO)) if f.is_relative_to(REPO) else str(f), "lines": keep[-n:]}
 
 
-def run_payload(run: str, root: Path = RUNS_SEG, now: Optional[float] = None) -> dict[str, Any]:
-    d = root / run
+def run_payload(run: str, root: Optional[Path] = None, now: Optional[float] = None) -> dict[str, Any]:
+    d = root / run if root else run_dir(run)
     now = time.time() if now is None else now
     live, timing, gm_run = (read_json(d / n) for n in ("gm_live.json", "gm_timing.json", "gm_run.json"))
     epochs = list(timing.get("epochs") or [])
@@ -272,6 +284,21 @@ def make_handler(sampler: Sampler, default_run: Optional[str]) -> type[BaseHTTPR
     return Handler
 
 
+
+def shown_host(host: str) -> str:
+    """The address to type on a phone: this PC's Wi-Fi address when listening on every interface."""
+    if host != "0.0.0.0":
+        return host
+    import socket
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))  # no packet is sent; picks the LAN interface
+            return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", default="127.0.0.1")
@@ -281,7 +308,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     sampler = Sampler()
     sampler.start()
     srv = ThreadingHTTPServer((a.host, a.port), make_handler(sampler, a.run))
-    print(f"RoadFix training dashboard: http://{a.host}:{a.port}  (Ctrl+C stops it)", flush=True)
+    print(f"RoadFix training dashboard: http://{shown_host(a.host)}:{a.port}  (Ctrl+C stops it)", flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

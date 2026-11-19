@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoadFix Annotate</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#1d232b;--mute:#66707c;--line:#d9dde3;--acc:#1f6feb;
+  --pot:#d4380d;--clean:#2f9e44;--unsure:#b08900;--none:#c5cad1;--draw:#ff2d55}
+@media (prefers-color-scheme:dark){:root{--bg:#14171c;--panel:#1d2128;--ink:#e6e9ee;--mute:#9aa3ae;--line:#323844;
+  --acc:#4c8dff;--none:#3d4450}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 14px;background:var(--panel);
+  border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0}
+select,button,input{font:inherit;color:inherit}
+select,input{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+button{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+button.big{padding:9px 12px;font-weight:600;width:100%;text-align:left}
+button.pot{border-color:var(--pot)} button.pot.cur{background:var(--pot);color:#fff}
+button.clean{border-color:var(--clean)} button.clean.cur{background:var(--clean);color:#fff}
+button.unsure{border-color:var(--unsure)} button.unsure.cur{background:var(--unsure);color:#fff}
+.mute{color:var(--mute)} .small{font-size:12px}
+main{display:grid;grid-template-columns:1fr 300px;gap:0;height:calc(100vh - 50px)}
+#stage{position:relative;overflow:hidden;background:#0b0d10;touch-action:none}
+#cv{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair}
+#hint{position:absolute;left:10px;bottom:10px;right:10px;color:#e8ecf1;font-size:12px;text-shadow:0 1px 2px #000;
+  pointer-events:none}
+#busy{position:absolute;top:10px;left:10px;color:#fff;background:#000a;padding:4px 8px;border-radius:6px;display:none}
+aside{background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:12px;display:flex;
+  flex-direction:column;gap:14px}
+aside h2{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);margin:0 0 6px}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.stack{display:flex;flex-direction:column;gap:6px}
+#strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(38px,1fr));gap:4px}
+#strip button{padding:4px 0;font-size:11px;border-width:2px}
+#strip .potholes{border-color:var(--pot)} #strip .clean{border-color:var(--clean)}
+#strip .unsure{border-color:var(--unsure)} #strip .cur{outline:2px solid var(--acc);outline-offset:1px}
+.shape{display:flex;justify-content:space-between;align-items:center;padding:3px 6px;border:1px solid var(--line);
+  border-radius:6px;font-size:12px}
+.shape button{padding:0 6px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+#login{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;padding:16px}
+#login form{background:var(--panel);padding:20px;border-radius:10px;max-width:340px;width:100%;
+  display:flex;flex-direction:column;gap:10px}
+#msg{min-height:1.2em}
+.err{color:var(--pot)}
+kbd{font:11px ui-monospace,monospace;border:1px solid var(--line);border-radius:3px;padding:0 3px}
+@media (max-width:820px){main{grid-template-columns:1fr;grid-template-rows:62vh auto;height:auto}
+  aside{border-left:0;border-top:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>RoadFix · mark potholes</h1>
+  <select id="coll" aria-label="Photo set"></select>
+  <span id="prog" class="mute"></span>
+  <span style="flex:1"></span>
+  <span id="who" class="mute small"></span>
+</header>
+<main>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="busy">loading…</div>
+    <div id="hint"></div>
+  </div>
+  <aside>
+    <div>
+      <h2>Photo <span id="pos"></span></h2>
+      <div class="row">
+        <button id="prev" title="Previous (P)">◀ Prev</button>
+        <button id="next" title="Next (N)">Next ▶</button>
+        <button id="nextOpen" title="Next photo nobody marked yet">Next unmarked</button>
+      </div>
+      <div id="last" class="mute small" style="margin-top:6px"></div>
+    </div>
+    <div>
+      <h2>Draw</h2>
+      <div class="row">
+        <button id="tPoly" class="on" title="Outline (O): click points, double-click or Enter to close; or press and drag to draw freehand">Outline <kbd>O</kbd></button>
+        <button id="tBox" title="Box (B): drag a rectangle">Box <kbd>B</kbd></button>
+        <button id="undo" title="Undo (Z / Backspace)">Undo <kbd>Z</kbd></button>
+        <button id="fit" title="Fit photo (F). Mouse wheel zooms, right-drag or Space+drag pans">Fit <kbd>F</kbd></button>
+      </div>
+      <div id="shapes" class="stack" style="margin-top:8px"></div>
+    </div>
+    <div>
+      <h2>Model guesses <label class="small mute" style="text-transform:none;letter-spacing:0">
+        <input type="checkbox" id="showSug" checked> show (G)</label></h2>
+      <div id="sug" class="stack small"></div>
+      <div class="mute small">Dashed boxes. Click one on the photo to accept it as a pothole; then refine or delete.</div>
+    </div>
+    <div>
+      <h2>This photo is…</h2>
+      <div class="stack">
+        <button class="big pot" id="sPot" title="Save the drawn potholes and go on (Enter / S)">Potholes, as drawn <kbd>S</kbd></button>
+        <button class="big clean" id="sClean" title="No pothole in this photo (C)">No pothole <kbd>C</kbd></button>
+        <button class="big unsure" id="sUnsure" title="Cannot tell (U); not used for scoring">Not sure <kbd>U</kbd></button>
+      </div>
+      <div id="msg" class="small"></div>
+    </div>
+    <div>
+      <h2>All photos</h2>
+      <div id="strip"></div>
+      <div class="small mute" style="margin-top:6px"><span class="sw" style="background:var(--pot)"></span>potholes
+        <span class="sw" style="background:var(--clean);margin-left:8px"></span>no pothole
+        <span class="sw" style="background:var(--unsure);margin-left:8px"></span>not sure</div>
+    </div>
+    <div class="small mute">Mark the whole broken area of each pothole (not cracks, not patched repairs). Keys:
+      <kbd>N</kbd>/<kbd>P</kbd> next/prev, <kbd>Esc</kbd> cancel shape, <kbd>Del</kbd> delete the last shape.</div>
+  </aside>
+</main>
+<div id="login"><form id="lf">
+  <strong>Sign in</strong>
+  <span class="small mute">Same access code as the phone capture page (printed in the server's terminal).</span>
+  <input id="lname" placeholder="Your name" autocomplete="name" required>
+  <input id="lcode" placeholder="Access code" autocomplete="off" required>
+  <button class="on" type="submit">Sign in</button>
+  <span id="lerr" class="err small"></span>
+</form></div>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const COLORS = ["#ff9f1a", "#22d3ee", "#a78bfa", "#f472b6"];
+const S = {cid: null, items: [], i: 0, img: null, shapes: [], saved: "[]", status: null, sug: [], tool: "poly",
+  draft: null, view: {s: 1, x: 0, y: 0}, hover: null, pan: null, space: false};
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, {credentials: "same-origin", ...opts,
+    headers: {"Content-Type": "application/json", ...(opts.headers || {})}});
+  if (r.status === 401) { showLogin(); throw new Error("sign in first"); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || r.statusText);
+  return j;
+}
+function showLogin() { $("login").style.display = "flex"; $("lname").focus(); }
+$("lf").onsubmit = async e => {
+  e.preventDefault(); $("lerr").textContent = "";
+  try {
+    await api("api/login", {method: "POST", body: JSON.stringify({name: $("lname").value, code: $("lcode").value})});
+    $("login").style.display = "none"; start();
+  } catch (x) { $("lerr").textContent = x.message; }
+};
+
+async function start() {
+  const j = await api("api/collections");
+  $("who").textContent = "signed in as " + j.me;
+  const sel = $("coll"); sel.innerHTML = "";
+  for (const c of j.collections) {
+    const o = document.createElement("option"); o.value = c.id;
+    o.textContent = `${c.name} — ${c.marked}/${c.images} marked`; sel.appendChild(o);
+  }
+  if (!j.collections.length) { $("hint").textContent = "No photos yet."; return; }
+  const want = new URLSearchParams(location.hash.slice(1)).get("c");
+  sel.value = j.collections.some(c => c.id === want) ? want : j.collections[0].id;
+  await openColl(sel.value);
+}
+$("coll").onchange = async e => { await leave(); await openColl(e.target.value); };
+
+async function openColl(cid) {
+  S.cid = cid;
+  const j = await api("api/items?cid=" + encodeURIComponent(cid));
+  S.items = j.items;
+  const want = new URLSearchParams(location.hash.slice(1)).get("i");
+  let i = S.items.findIndex(t => t.image === want);
+  if (i < 0) i = Math.max(0, S.items.findIndex(t => !t.status));
+  await go(i);
+}
+
+function strip() {
+  const s = $("strip"); s.innerHTML = "";
+  S.items.forEach((t, k) => {
+    const b = document.createElement("button");
+    b.textContent = t.image.replace(/\.[a-z]+$/i, "").replace(/^0+(?=\d)/, "");
+    b.className = (t.status || "") + (k === S.i ? " cur" : "");
+    b.title = t.image + (t.status ? ` — ${t.status} (${t.by})` : " — not marked");
+    b.onclick = async () => { await leave(); await go(k); };
+    s.appendChild(b);
+  });
+  const done = S.items.filter(t => t.status).length;
+  $("prog").textContent = `${done}/${S.items.length} marked`;
+}
+
+async function go(i) {
+  if (!S.items.length) return;
+  S.i = Math.min(Math.max(0, i), S.items.length - 1);
+  const t = S.items[S.i];
+  history.replaceState(null, "", "#c=" + encodeURIComponent(S.cid) + "&i=" + encodeURIComponent(t.image));
+  $("pos").textContent = `${S.i + 1} / ${S.items.length} · ${t.image}`;
+  $("busy").style.display = "block"; S.draft = null; S.sug = []; renderSug();
+  const q = "cid=" + encodeURIComponent(S.cid) + "&image=" + encodeURIComponent(t.image);
+  const [it, img] = await Promise.all([api("api/item?" + q), new Promise((res, rej) => {
+    const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error("photo failed to load"));
+    im.src = "media?" + q;
+  })]);
+  if (S.items[S.i] !== t) return;
+  S.img = img; S.shapes = it.shapes; S.saved = JSON.stringify(it.shapes); S.status = it.status;
+  $("last").textContent = it.status ? `Saved: ${it.status} by ${it.by} (${(it.at || "").replace("T", " ").slice(0, 16)} UTC)`
+    : "Not marked yet.";
+  $("busy").style.display = "none"; fit(); strip(); statusButtons(); shapeList(); msg("");
+  api("api/suggest?" + q).then(j => { if (S.items[S.i] === t) { S.sug = j.models; renderSug(); draw(); } })
+    .catch(x => { $("sug").textContent = "model guesses unavailable: " + x.message; });
+  $("sug").textContent = "asking the models…";
+}
+
+function dirty() { return JSON.stringify(S.shapes) !== S.saved; }
+async function leave() {   // autosave drawn shapes when moving away
+  if (S.draft && S.draft.pts.length >= 3 && S.tool === "poly") closeDraft();
+  if (dirty() && S.shapes.length) await save(S.status === "unsure" ? "unsure" : "potholes", false);
+}
+async function save(status, advance = true) {
+  if (S.draft && S.draft.type === "polygon" && S.draft.pts.length >= 3) closeDraft();
+  try {
+    const t = S.items[S.i];
+    const r = await api("api/save", {method: "POST", body: JSON.stringify({cid: S.cid, image: t.image, status,
+      shapes: status === "clean" ? [] : S.shapes})});
+    t.status = r.status; t.by = $("who").textContent.replace("signed in as ", "");
+    S.shapes = r.shapes; S.saved = JSON.stringify(r.shapes); S.status = r.status;
+    msg(`Saved: ${status === "clean" ? "no pothole" : status === "unsure" ? "not sure" : r.shapes.length + " pothole(s)"}`);
+    strip(); statusButtons();
+    if (advance && S.i < S.items.length - 1) await go(S.i + 1); else draw();
+    return true;
+  } catch (x) { msg(x.message, true); return false; }
+}
+function msg(s, err) { $("msg").textContent = s; $("msg").className = "small" + (err ? " err" : ""); }
+function statusButtons() {
+  $("sPot").classList.toggle("cur", S.status === "potholes");
+  $("sClean").classList.toggle("cur", S.status === "clean");
+  $("sUnsure").classList.toggle("cur", S.status === "unsure");
+}
+
+function renderSug() {
+  const d = $("sug"); d.innerHTML = "";
+  S.sug.forEach((m, k) => {
+    const row = document.createElement("div"); row.className = "shape";
+    row.innerHTML = `<span><span class="sw" style="background:${COLORS[k % 4]}"></span></span>`;
+    row.firstChild.append(`${m.label}: ${m.boxes.length} box${m.boxes.length === 1 ? "" : "es"}`);
+    if (m.boxes.length) {
+      const b = document.createElement("button"); b.textContent = "accept all"; b.title = "Add all of them as potholes";
+      b.onclick = () => { m.boxes.forEach(acceptBox); };
+      row.appendChild(b);
+    }
+    d.appendChild(row);
+  });
+}
+function acceptBox(bx) {
+  const s = {type: "box", pts: bx.pts.map(p => p.slice())};
+  if (!S.shapes.some(x => JSON.stringify(x.pts) === JSON.stringify(s.pts))) S.shapes.push(s);
+  shapeList(); draw();
+}
+function shapeList() {
+  const d = $("shapes"); d.innerHTML = "";
+  if (!S.shapes.length) { d.innerHTML = '<span class="small mute">No potholes drawn on this photo.</span>'; return; }
+  S.shapes.forEach((s, k) => {
+    const row = document.createElement("div"); row.className = "shape";
+    row.append(`#${k + 1} ${s.type === "box" ? "box" : "outline, " + s.pts.length + " points"}`);
+    const b = document.createElement("button"); b.textContent = "×"; b.title = "Delete";
+    b.onclick = () => { S.shapes.splice(k, 1); shapeList(); draw(); };
+    row.onmouseenter = () => { S.hover = k; draw(); }; row.onmouseleave = () => { S.hover = null; draw(); };
+    row.appendChild(b); d.appendChild(row);
+  });
+}
+
+// ---------------------------------------------------------------- canvas: view, drawing
+const cv = $("cv"), ctx = cv.getContext("2d");
+function resize() {
+  const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); draw();
+}
+function fit() {
+  if (!S.img) return;
+  const r = cv.getBoundingClientRect(), s = Math.min(r.width / S.img.width, r.height / S.img.height);
+  S.view = {s, x: (r.width - S.img.width * s) / 2, y: (r.height - S.img.height * s) / 2}; draw();
+}
+const toImg = (cx, cy) => [(cx - S.view.x) / S.view.s / S.img.width, (cy - S.view.y) / S.view.s / S.img.height];
+const toScr = (u, v) => [u * S.img.width * S.view.s + S.view.x, v * S.img.height * S.view.s + S.view.y];
+function local(e) { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+const clamp = v => Math.min(1, Math.max(0, v));
+
+function path(pts, close) {
+  ctx.beginPath();
+  pts.forEach((p, k) => { const [x, y] = toScr(p[0], p[1]); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  if (close) ctx.closePath();
+}
+function boxPts(b) { const [[a, c], [e, f]] = b; return [[a, c], [e, c], [e, f], [a, f]]; }
+function draw() {
+  const d = window.devicePixelRatio || 1;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.setTransform(d, 0, 0, d, 0, 0);
+  if (!S.img) return;
+  ctx.drawImage(S.img, S.view.x, S.view.y, S.img.width * S.view.s, S.img.height * S.view.s);
+  if ($("showSug").checked) S.sug.forEach((m, k) => m.boxes.forEach(b => {
+    ctx.setLineDash([6, 4]); ctx.lineWidth = 2; ctx.strokeStyle = COLORS[k % 4];
+    path(boxPts(b.pts), true); ctx.stroke(); ctx.setLineDash([]);
+    const [x, y] = toScr(Math.min(b.pts[0][0], b.pts[1][0]), Math.min(b.pts[0][1], b.pts[1][1]));
+    ctx.fillStyle = COLORS[k % 4]; ctx.font = "12px system-ui"; ctx.fillText(b.conf.toFixed(2), x + 3, y - 4);
+  }));
+  S.shapes.forEach((s, k) => {
+    path(s.type === "box" ? boxPts(s.pts) : s.pts, true);
+    ctx.fillStyle = k === S.hover ? "rgba(255,45,85,.45)" : "rgba(255,45,85,.22)"; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = "#ff2d55"; ctx.stroke();
+    const [x, y] = toScr(s.pts[0][0], s.pts[0][1]);
+    ctx.fillStyle = "#fff"; ctx.font = "bold 12px system-ui"; ctx.fillText("#" + (k + 1), x + 3, y - 4);
+  });
+  if (S.draft) {
+    const pts = S.draft.type === "box" ? boxPts(S.draft.pts) : S.draft.pts.concat(S.draft.cursor ? [S.draft.cursor] : []);
+    path(pts, S.draft.type === "box"); ctx.lineWidth = 2; ctx.strokeStyle = "#ffe14d"; ctx.stroke();
+    if (S.draft.type === "polygon") S.draft.pts.forEach((p, k) => {
+      const [x, y] = toScr(p[0], p[1]); ctx.beginPath(); ctx.arc(x, y, k === 0 ? 6 : 3, 0, 7);
+      ctx.fillStyle = k === 0 ? "#ffe14d" : "#fff"; ctx.fill();
+    });
+  }
+  $("hint").textContent = S.tool === "poly"
+    ? (S.draft ? "Click to add points · click the first point, double-click or Enter to close · Esc cancels"
+      : "Outline: click around the pothole edge, or press and drag to trace it")
+    : "Box: drag from one corner to the other";
+}
+
+function closeDraft() {
+  const d = S.draft; S.draft = null;
+  if (d && d.type === "polygon" && d.pts.length >= 3) { S.shapes.push({type: "polygon", pts: d.pts}); }
+  shapeList(); draw();
+}
+function hitSuggestion(u, v) {
+  if (!$("showSug").checked) return null;
+  for (const m of S.sug) for (const b of m.boxes) {
+    const [[a, c], [e, f]] = b.pts, pad = 6 / (S.view.s * S.img.width);
+    const onEdge = (Math.abs(u - a) < pad || Math.abs(u - e) < pad) && v > c - pad && v < f + pad ||
+      (Math.abs(v - c) < pad || Math.abs(v - f) < pad) && u > a - pad && u < e + pad;
+    if (onEdge) return b;
+  }
+  return null;
+}
+
+let down = null;
+cv.addEventListener("contextmenu", e => e.preventDefault());
+cv.addEventListener("pointerdown", e => {
+  if (!S.img) return;
+  cv.setPointerCapture(e.pointerId);
+  const [x, y] = local(e);
+  if (e.button === 1 || e.button === 2 || S.space) { S.pan = {x, y, vx: S.view.x, vy: S.view.y}; return; }
+  const [u, v] = toImg(x, y);
+  down = {x, y, u: clamp(u), v: clamp(v), moved: false, t: Date.now()};
+  if (S.tool === "box") S.draft = {type: "box", pts: [[down.u, down.v], [down.u, down.v]]};
+});
+cv.addEventListener("pointermove", e => {
+  if (!S.img) return;
+  const [x, y] = local(e);
+  if (S.pan) { S.view.x = S.pan.vx + x - S.pan.x; S.view.y = S.pan.vy + y - S.pan.y; draw(); return; }
+  const [u, v] = toImg(x, y);
+  if (down && Math.hypot(x - down.x, y - down.y) > 5) down.moved = true;
+  if (S.tool === "box" && down && S.draft) { S.draft.pts[1] = [clamp(u), clamp(v)]; draw(); return; }
+  if (S.tool === "poly") {
+    if (down && down.moved) {        // freehand trace while the button is held
+      if (!S.draft) S.draft = {type: "polygon", pts: [[down.u, down.v]], free: true};
+      const l = S.draft.pts[S.draft.pts.length - 1];
+      if (Math.hypot((u - l[0]) * S.img.width * S.view.s, (v - l[1]) * S.img.height * S.view.s) > 6)
+        S.draft.pts.push([clamp(u), clamp(v)]);
+    }
+    if (S.draft) { S.draft.cursor = [clamp(u), clamp(v)]; draw(); }
+  }
+});
+cv.addEventListener("pointerup", e => {
+  if (S.pan) { S.pan = null; return; }
+  if (!down || !S.img) return;
+  const d = down; down = null;
+  if (S.tool === "box") {
+    const b = S.draft; S.draft = null;
+    if (b && d.moved) {
+      const [[a, c], [e2, f]] = b.pts;
+      S.shapes.push({type: "box", pts: [[Math.min(a, e2), Math.min(c, f)], [Math.max(a, e2), Math.max(c, f)]]});
+      shapeList();
+    } else { const s = hitSuggestion(d.u, d.v); if (s) acceptBox(s); }
+    draw(); return;
+  }
+  if (S.draft && S.draft.free) { S.draft.free = false; if (d.moved) { closeDraft(); return; } }
+  if (d.moved) return;
+  if (!S.draft) {
+    const s = hitSuggestion(d.u, d.v);
+    if (s) { acceptBox(s); return; }
+    S.draft = {type: "polygon", pts: [[d.u, d.v]]}; draw(); return;
+  }
+  const f = S.draft.pts[0], [fx, fy] = toScr(f[0], f[1]);
+  if (S.draft.pts.length >= 3 && Math.hypot(fx - d.x, fy - d.y) < 10) { closeDraft(); return; }
+  S.draft.pts.push([d.u, d.v]); draw();
+});
+cv.addEventListener("dblclick", e => { e.preventDefault(); if (S.draft && S.draft.type === "polygon") {
+  S.draft.pts.pop(); closeDraft(); } });   // the second click of a double-click added a point; drop it
+cv.addEventListener("wheel", e => {
+  if (!S.img) return; e.preventDefault();
+  const [x, y] = local(e), k = Math.exp(-e.deltaY * 0.0015), s = Math.min(Math.max(S.view.s * k, 0.05), 20);
+  S.view.x = x - (x - S.view.x) * s / S.view.s; S.view.y = y - (y - S.view.y) * s / S.view.s; S.view.s = s; draw();
+}, {passive: false});
+
+function tool(t) { S.tool = t; S.draft = null; $("tPoly").classList.toggle("on", t === "poly");
+  $("tBox").classList.toggle("on", t === "box"); draw(); }
+function undo() {
+  if (S.draft && S.draft.type === "polygon" && S.draft.pts.length > 1) S.draft.pts.pop();
+  else if (S.draft) S.draft = null; else S.shapes.pop();
+  shapeList(); draw();
+}
+$("tPoly").onclick = () => tool("poly"); $("tBox").onclick = () => tool("box");
+$("undo").onclick = undo; $("fit").onclick = fit; $("showSug").onchange = draw;
+$("prev").onclick = async () => { await leave(); await go(S.i - 1); };
+$("next").onclick = async () => { await leave(); await go(S.i + 1); };
+$("nextOpen").onclick = async () => {
+  await leave();
+  const k = S.items.findIndex((t, j) => j > S.i && !t.status), k2 = S.items.findIndex(t => !t.status);
+  if (k >= 0 || k2 >= 0) await go(k >= 0 ? k : k2); else msg("Every photo in this set is marked.");
+};
+$("sPot").onclick = () => save("potholes");
+$("sClean").onclick = () => save("clean");
+$("sUnsure").onclick = () => save("unsure");
+document.addEventListener("keydown", async e => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key;
+  if (k === " ") { S.space = true; e.preventDefault(); return; }
+  if (k === "Enter") { e.preventDefault(); if (S.draft) closeDraft(); else await save("potholes"); return; }
+  if (k === "Escape") { S.draft = null; draw(); return; }
+  const lk = k.toLowerCase();
+  const act = {o: () => tool("poly"), b: () => tool("box"), z: undo, backspace: undo, f: fit,
+    delete: () => { S.shapes.pop(); shapeList(); draw(); },
+    g: () => { $("showSug").checked = !$("showSug").checked; draw(); },
+    s: () => save("potholes"), c: () => save("clean"), u: () => save("unsure"),
+    n: async () => { await leave(); await go(S.i + 1); }, p: async () => { await leave(); await go(S.i - 1); },
+    arrowright: async () => { await leave(); await go(S.i + 1); },
+    arrowleft: async () => { await leave(); await go(S.i - 1); }}[lk];
+  if (act) { e.preventDefault(); await act(); }
+});
+document.addEventListener("keyup", e => { if (e.key === " ") S.space = false; });
+window.addEventListener("resize", () => { resize(); fit(); });
+window.addEventListener("beforeunload", e => { if (dirty()) { e.preventDefault(); e.returnValue = ""; } });
+resize();
+start().catch(x => { if (x.message !== "sign in first") $("hint").textContent = x.message; });
+</script>
+</body>
+</html>

@@ -28,7 +28,7 @@ from measure.types import CalibCert, FrameMeasurement, Method, SurfaceFit
 class FrameContext:
     """Everything computed once per frame (handy for overlays / debugging)."""
 
-    depth: np.ndarray  # raw backend depth (undistorted frame)
+    depth: Optional[np.ndarray]  # raw backend depth (undistorted frame); None in size-only mode (D27)
     K: np.ndarray
     cert: CalibCert  # intrinsics matched to the image
     surface: SurfaceFit  # global plane fit (before per-mask quadratic)
@@ -67,6 +67,9 @@ def measure_frames(img: np.ndarray, masks: Sequence[np.ndarray], cert: CalibCert
         img_u = img
         info["undistorted"] = False
     timings: dict[str, Any] = {}
+    if depth is None and backend is None and size_only(cfg):
+        return _measure_frames_ground(img_u, masks, K, cert_i, cfg, info, timings, t0, mask_confs, verifier_classes,
+                                      seq, t_frame_ms)
     # --- depth
     if depth is None:
         backend = backend or get_backend(cfg)
@@ -114,6 +117,41 @@ def measure_frames(img: np.ndarray, masks: Sequence[np.ndarray], cert: CalibCert
         fm = fm.model_copy(update={"extras": ex, "seq": seq, "t_frame_ms": t_frame_ms})
         out.append(fm)
         ctx.maps.append(maps)
+    timings["total_ms"] = (time.perf_counter() - t0) * 1000.0
+    return out, ctx
+
+
+def size_only(cfg: dict[str, Any]) -> bool:
+    """D27: ``depth.backend: off`` (YAML may read a bare off as False) -> no depth model, size from the ground plane."""
+    b = (cfg.get("depth") or {}).get("backend")
+    return b is False or str(b).strip().lower() in ("off", "none", "false", "")
+
+
+def _measure_frames_ground(img_u: np.ndarray, masks: list[np.ndarray], K: np.ndarray, cert_i: CalibCert,
+                           cfg: dict[str, Any], info: dict[str, Any], timings: dict[str, Any], t0: float,
+                           mask_confs: Optional[Sequence[float]], verifier_classes: Optional[Sequence[Optional[str]]],
+                           seq: Optional[int], t_frame_ms: Optional[int]) -> tuple[list[FrameMeasurement], FrameContext]:
+    """Size-only measurement of every mask (D27): no depth pass, no RANSAC; the calibrated plane is the road."""
+    from measure.ground_geom import ground_surface, measure_mask_ground
+
+    surf = ground_surface(cert_i.h_true_m, cert_i.pitch_deg, cert_i.roll_deg, cert_i.yaw_deg)
+    ctx = FrameContext(depth=None, K=K, cert=cert_i, surface=surf, img=img_u, masks=masks, timings_ms=timings,
+                       info={**info, "size_only": True})
+    out: list[FrameMeasurement] = []
+    for i, m in enumerate(masks):
+        tm = time.perf_counter()
+        fm = measure_mask_ground(m, K, cert_i, cfg, img_bgr=img_u,
+                                 mask_conf=float(mask_confs[i]) if mask_confs and i < len(mask_confs) else 1.0,
+                                 verifier_cls=verifier_classes[i] if verifier_classes and i < len(verifier_classes)
+                                 else None)
+        sev = irc.severity(None, fm.width_m * 1000.0, fm.water_filled)
+        ex = dict(fm.extras)
+        ex.update(severity=sev.value, severity_labels=irc.labels(sev), severity_basis="width (IRC:82, no depth)",
+                  intrinsics=info, timings_ms={**timings, "mask_ms": (time.perf_counter() - tm) * 1000.0})
+        if fm.water_filled:
+            ex["severity_lower_bound"] = irc.water_lower_bound(fm.width_m * 1000.0).value
+        out.append(fm.model_copy(update={"extras": ex, "seq": seq, "t_frame_ms": t_frame_ms}))
+        ctx.maps.append({})
     timings["total_ms"] = (time.perf_counter() - t0) * 1000.0
     return out, ctx
 

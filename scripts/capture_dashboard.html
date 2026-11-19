@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RoadFix Drives</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f4f2; --surface: #fcfcfb; --surface-2: #f0efec; --border: #e2e1dc;
+    --text: #0b0b0b; --text-2: #52514e; --muted: #77766f; --accent: #2a78d6; --route: #2a78d6;
+    --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b; --none: #9a9992;
+    --shadow: 0 1px 2px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #111110; --surface: #1a1a19; --surface-2: #232321; --border: #2e2e2b;
+      --text: #f0efec; --text-2: #c3c2b7; --muted: #8f8e86; --accent: #3987e5; --route: #3987e5; --none: #6c6b65; --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #111110; --surface: #1a1a19; --surface-2: #232321; --border: #2e2e2b;
+    --text: #f0efec; --text-2: #c3c2b7; --muted: #8f8e86; --accent: #3987e5; --route: #3987e5; --none: #6c6b65; --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1400px; margin: 0 auto; padding: 12px 16px 32px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 12px; }
+  h1 { font-size: 18px; margin: 0; font-weight: 650; }
+  h1 span { color: var(--muted); font-weight: 500; }
+  .controls { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  a { color: var(--accent); }
+  input, button { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+  button { cursor: pointer; font-weight: 600; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; box-shadow: var(--shadow); min-width: 0; }
+  .card h2 { font-size: 13px; color: var(--text-2); margin: 0 0 8px; font-weight: 600; }
+  .layout { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 12px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+  .muted { color: var(--muted); } .small { font-size: 12.5px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); white-space: nowrap; }
+  .pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--none); display: inline-block; }
+  .pill.ok i { background: var(--good); } .pill.run i { background: var(--accent); } .pill.warn i { background: var(--warning); } .pill.bad i { background: var(--critical); }
+  .drive { padding: 10px; border-radius: 10px; cursor: pointer; border: 1px solid transparent; }
+  .drive + .drive { margin-top: 4px; }
+  .drive:hover { background: var(--surface-2); }
+  .drive.on { background: var(--surface-2); border-color: var(--border); }
+  .drive b { font-weight: 600; }
+  .bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 12px; }
+  .tile { background: var(--surface-2); border-radius: 10px; padding: 8px 10px; }
+  .tile .k { font-size: 12px; color: var(--muted); }
+  .tile .v { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .tile .v small { font-size: 13px; color: var(--muted); font-weight: 500; }
+  #map { height: 420px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); }
+  @media (max-width: 600px) { #map { height: 300px; } }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-2); margin: 8px 0 0; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border); }
+  .sev-large { background: var(--critical); } .sev-medium { background: var(--serious); } .sev-small { background: var(--warning); } .sev-none { background: var(--none); }
+  .potholes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px; margin-top: 12px; }
+  .ph { display: grid; grid-template-columns: 110px 1fr; gap: 10px; background: var(--surface-2); border-radius: 10px; padding: 8px; cursor: pointer; }
+  .ph img { width: 110px; height: 110px; object-fit: cover; border-radius: 8px; background: #000; }
+  .ph .t { font-weight: 650; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .ph .m { font-size: 12.5px; color: var(--text-2); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .empty { padding: 20px; text-align: center; color: var(--muted); }
+  .err { border-left: 4px solid var(--critical); background: var(--surface-2); padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; display: none; }
+  .note { border-left: 4px solid var(--border); padding: 6px 10px; color: var(--text-2); font-size: 12.5px; margin-top: 10px; }
+  .leaflet-popup-content { font: 13px/1.4 system-ui, sans-serif; }
+  .leaflet-popup-content img { width: 200px; border-radius: 6px; display: block; margin-bottom: 4px; }
+  .hidden { display: none !important; }
+  .kf { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
+  .kf a { display: block; text-decoration: none; color: var(--text-2); font-size: 12px; }
+  .kf img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; background: #000; display: block; }
+  .kf .b { color: var(--critical); font-weight: 600; }
+  h3 { font-size: 13px; color: var(--text-2); margin: 16px 0 0; font-weight: 600; }
+  .warn { border-left: 4px solid var(--critical); background: var(--surface-2); padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>RoadFix <span>· Drives</span></h1>
+    <span id="worker" class="pill"><i></i>…</span>
+    <div class="controls"><a href="/">Phone page</a><button id="refresh">Refresh</button></div>
+  </header>
+  <div id="err" class="err" role="alert"></div>
+
+  <section id="login" class="card hidden" style="max-width:420px">
+    <h2>Sign in</h2>
+    <input id="lname" placeholder="Your name" style="width:100%;margin-bottom:8px" autocomplete="name">
+    <input id="lcode" placeholder="Access code" style="width:100%;margin-bottom:8px" autocomplete="off">
+    <button class="primary" id="lbtn" style="width:100%">Sign in</button>
+  </section>
+
+  <div class="layout hidden" id="main">
+    <section class="card"><h2>Drives <span class="muted small">· newest first, updates by itself</span></h2><div id="drives"></div></section>
+    <section class="card" id="detail"><div class="empty">Pick a drive.</div></section>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const SEV = {large: "Large", medium: "Medium", small: "Small"};
+const fmt = (v, d = 2) => v == null || !isFinite(v) ? "–" : Number(v).toFixed(d);
+const when = (iso) => iso ? iso.slice(0, 16).replace("T", " ") : "";
+let sel = null, map = null, layer = null, lastSig = "", drivesCache = [], showAll = false;
+
+async function api(path, opt) {
+  const r = await fetch(path, {credentials: "same-origin", headers: {"ngrok-skip-browser-warning": "1", ...(opt && opt.headers)}, ...opt});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.detail || r.statusText); e.status = r.status; throw e; }
+  return j;
+}
+function err(m) { $("err").textContent = m || ""; $("err").style.display = m ? "block" : "none"; }
+$("lbtn").onclick = async () => { try { await api("/api/login", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({name: $("lname").value, code: $("lcode").value})}); err(""); load(); } catch (e) { err(e.message); } };
+$("refresh").onclick = () => { lastSig = ""; load(); };
+
+function driveState(d) {
+  if (!d.closed) return ["run", "recording / uploading"];
+  if (d.processed < d.frames) return ["run", `processing ${d.processed}/${d.frames}`];
+  if (d.replayed) return ["ok", "done · sent to RoadFix"];
+  return ["warn", "done · sending to RoadFix"];
+}
+async function load() {
+  let j;
+  try { j = await api("/api/drives"); } catch (e) { if (e.status === 401) { $("login").classList.remove("hidden"); $("main").classList.add("hidden"); return; } err("PC not reachable: " + e.message); return; }
+  $("login").classList.add("hidden"); $("main").classList.remove("hidden"); err("");
+  const w = j.worker;
+  $("worker").className = "pill " + (!j.processing ? "warn" : w.busy ? "run" : "ok");
+  $("worker").innerHTML = `<i></i>${!j.processing ? "automatic processing off" : w.busy ? `processing ${esc(w.busy)}${w.queued ? ` · ${w.queued} waiting` : ""}` : "processing: idle"}`;
+  drivesCache = j.drives;
+  if (!sel && j.drives.length) sel = j.drives[0].trip_id;
+  $("drives").innerHTML = j.drives.length ? j.drives.map((d) => { const [c, t] = driveState(d), pct = d.frames ? d.processed / d.frames * 100 : 0;
+    return `<div class="drive ${d.trip_id === sel ? "on" : ""}" data-id="${esc(d.trip_id)}"><b>${esc(when(d.started_at))}</b> · ${esc(d.user)}<br>
+      <span class="small muted">${esc(d.phone || "phone")} · ${fmt(d.km, 2)} km · ${d.frames} keyframes</span><br><span class="pill ${c}"><i></i>${esc(t)}</span>
+      <div class="bar"><i style="width:${pct}%"></i></div></div>`; }).join("")
+    : `<div class="empty">No drives yet. Record one on the phone page; it shows up here while you drive.</div>`;
+  if (sel) await loadDrive(sel);
+}
+$("drives").addEventListener("click", (e) => { const el = e.target.closest("[data-id]"); if (!el) return; sel = el.dataset.id; lastSig = ""; showAll = false; load(); });
+
+async function loadDrive(id) {
+  let v; try { v = await api(`/api/drives/${encodeURIComponent(id)}`); } catch (e) { err(e.message); return; }
+  const sig = JSON.stringify([v.processed, v.frames, v.potholes.length, v.api, v.fixes, v.closed, v.blank, showAll]);
+  if (sig === lastSig) return; lastSig = sig;
+  const apiTxt = {sent: `sent to RoadFix (${v.api.observations ?? 0} observations)`, error: "RoadFix API not reachable — retrying every 5 min", queued: "sending to RoadFix…",
+                  waiting: "sent when the drive ends", skipped: `not sent: ${v.api.error || ""}`}[v.api.state] || v.api.state;
+  const reliable = v.potholes.filter((p) => p.reliable).length;
+  const kfs = v.keyframes.slice().reverse(), shown = showAll ? kfs : kfs.slice(0, 48);
+  $("detail").innerHTML = `
+    ${v.blank ? `<div class="warn"><b>${v.blank} of ${v.processed} keyframes are completely black</b>: the phone's camera delivered no picture, so nothing could be detected on them. Update the phone page (reload it) and record again; the page now refuses black pictures and restarts the camera.</div>` : ""}
+    <div class="tiles">
+      <div class="tile"><div class="k">distance</div><div class="v">${fmt(v.km, 2)}<small> km</small></div></div>
+      <div class="tile"><div class="k">keyframes processed</div><div class="v">${v.processed}<small> / ${v.frames}</small></div></div>
+      <div class="tile"><div class="k">potholes found</div><div class="v">${v.potholes.length}<small> · ${reliable} measured</small></div></div>
+      <div class="tile"><div class="k">RoadFix</div><div class="small" style="margin-top:6px">${esc(apiTxt)}</div></div>
+    </div>
+    <div id="map"></div>
+    <div class="legend"><span><i class="dot sev-large"></i>Large</span><span><i class="dot sev-medium"></i>Medium</span><span><i class="dot sev-small"></i>Small</span><span><i class="dot sev-none"></i>Size not measured</span><span>shaded ring = position ± m</span><span><i class="dot" style="background:var(--route);border-radius:2px"></i>route</span></div>
+    <div class="potholes">${v.potholes.map(card).join("") || `<div class="empty">${v.processed < v.frames || !v.closed ? "No pothole found yet — processing continues as frames arrive." : "No pothole found on this drive."}</div>`}</div>
+    <h3>Keyframes (recordings) · ${v.keyframes.length}${v.keyframes.length > shown.length ? ` · newest ${shown.length} shown <button id="kfAll" style="font-size:12px;padding:2px 8px">show all</button>` : ""}</h3>
+    <div class="kf">${shown.map((k) => `<a href="/media/${esc(sel)}/view/${k.seq}?w=1280" target="_blank" rel="noopener"><img loading="lazy" src="/media/${esc(sel)}/view/${k.seq}?w=320" alt="keyframe ${k.seq}">
+      #${k.seq} · ${esc(when(k.t).slice(11))} · ${fmt(k.speed_kmh, 1)} km/h${k.potholes ? ` · <b>${k.potholes} pothole${k.potholes > 1 ? "s" : ""}</b>` : ""}${k.blank ? ` · <span class="b">black</span>` : ""}</a>`).join("") || `<div class="empty">No keyframes yet: they are taken every 4 m above 5 km/h (1.5 km/h with "Testing on foot").</div>`}</div>
+    <div class="note">Position: the phone's GPS fix moved forward by the measured distance to the pothole, with the GPS accuracy as ± radius (phones: about 5–15 m on open roads). Driving the same road again lets RoadFix confirm the pothole and average the position. Size is measured from the outline and the camera height (no depth); bags and cost are in the RoadFix web app once confirmed.</div>`;
+  drawMap(v);
+  if ($("kfAll")) $("kfAll").onclick = () => { showAll = true; lastSig = ""; loadDrive(sel); };
+}
+function sevClass(p) { return p.severity ? "sev-" + p.severity : "sev-none"; }
+function card(p) {
+  const size = p.reliable ? `${fmt(p.width_m)} ± ${fmt(p.width_sigma_m)} m wide · ${fmt(p.area_m2, 3)} m²` : `size not measured (${esc(p.why || "")})`;
+  return `<div class="ph" data-ph="${p.id}"><img loading="lazy" src="/media/${esc(sel)}/results/${esc(p.crop)}" alt="pothole ${p.id}">
+    <div><div class="t"><i class="dot ${sevClass(p)}"></i>${p.severity ? SEV[p.severity] : "Unrated"} <span class="muted small">conf ${fmt(p.conf)}</span></div>
+      <div class="m">${size}</div>
+      <div class="m">${fmt(p.lat, 6)}, ${fmt(p.lon, 6)} <b>± ${Math.round(p.pos_sigma_m)} m</b></div>
+      <div class="m">${esc(when(p.seen_at).slice(11))} · ${p.frames.length} frame${p.frames.length > 1 ? "s" : ""} · ${esc(p.placed)}</div>
+      <div class="m"><a href="https://www.google.com/maps?q=${p.lat},${p.lon}" target="_blank" rel="noopener">Open in Google Maps</a></div></div></div>`;
+}
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function drawMap(v) {
+  const el = $("map");
+  if (!window.L) { el.innerHTML = `<div class="empty">Map not available (no internet for the map library). The list below has every position.</div>`; return; }
+  if (map) { map.remove(); map = null; }
+  map = L.map(el, {zoomControl: true});
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19, referrerPolicy: "strict-origin-when-cross-origin",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+  layer = L.featureGroup().addTo(map);
+  if (v.route.length > 1) L.polyline(v.route, {color: css("--route"), weight: 4, opacity: .8}).addTo(layer);
+  const col = {large: css("--critical"), medium: css("--serious"), small: css("--warning")};
+  for (const p of v.potholes) {
+    const c = col[p.severity] || css("--none");
+    L.circle([p.lat, p.lon], {radius: p.pos_sigma_m, color: c, weight: 1, fillColor: c, fillOpacity: .12, interactive: false}).addTo(layer);
+    const mk = L.circleMarker([p.lat, p.lon], {radius: 8, color: css("--surface") || "#fff", weight: 2, fillColor: c, fillOpacity: 1});
+    mk._ph = p.id;
+    mk
+      .bindPopup(`<img src="/media/${esc(sel)}/results/${esc(p.crop)}" alt=""><b>${p.severity ? SEV[p.severity] : "Unrated"}</b> · conf ${fmt(p.conf)}<br>${p.reliable ? `${fmt(p.width_m)} m wide` : "size not measured"}<br>± ${Math.round(p.pos_sigma_m)} m · <a href="https://www.google.com/maps?q=${p.lat},${p.lon}" target="_blank" rel="noopener">Google Maps</a>`)
+      .addTo(layer);
+  }
+  const pts = v.route.concat(v.potholes.map((p) => [p.lat, p.lon])); // from coordinates: circles have no bounds before a view exists
+  if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.15), {maxZoom: 18}); else map.setView([17.385, 78.4867], 12);
+  $("detail").querySelectorAll("[data-ph]").forEach((el) => el.onclick = () => {
+    const p = v.potholes.find((x) => String(x.id) === el.dataset.ph); if (!p) return;
+    map.setView([p.lat, p.lon], 18); layer.eachLayer((l) => { if (l._ph === p.id) l.openPopup(); }); el.scrollIntoView({block: "nearest"}); $("map").scrollIntoView({behavior: "smooth", block: "center"}); });
+}
+load();
+setInterval(() => { if (!document.hidden) load(); }, 10000);
+</script>
+</body>
+</html>

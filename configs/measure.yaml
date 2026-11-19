@@ -1,6 +1,6 @@
 # Measurement core parameters (PLAN 4). Read by measure/pipeline.py; every key has this default.
 depth:
-  backend: da2_metric                 # da2_metric | da3_metric | metric3d_onnx | synthetic | stereo_sgbm
+  backend: "off"                      # D27 size-only (no depth model) | da2_metric | da3_metric | metric3d_onnx | synthetic | stereo_sgbm
   model_id: depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf
   da3_model_id: depth-anything/DA3METRIC-LARGE
   scale_convention: fx_over_300       # da3 only: fx_over_300 | fx | relative
@@ -9,6 +9,11 @@ depth:
   fp16: true
 
 undistort: true
+
+ground:                               # D27 size-only mode (depth.backend off): outline projected on the calibrated road plane
+  height_sigma_m: 0.02                # camera height 1-sigma on a moving bus (tape 1 cm + load/suspension)
+  pitch_sigma_deg: 0.75               # pitch 1-sigma (braking, road grade)
+  min_valid_frac: 0.9                 # reject when > 10 % of the outline lies above the horizon
 
 road_candidates:
   lower_frac: 0.65                    # lower 65 % of the image

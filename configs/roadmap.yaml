@@ -1,0 +1,248 @@
+# RoadFix — what is left to finish the project end to end (D26). Read by scripts/project_control.py (`make control`).
+#
+# Each item has a gate (what "done" means), the command or document to act on, and a check that the dashboard
+# evaluates live on every refresh. Check kinds (all paths relative to the repo root):
+#   metric        model_eval.json key path; op >= or <= threshold; optional target       -> done when it passes
+#   file          glob; done when at least one file matches
+#   absent        list of paths; done when none of them exists
+#   json_true     file + key path; done when the value is true (all values true when the value is a dict)
+#   newer         path newer (mtime) than `than`
+#   eval_after    newest trained_* entry in model_eval.json was evaluated after `path` was last written
+#   python_pkg    the .venv can import `name`
+#   review        share of train+val images with at least one decision in the base-dataset review DB >= `min`
+#   bench         reports/benchmark.json: the model in use (.env SEG_WEIGHTS), one test set, field op threshold (D38)
+#   manual        ticked by a person on the dashboard; stored in docs/roadmap_state.json (travels with git)
+# `depends` lists item ids that must be done first (the item shows as blocked until then). The dashboard never runs
+# any command: it shows them for you to run in a terminal (training stays in the foreground, D17).
+
+eval_file: reports/model_eval.json
+state_file: docs/roadmap_state.json
+
+areas:
+  - id: model
+    title: Pothole detection model (D38 base)
+    why: Base = the supplied YOLO11n on the Nagar Netra dataset; every earlier dataset is a test set (make benchmark).
+    items:
+      - id: model.base_dataset
+        title: Base dataset built with a leak-free split
+        gate: data/datasets/nagar_netra_pothole/data.yaml (near-copies never straddle splits)
+        cmd: make base-dataset
+        ref: docs/DECISIONS.md D38
+        check: {kind: file, glob: data/datasets/nagar_netra_pothole/data.yaml}
+      - id: model.benchmark
+        title: Benchmark of the model in use on every test set
+        gate: reports/benchmark.json newer than the model registry
+        cmd: make benchmark
+        depends: [model.base_dataset]
+        check: {kind: newer, path: reports/benchmark.json, than: configs/models.yaml}
+      - id: model.finetune
+        title: Fine-tune the base model on the base dataset (adopted only if not worse anywhere)
+        gate: a runs/detect/*/weights/best.pt with its reports/train_<name>.json
+        cmd: make train
+        depends: [model.base_dataset]
+        check: {kind: file, glob: "reports/train_*.json"}
+      - id: model.review
+        title: Review the base dataset (keep / reject / fix)
+        gate: ">= 95 % of train+val images have a decision"
+        cmd: make review
+        check: {kind: review, min: 0.95}
+      - id: model.phone_frames
+        title: Label real phone / bus frames and add them to the base dataset
+        gate: "labelled Hyderabad drive frames in the base dataset (the main gap is tiny distant potholes and patches)"
+        ref: docs/DECISIONS.md D36-D38
+        check: {kind: manual}
+      - id: model.base_test
+        title: Base test AP50 at the floor
+        gate: ">= 0.70 on the leak-free Nagar Netra test"
+        cmd: make benchmark
+        check: {kind: bench, test: base_test, field: ap50, op: ">=", threshold: 0.70}
+      - id: model.phone_street
+        title: Phone street frames found (unseen walk, 13 pothole frames)
+        gate: ">= 12 of 13 found"
+        cmd: make benchmark
+        check: {kind: bench, test: phone_street, field: found, op: ">=", threshold: 12}
+      - id: model.false_alarms
+        title: False alarms on pothole-free Indian roads (eYantra)
+        gate: "<= 3 % of images flagged"
+        cmd: make benchmark
+        check: {kind: bench, test: eyantra_negatives, field: false_alarm_rate, op: "<=", threshold: 0.03}
+
+  - id: export
+    title: Export and bus model
+    why: The bus / phone runs a small exported model; the base model already has ONNX and int8 TFLite exports.
+    items:
+      - id: export.onnx
+        title: ONNX of the model in use
+        gate: weights/base/civic_yolo11n.onnx (supplied) or an export of an adopted fine-tune
+        check: {kind: file, glob: "weights/base/*.onnx"}
+      - id: export.litert
+        title: LiteRT (TFLite) of the model in use for Android
+        gate: weights/base/civic_yolo11n_int8.tflite (supplied)
+        check: {kind: file, glob: "weights/base/*.tflite"}
+      - id: export.prune_v1
+        title: Delete the v1 datasets and laptop run
+        gate: v1 paths gone (approved 2026-11-16)
+        cmd: make seg-prune-v1
+        check: {kind: absent, paths: [data/datasets/india_pothole_seg, data/datasets/india_pothole_seg4]}
+
+  - id: measure
+    title: Real-camera size accuracy
+    why: Depth is off (D27); width and area from the outline are proven only on synthetic geometry so far.
+    items:
+      - id: measure.synthetic
+        title: Synthetic accuracy and σ coverage report
+        gate: reports/measure_demo/summary.json written
+        cmd: make measure-demo
+        check: {kind: file, glob: reports/measure_demo/summary.json}
+      - id: measure.session
+        title: Staged foam-board session filmed and filled in
+        gate: data/truth/staged_*.csv with measurements
+        cmd: .venv/bin/python scripts/staged_pothole_truth.py template --out data/truth/template.csv
+        ref: docs/CALIBRATION_SOP.md, PLAN §4.12
+        check: {kind: file, glob: "data/truth/staged_*.csv"}
+      - id: measure.gates
+        title: Staged test - width within 10 % and IRC width class right on >= 90 % of targets (size-only, D27)
+        gate: measured width / area vs tape on the foam-board targets, bus calibration certificate in use
+        cmd: .venv/bin/python scripts/staged_pothole_truth.py compare data/truth/staged_<date>.csv --out reports/staged_truth
+        depends: [measure.session]
+        check: {kind: manual}
+
+  - id: code
+    title: Open code-review issues (2026-11-16)
+    why: Found in review, not fixed yet (HANDOFF §2 known issues). Tick each once fixed and tested.
+    items:
+      - id: code.pipeline_inline
+        title: Wire the production path (PIPELINE_INLINE=0)
+        gate: ingest enqueues jobs; trip-close hooks run after the trip's observations are processed
+        ref: server/app/routers/ingest.py:258
+        check: {kind: manual}
+      - id: code.demo_otp
+        title: Demo OTP must not yield a super_admin token outside the demo
+        gate: fixed OTP refused when DEMO_MODE is off; test added
+        ref: server/app/routers/auth.py:62
+        check: {kind: manual}
+      - id: code.fleet_seed
+        title: Make fleet runs reproducible (no per-process hash())
+        gate: stable seed; two runs give the same trips
+        ref: edge/sim/fleet.py:247
+        check: {kind: manual}
+      - id: code.recurrence
+        title: Check recurrence_watch is reachable
+        gate: re-checked; fixed or closed as not a bug
+        check: {kind: manual}
+      - id: code.jurisdiction
+        title: Jurisdiction queue resolvable only within the user's agency
+        gate: cross-agency resolve rejected; RBAC test
+        check: {kind: manual}
+      - id: code.privacy
+        title: DPDP — sign frame URLs per user, blur faces and plates
+        gate: no anonymous frame URLs; blur before any public view
+        ref: PLAN §11 privacy
+        check: {kind: manual}
+      - id: code.android_outbox
+        title: Android outbox keeps data and stops retrying 4xx
+        ref: edge/android/
+        check: {kind: manual}
+      - id: code.verify_timing
+        title: Bus verification timing (claim_at + 20 min) on slow surveys
+        check: {kind: manual}
+
+  - id: platform
+    title: Production platform
+    why: The demo runs on SQLite in one process; production is PostGIS + workers (DECISIONS D1-D3).
+    items:
+      - id: platform.postgis
+        title: PostGIS installed and migrated (alembic upgrade head)
+        ref: docs/DECISIONS.md D1-D3, PLAN WP4
+        check: {kind: manual}
+      - id: platform.mapmatch_pg
+        title: mapmatch_pg run against PostGIS
+        depends: [platform.postgis]
+        check: {kind: manual}
+      - id: platform.workers
+        title: Job queue workers in production mode
+        depends: [code.pipeline_inline]
+        check: {kind: manual}
+
+  - id: apps
+    title: Bus and web apps
+    why: The bus app is a skeleton; the web app needs its PWA audit and credits page.
+    items:
+      - id: apps.android_build
+        title: Android app builds (assembleDebug)
+        cmd: cd edge/android && ./gradlew assembleDebug
+        check: {kind: file, glob: "edge/android/app/build/outputs/apk/debug/*.apk"}
+      - id: apps.android_model
+        title: Android app runs the LiteRT bus model on a phone
+        depends: [apps.android_build, export.litert]
+        check: {kind: manual}
+      - id: apps.jetson
+        title: Jetson runner on a device (TensorRT)
+        ref: edge/jetson/runner.py
+        check: {kind: manual}
+      - id: apps.lighthouse
+        title: Lighthouse PWA audit (installable)
+        cmd: cd web && npm run build
+        check: {kind: manual}
+      - id: apps.attribution
+        title: Attribution page in the web app (OSM, RDD2022, BharatPotHole, GTFS, models)
+        ref: docs/LICENCES.md §4.5
+        check: {kind: manual}
+
+  - id: legal
+    title: Licence decisions
+    why: Needed before the pilot (docs/LICENCES.md §4; owner pilot lead + legal cell).
+    items:
+      - id: legal.ultralytics
+        title: Ultralytics AGPL — Enterprise licence, AGPL release, or RF-DETR-Seg
+        ref: docs/LICENCES.md §4.1
+        check: {kind: manual}
+      - id: legal.depth
+        title: Depth model licence (only if depth is switched back on; off since D27)
+        ref: docs/LICENCES.md §4.2
+        check: {kind: manual}
+      - id: legal.eyantra
+        title: eYantra GPL-2.0 data out of the deployed model, or permission obtained
+        ref: docs/LICENCES.md §4.3
+        check: {kind: manual}
+
+  - id: demo
+    title: Demo and pilot readiness
+    why: The jury demo and the 20-bus pilot plan.
+    items:
+      - id: demo.e2e
+        title: End-to-end demo passes its acceptance
+        gate: every check in reports/demo_summary.json acceptance is true
+        cmd: make demo
+        check: {kind: json_true, path: reports/demo_summary.json, key: acceptance}
+      - id: demo.e2e_model
+        title: Re-run the demo with the model in use
+        gate: demo summary written after the latest benchmark
+        cmd: make demo
+        check: {kind: newer, path: reports/demo_summary.json, than: reports/benchmark.json}
+      - id: demo.report
+        title: Project report regenerated after the latest benchmark
+        cmd: make report
+        check: {kind: newer, path: reports/REPORT.md, than: reports/benchmark.json}
+      - id: demo.phone_drive
+        title: Phone drive recorded and uploaded (route with 10-20 potholes, driven twice)
+        gate: a trip in data/capture/ from the phone page
+        cmd: make capture-public
+        ref: docs/DECISIONS.md D28
+        check: {kind: file, glob: "data/capture/*/trip.json"}
+      - id: demo.phone_replay
+        title: Phone drive replayed into the demo API (map, severity, repair)
+        gate: data/capture/<trip>/replay.json written
+        cmd: make capture-replay TRIP=<trip id>
+        depends: [demo.phone_drive]
+        check: {kind: file, glob: "data/capture/*/replay.json"}
+      - id: demo.phone_truth
+        title: Tape width/length of ~10 driven potholes compared with the measured size
+        gate: width within 10 %, IRC width class right on >= 90 %
+        depends: [demo.phone_replay]
+        check: {kind: manual}
+      - id: demo.pilot
+        title: 20-bus pilot plan agreed with TGSRTC (3 depots)
+        ref: docs/DEPLOYMENT_TSRTC.md
+        depends: [legal.ultralytics, legal.depth, legal.eyantra]
+        check: {kind: manual}

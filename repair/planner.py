@@ -311,7 +311,7 @@ def plan(pothole: Any, rules: Mapping[str, Any], rate_card: Mapping[str, Any],
             notes.append("Bail out standing water before patching; damp cavity acceptable, active rain is not.")
             refs.append(str(rep.get("ref_wet", "IRC:82-2015 Sec 10")))
             refs.append(str(rules.get("severity", {}).get("ref", "IRC:82-2015 Cl. 7.5.3.4")) + " (water-filled lower bound, PLAN 4.10)")
-        else:
+        elif not (rep.get("depth_unknown_assumed_max_mm") or {}):
             notes.append("Depth unavailable: quantities are lower bounds at the minimum patch depth; re-measure.")
         extras["lower_bound_severity"] = lb_sev.value
     else:
@@ -355,7 +355,25 @@ def plan(pothole: Any, rules: Mapping[str, Any], rate_card: Mapping[str, Any],
     bags = max(1, _ceil_div(mix_kg, bag_kg))
     bags_low = min(bags, max(1, _ceil_div(mix_kg - mix_sigma, bag_kg)))
     bags_high = max(bags, _ceil_div(mix_kg + mix_sigma, bag_kg))
-    if pending:
+    assumed = (rep.get("depth_unknown_assumed_max_mm") or {}).get(sev.value) if not p.water_filled else None
+    if pending and p.depth_p95_mm is None and assumed is not None:
+        # D27 size-only: depth not measured. Low = the depth basis above (IRC:116 minimum patch / class floor);
+        # high = an assumed maximum depth for the size class, through the same layering rule.
+        d_hi_mm = _ceil_step(max(float(assumed), d_design_mm), step_mm)
+        patch_hi_mm = min_patch_mm if d_hi_mm > max_layer_mm + _EPS else d_hi_mm
+        crm_hi_mm = d_hi_mm - patch_hi_mm
+        mix_hi = a_cut * patch_hi_mm / 1000.0 * rho * (1 + wst)
+        mix_hi_sigma = rho * (1 + wst) * (patch_hi_mm / 1000.0) * sigma_a_cut
+        bags_high = max(bags_high, _ceil_div(mix_hi + mix_hi_sigma, bag_kg))
+        extras["depth_assumed_range_mm"] = [_r(d_design_mm, 1), _r(d_hi_mm, 1)]
+        extras["crm_t_high"] = _r(a_cut * crm_hi_mm / 1000.0 * float(rep.get("crm_density_t_m3", 2.1)), 4)
+        rng = f"{bags_low}" if bags_low == bags_high else f"{bags_low}-{bags_high}"
+        notes.append(f"Depth not measured (size-only, D27): {rng} bag(s) of {bag_kg} kg for a "
+                     f"patch depth of {d_design_mm:.0f}-{d_hi_mm:.0f} mm (upper value assumed for a "
+                     f"'{sev.value}' pothole)" + (f"; deeper than {max_layer_mm:.0f} mm the bottom is crusher-run, up to "
+                                                     f"{extras['crm_t_high']:g} t" if crm_hi_mm > 0 else "")
+                     + "; the crew confirms the depth on site.")
+    elif pending:
         notes.append(f"Estimate: at least {bags} bag(s) of {bag_kg} kg; upper bound unknown until re-measured.")
     else:
         notes.append(f"Estimate: {bags} bag(s) of {bag_kg} kg (range {bags_low}-{bags_high} at +/-1 sigma).")

@@ -1,0 +1,64 @@
+# D38 dataset registry. One BASE dataset trains the model; every earlier dataset is a TEST set (ml/benchmark.py,
+# `make benchmark`). Paths are relative to the repo root. Kinds:
+#   yolo        YOLO label files; `pothole_ids` = label ids that are potholes (boxes or polygons, both read as boxes)
+#   rdd_locked  the locked RDD-India images; ground truth = the ORIGINAL RDD2022 D40 boxes (as ml.eval did)
+#   negatives   images that contain no pothole: scored by the share of images with a false pothole box
+#   frames      frame-level labels (labels.json: pothole / clean frame lists): frames found / false alarms
+base:
+  id: nagar_netra_pothole
+  path: data/datasets/nagar_netra_pothole          # make base-dataset (data/build_base_dataset.py), leak-free split
+  data_yaml: data/datasets/nagar_netra_pothole/data.yaml
+  pothole_id: 1                                    # 16 Nagar Netra names, pothole = 1 (head of the base model)
+  source: "new dataset for pathole/pothole_dataset_trained_20260907"
+train_sets:                                        # make train DATA=<id> (ml/train_det.py --data <id>)
+  base: data/datasets/nagar_netra_pothole/data.yaml                    # base train only (pothole-only, D38)
+  combined: data/datasets/combined_ft/data.yaml                        # D39: base x5 + earlier train/val (make combined-dataset)
+  base_neg: data/datasets/base_neg/data.yaml                           # D42: base x5 + earlier images WITHOUT potholes (make negatives-dataset)
+  phone: data/datasets/phone_marked/data.yaml                          # D41: phone drive frames you marked (make annotate-export)
+tests:
+  - id: base_test
+    name: Nagar Netra test (leak-free)
+    kind: yolo
+    images: data/datasets/nagar_netra_pothole/images/test
+    labels: data/datasets/nagar_netra_pothole/labels/test
+    pothole_ids: [1]
+    primary: true
+  - id: rdd_india_locked
+    name: RDD-India locked test (514)
+    kind: rdd_locked
+    images: data/datasets/india_pothole_seg4_v2/images/test
+    lock: data/splits/rdd_india_test.lock.txt
+    note: "public RDD2022 images; tiny distant potholes; models trained on RDD score high here (leakage, D35/D36)"
+  - id: bharat_test
+    name: BharatPotHole dashcam test
+    kind: yolo
+    images: data/datasets/india_pothole_seg4_v2/images/test
+    labels: data/datasets/india_pothole_seg4_v2/labels/test
+    prefix: bh_
+    pothole_ids: [0]
+  - id: web_test
+    name: Web pothole photos (human masks)
+    kind: yolo
+    images: data/datasets/india_pothole_seg4_v2/images/test
+    labels: data/datasets/india_pothole_seg4_v2/labels/test
+    prefix: ws_
+    pothole_ids: [0]
+  - id: eyantra_negatives
+    name: eYantra Indian roads without potholes (false alarms)
+    kind: negatives
+    images: data/datasets/india_pothole_seg4_v2/images/test
+    prefix: ey_
+  - id: phone_street
+    name: Phone street walk 2026-11-18 (unseen by every model)
+    kind: frames
+    images: data/testsets/phone_street_20261118/images
+    labels: data/testsets/phone_street_20261118/labels.json
+    primary: true
+  - id: phone_street_marked
+    name: Phone street walk, potholes outlined by hand (D41 annotation dashboard)
+    kind: yolo
+    images: data/testsets/phone_street_20261118/images
+    labels: data/testsets/phone_street_20261118/labels
+    pothole_ids: [1]
+    require_label: true
+    note: "box AP50 against your own outlines; only photos marked 'potholes' or 'no pothole' count (make annotate-export)"

@@ -501,3 +501,435 @@ given only when the measurement passes the fusion gates of `configs/measure.yaml
 `min_quality_for_fusion` 0.2, scale lock inside `clip` [0.5, 2]); otherwise the summary says why it could not be
 measured. Found while testing: on the demo dashcam frames with demo calibrations the scale lock was 0.26 and quality
 0.12, which without the gate turned into a "14 m pothole" and 184-250 bags.
+
+## D26. Project control dashboard: what is left to finish end to end (user request 2026-11-18)
+`scripts/project_control.py` (`make control`, http://127.0.0.1:8790) shows every open step to finish RoadFix: 39 items
+in 8 areas (detection model, export and bus model, real-camera measurement, the 2026-11-16 code-review issues,
+production platform, bus and web apps, licences, demo and pilot). The list, gates and commands are in
+`configs/roadmap.yaml`. Every refresh checks the repo: `reports/model_eval.json` metrics (AP50 floor 0.70, mask IoU,
+ONNX delta), review progress read-only from `data/review/review.sqlite`, exported files, staged-truth and demo summaries,
+file ages (dataset rebuilt after the review export, report after the eval), the last pytest run
+(`.pytest_cache/.../lastfailed`), training in progress (`gm_live.json` < 120 s old), tools up (8765/8770/8780/8000/5173),
+GPU and git. An automatically checked item whose dependencies are not done counts as **blocked** even when its own check
+passes. Example: the 2026-11-17 eval is newer than the current dataset, but "retrain on reviewed data" stays blocked
+until the review and rebuild are done. Blocking chains through dependencies. Items that cannot be checked automatically
+(licences, code fixes, PostGIS, pilot) are ticked by a named person on the page. Ticks and notes go to
+`docs/roadmap_state.json` (committed, so they travel with the repo) and are accepted only from loopback; automatic items
+take notes only. User choices: a **local live** page (rejected: a hosted claude.ai snapshot, which goes stale) and
+**read-only** (rejected: buttons that start jobs; training stays in the foreground, D17), so commands are shown with a
+copy button. Standard library + PyYAML, no CDN. `--check` prints the same status in the terminal.
+
+## D27. Depth model off: size-only severity from the pothole outline (user decision 2026-11-18)
+User view: monocular depth on bus frames and detection are both hard; drop the depth pipeline and grade potholes
+another way. The user first suggested **detector confidence as severity**. It was tested on the v2 test split (current
+model, 3,428 labelled potholes) and rejected: Spearman(confidence, pothole area) = **+0.02 on RDD-India** (+0.16
+BharatPotHole, +0.03 web close-ups). Confidence measures how clear the image is, not how big the pothole is, and its
+scale shifts with every retrain. The model keeps using confidence only as the trust gate (conf < 0.5 dropped).
+Chosen instead (user approved):
+- **`depth.backend: "off"`** (`configs/measure.yaml`, `.env`/server default `DEPTH_BACKEND=off`): `measure_frames` takes
+  the size-only path (`measure/ground_geom.py`). Each mask pixel ray meets the road plane known from the calibration
+  (height, pitch, roll, yaw). Output: area, length, width (m), range and lane offset, with sigma from re-projecting at
+  height +-`ground.height_sigma_m` (0.02 m), pitch +-`ground.pitch_sigma_deg` (0.75 deg) and the +-1 px outline.
+  Depth, volume and depth-based water detection are None. Contract additions (CONTRACTS.md): `Method.mono_ground`,
+  `DepthQuality.not_measured`. No depth model is loaded (server `depth_backend()` returns None; the CLI skips the
+  SegFormer road mask). `/measure` now follows `DEPTH_BACKEND` like the workers (before, it only read measure.yaml).
+- **Severity**: IRC:82 width class (Large > 500 mm, Medium 200-500 mm, else Small; `measure.irc.severity_size_only`),
+  raised one level when a bus felt the jolt (`pothole.imu_corroborations >= 1`; `server/workers/stages.update_severity`).
+  With measured depth, plain IRC:82 as before.
+- **Repair**: depth unknown and not water -> bags low = the IRC:116 50 mm minimum patch, high = an assumed maximum per
+  width class (`irc_rules.yaml repair.depth_unknown_assumed_max_mm`: small 50, medium 75, large 100 mm; NOT IRC values,
+  engineer-editable), through the same layering rule (above 75 mm the extra depth is crusher-run, `extras.crm_t_high`).
+  The note says the crew confirms depth on site. Water-filled potholes keep the PLAN 4.10 lower-bound rule.
+- Model test page and web app show width / length / area and "Size only (no depth)"; the depth chart shows "Depth not
+  measured".
+- **Accuracy** (tests/test_size_only.py, rectangle drawn with an independent pinhole projection, demo phone 1.4 m /
+  12 deg): width within 1-3 % at 4-10 m. Length and area read 3-15 % high at 6-10 m (the outline's edge pixels), inside
+  the stated sigma.
+  Real accuracy depends on the bus calibration certificate and a flat road; the foam-board session now checks width and
+  area instead of depth.
+- **Kept, not deleted**: all depth code, backends and tests. `DEPTH_BACKEND=da2_metric` brings depth back. Future
+  option: severity classes trained into the detector, once reviewers have labelled severity.
+
+## D28. Phone as the bus camera for the demo; SQLite CHECK-constraint refresh (user decision 2026-11-18)
+The user asked what to provide for a demo, or for a simple Android app that does the bus camera's job. Chosen: a
+**phone web page** (rejected: finishing the native `edge/android` skeleton, which has no JDK/SDK on this PC, a stub
+detector and needs a trained and exported YOLO26n; rejected: video + GPS-logger import, which has error-prone time
+sync and no IMU).
+- `make capture` (`scripts/phone_capture.py` + `.html`): HTTPS on the LAN :8443 with a self-signed certificate for the
+  PC's IP (openssl, `data/capture/tls/`; phones need HTTPS for camera, GPS and motion). Same access code and signed
+  cookie as the review tool. The page: **Set up** (rear camera, tape height, tilt read from the gravity sensor with a
+  level indicator, field of view default 67 deg) -> `configs/cameras/phonecap_<hash of values>.json` (certified=false;
+  the id changes when any value changes, so the API never reuses a stale cached certificate). **Drive** (no network):
+  keyframe every 4 m at >= 5 km/h with the odometer dead-reckoned between 1 Hz GPS fixes (50 ms tick), 1 Hz trip
+  fixes with `cam_active`, jolts at a vertical peak >= 0.35 g and >= 15 km/h, screen wake lock, all in IndexedDB.
+  **Upload** on office Wi-Fi, resumable, every call idempotent (frames by seq, fix and jolt batches by content).
+  Trip ids are UUIDs (edge schema). Frames stay in `data/capture/` (git-ignored; faces and number plates, DPDP).
+- `make capture-replay TRIP=<id> [API=...]` (`scripts/capture_replay.py`): the PC acts as the bus box. It runs
+  SEG_WEIGHTS at the edge confidence 0.35 on every keyframe, links detections across consecutive keyframes (overlap,
+  or a box moving down the image), keeps <= 3 keyframes per track (first, middle, nearest), and builds edge
+  observations and jolt observations (schema-validated). It registers the device and uploads through
+  `edge/sim/client.py` (frames, observations, fixes, trip close), then writes `replay.json`. `--dry-run` only detects.
+- Tested end to end (2026-11-18): a phone-like trip from 60 consecutive BharatPotHole frames along GTFS 10H was
+  replayed into a size-only API on a copy of `data/gunthameter.db`. Result: 1 track, 2 keyframes, size-only
+  measurements 0.37 +- 0.02 m and 0.20 +- 0.01 m wide, a candidate pothole on OSM way 313353060, fused width 0.275 m,
+  Medium, method `mono_ground`. The page itself was driven in Chrome with fake sensors (canvas camera, synthetic GPS at
+  36 km/h, gravity at 9 deg): tilt read 9.0 deg, 24 keyframes over 0.11 km, 5/5 bumps as jolts, upload complete, and
+  the replay was accepted with 0 schema rejections.
+- **Found by that test, fixed:** (1) `EnumStr` columns carry CHECK constraints written at table creation, so every
+  existing SQLite DB refused D27's `mono_ground` / `not_measured`. `Database.create_all` now calls
+  `server/app/db/migrate.refresh_sqlite_checks`: tables whose CHECK constraints differ from the models are rebuilt with
+  the SQLite 12-step procedure (foreign keys off, copy, rename, indexes, `foreign_key_check`) in one transaction,
+  after a copy of the file to `<db dir>/backups/`. On the 137 MB DB copy it rebuilt pothole, measurement and
+  pass_measurement, integrity_check ok. PostgreSQL still needs real migrations (D1-D3). (2) `edge/sim/sim_server.py
+  --depth settings` hard-coded `da2_metric` when `DEPTH_BACKEND` was not in the environment; it now follows .env / the
+  Settings default.
+- Note: a shell that ran `set -a; source .env` before D27 still exports `DEPTH_BACKEND=da2_metric`, and an environment
+  variable overrides .env. Re-source .env or `unset DEPTH_BACKEND` before starting the API.
+- What the demo needs from the team: phone in a fixed landscape mount; tape height; a route with 10-20 potholes driven
+  twice; for about 10 of them tape width/length + photo + location (size accuracy and IRC class check); optionally the
+  same road after one repair (bus verification). Every keyframe is also bus-view training data (roadmap
+  `model.bus_frames`).
+
+## D29. Phone capture from any network (user request 2026-11-18)
+The phone page (D28) only reached the PC on the office LAN. `make capture-public` (`phone_capture.py --public`) serves
+on 127.0.0.1 only and starts the ngrok agent already installed and signed in on this PC (`~/bin/ngrok`, v3). The
+phone then uses a public `https://...ngrok...` URL with a valid certificate (no warning page), on mobile data or any
+Wi-Fi. `--ngrok-url` / `GM_NGROK_URL` pins a fixed domain (e.g. the account's free static dev domain). Rejected: router
+port forwarding (needs office IT); Tailscale (private and the most secure, but every phone needs the app and an account,
+and it is not installed); Cloudflare quick tunnel (not installed, URL changes on every start). Trade-offs accepted
+by the user's request: frames pass through ngrok's servers (TLS ends there; DPDP: share the link only with drivers),
+and the sign-in page is public. Hardening, on in both modes:
+- the capture page has its **own access code** (4 words + 4 digits) and signing key in `data/capture/` (0600), no
+  longer the review tool's (`GM_CAPTURE_CODE` overrides);
+- **sign-in lockout**: 5 wrong codes in 10 min lock that client for 15 min; 50 wrong codes overall lock all sign-ins.
+  The client is the tunnel's `X-Forwarded-For`, trusted only from loopback;
+- uploads refused (HTTP 507) below 5 GB free disk; at most 20,000 keyframes per trip;
+- headers: nosniff, `X-Frame-Options: DENY`, no-referrer, no-store, Permissions-Policy camera/geolocation/motion self.
+Phone page: every call sends `ngrok-skip-browser-warning`. New options in 3 Upload: **upload while driving** (every
+20 s when connected; only what is not yet sent, so it resumes after dead zones; after Stop the final upload waits for
+a running one, then closes the trip) and **Wi-Fi only** (Android Chrome reports Wi-Fi vs mobile data; other phones
+report "unknown" and upload). The list shows MB left (~25-50 MB per km, since every keyframe goes to the PC).
+Found and fixed while testing in Chrome with fake sensors: (1) Stop during a keyframe save read the cleared trip and
+lost that frame; the frame count then disagreed with the saved frames, so the PC showed the trip "incomplete". Now the
+save keeps its own trip reference and the counts come from storage. (2) In a browser tab the page did not see,
+Chrome ran the trigger timer once a second, giving 10 m spacing. The trigger now follows the camera's own frame
+callback (`requestVideoFrameCallback`, ~30 Hz) with the 50 ms timer as fallback. Time in the background is reported
+to the driver and the PC (`hidden_s`), with `cam_active=false` in those fixes. Result of the last browser run: 36
+keyframes, 30 fixes and 6 jolts uploaded while driving, trip closed, PC summary "complete". The run was in a background
+automation tab, so the spacing still reflects 1 Hz timers. A real phone run is still to do.
+
+## D30. No setup for the driver: any orientation, tilt measured during the drive (user request 2026-11-18)
+User: stop asking to mount sideways and hold still 2 s for the tilt. Now:
+- **Orientation free**: portrait or landscape. The certificate follows the real frame size, and the 67 deg field of
+  view is defined along the long side, so fx is the same either way. Checked with the independent ground-rectangle test
+  on a 720x1280 portrait frame: width 0.611 / 0.613 m for 0.60 m at 4 / 6 m. Only a picture rolled more than 45 deg is
+  refused (auto-rotate off).
+- **Tilt without a button**: the page logs the 1 s mean of `accelerationIncludingGravity` plus the screen orientation
+  angle with every 1 Hz fix and keyframe. `phone_capture.tilt_from_gravity` maps device axes to camera axes for the
+  four orientations and uses `measure.surface.pitch_roll_from_normal`, so the sign conventions are the measurement
+  code's own. Tested round-trip against `measure.camera.plane_from_extrinsics` in 0/90/180/270 deg, within 0.05 deg.
+  Readings outside 0.93-1.07 g are dropped. `capture_replay.py` uses the median over +-30 s around each keyframe:
+  braking tips the reading (0.1 g ~ 6 deg) only for seconds and is outvoted (tested: 6 s of 15 deg in 40 s of 9 deg
+  gives 9.0). It writes one certificate per 0.5 deg pitch / 1 deg roll step (`phone_capture.tilted`) and gives every
+  observation its own calib_id. The gravity fields are stripped before the API (frozen trip_fix schema). Without
+  gravity data (motion permission refused) the start tilt or 10 deg is used, and the replay prints that.
+- **Height from a vehicle preset** (car dashboard 115 cm, car windscreen 135, SUV 155, auto-rickshaw 130,
+  two-wheeler 105, bus 230), remembered on the phone; a tape-measured value is optional and better (size scales with
+  height: 10 cm off at 1.15 m is ~9 % on width). Calibration is made automatically when Start is pressed; the
+  "Set up" tab is optional and the page opens on Drive.
+- Browser check with fake sensors (phone sideways, 9 deg down): sign in -> Drive -> Start with no setup, 13 keyframes,
+  upload complete. The replay found "phone gravity sensor during the drive, 9.0 deg down, roll 0.0 deg" from 24
+  readings.
+
+## D31. Phone held sideways with auto-rotate off: frames turned upright on the PC (found in the first real-phone test, 2026-11-18)
+First real test (Samsung S24, public ngrok link): sign-in, recording, upload and trip close worked. It was a
+12 s / 16 m standing or walking test (0-3 km/h, GPS +-14-25 m), so 0 keyframes, which is correct below the 5 km/h
+trigger. The gravity log showed roll ~ +88-90 deg with the screen in portrait (orient 0): the phone was physically
+sideways with auto-rotate off, so every frame would hold the road turned 90 deg. The detector is trained on upright
+roads, and the D30 tilt step dropped all readings as rolled > 45 deg. Fix without asking the driver to change
+anything: `capture_replay.upright_turn` lets every gravity reading vote for the screen angle that would have been
+level (`tilt_from_gravity` at 0/90/180/270, smallest roll), minus the recorded angle. Frames are turned by that before
+detection (`turn_image`: 90 = counter-clockwise, as the screen would have), the turned JPEG is what is uploaded, the
+calibration gets the swapped frame size, and the tilt series is computed for the turned view. Tested for 90/180/270:
+the side gravity calls 'up' ends at the top of the turned picture, and tilt is recovered within 0.05 deg. On the S24
+data: turn 90 deg, tilt 16.7 deg down (10-90 %: 9.9-19.7, hand-held), roll -1.1 deg. The page no longer tells anyone
+to switch on auto-rotate.
+
+## D32. Automatic processing and a Drives dashboard (user request 2026-11-18)
+The user wanted the phone data processed automatically, with potholes and their GPS positions on a dashboard, and asked
+whether the phone sends data by itself. Done:
+- **Phone**: "Upload automatically while driving" is now ON by default (every 20 s with signal; it finishes after
+  Stop). A 4 Results tab opens the dashboard.
+- **Capture server worker** (`scripts/capture_worker.py`, started by `make capture` / `make capture-public`;
+  `--no-process` turns it off, `--api` / `GM_CAPTURE_API` picks the API): one thread with the model loaded once. Every
+  keyframe is processed as it arrives:
+  - upright turn (D31) and tilt from gravity so far (D30);
+  - detection;
+  - size-only measurement (D27);
+  - ground position: the GPS fix advanced by GNSS latency x speed and by the measured distance along the heading
+    (`geo.locate.ground_point`), +- sqrt(GPS accuracy^2 + (5 % range)^2). Without a heading (< 1 m/s) the pothole is
+    placed at the phone, with the range added to the +-.
+
+  Output: `data/capture/<trip>/results/<seq>.json` plus a crop. When the phone closes a trip, the worker re-checks
+  the turn, then `capture_replay.replay_trip` sends it to the RoadFix API. If the API is down, `results/api_error.json`
+  is kept and the send is retried every 5 min. A trip with nothing to send (no GPS) is marked skipped. On restart,
+  `scan()` resumes unprocessed frames and unsent trips. `capture_replay.main` is now a thin CLI over `replay_trip`.
+- **Dashboard** `/dashboard` (`scripts/capture_dashboard.html`, same sign-in, works on the phone and the PC):
+  - drives with live status (recording / processing n/m / done, sent to RoadFix / API error);
+  - Leaflet 1.9.4 (cdnjs) + OSM tiles, with the route from the 1 Hz fixes and pothole markers coloured by IRC class
+    with the +- ring;
+  - cards with crop, confidence, width +- / area, lat/lon +- m and a Google Maps link.
+
+  A pothole = detections linked across consecutive keyframes. Its position is the precision-weighted mean, but the +-
+  shown is the best single radius: frames 4 m apart share most of the GPS error, so averaging them must not shrink it.
+  Media are served only to signed-in users, by strict name pattern.
+- **"Exact location"**: not promised. Phone GPS is about +-5-15 m on open roads; the dashboard shows that radius, and
+  a second pass lets the API cluster and average.
+- Tests (`tests/test_capture_worker.py`): a ground rectangle 0.6 m wide, 5 m ahead and 0.3 m right, projected
+  independently, while the phone heads east at 8 m/s. Measured width 0.6 +- 5 %, Large; placed 7.4 +- 0.4 m east
+  (5 m + 0.3 s x 8 m/s) and 0.3 m south. Also tested: track linking, API down -> error and no re-queue within 5 min,
+  no GPS -> skipped, and the server routes (queueing, auth, media path guard).
+- Live end to end (separate test store + throwaway API on a DB copy): 60 real BharatPotHole frames uploaded over HTTP
+  like a phone. The worker processed all 60 and read the tilt as 10.0 deg (gravity). It found 1 pothole: 0.37 +- 0.02 m
+  wide, Medium, at 17.4571395, 78.3761092 +- 5 m on the HITEC City-Kondapur road, and sent it to the API with 0
+  rejections, with no manual step. In Chrome the map, popup and card zoom worked. Found and fixed there: the map fit
+  used the circle layers' bounds before the map had a view (Leaflet error, blank map); it now fits the coordinates.
+  The crop of that detection looks like a rectangular drain grating: a likely false positive, the weak detector again.
+
+## D33. Black keyframes from the phone; keyframe gallery; testing on foot (second real-phone test, 2026-11-18)
+Second S24 test (public link): 53 s, 79 m, GPS settled at +-5 m, phone sideways with auto-rotate off (turn 90 handled,
+tilt 20 deg). Only 2 keyframes, because the user was walking at ~4.5 km/h, under the 5 km/h trigger. Both keyframes
+were **pure black** (every pixel 0). Cause: switching tabs re-assigned `srcObject` on the video player, which resets
+it and leaves it paused (no autoplay, no play()), and keyframes are copied from that player. Desktop tests went
+straight to Drive, so they never hit it. Fixes:
+- The camera is attached once; tab switches only resume play (`keepPlaying`); both players have `autoplay`.
+- `grab()` refuses a paused / not-ready / black picture: a 32x18 probe whose maximum is < 3. It restarts the player,
+  retries on the next tick and warns the driver after 5 tries.
+- The worker flags black frames (`blank`, max < 8) without running the model; the dashboard warns "N of M keyframes
+  are completely black".
+- The Drive-tab link to the results opens a new tab (it used to navigate away from a recording).
+- New **"Testing on foot"** option (Set up): keyframes from 1.5 km/h instead of 5 km/h, still every 4 m.
+- **Recordings on the dashboard**: a keyframe gallery per drive, each frame turned upright as the processing saw it
+  (`/media/<trip>/view/<seq>?w=`, signed-in only), with time, speed, potholes found and black marks; a click opens
+  the full frame.
+Check in Chrome, the user's flow (Preview camera -> Drive -> Start, sideways, on foot at 4.5 km/h): both players
+playing, 8 keyframes over 31 m with mean brightness 100-126, upload complete.
+
+## D34. One RoadFix device per tester phone (second tester, 2026-11-18)
+A second tester (Sathwik) joined. His first two "drives" were 4 s and 1 s long (Start then Stop): no GPS fix yet, so
+0 frames, 0 fixes, marked skipped (correct). It showed a multi-user flaw: the device id came from the phone name
+field, and an empty name fell back to the vehicle label, so every tester who leaves it empty would be one device
+("phone-car-phone-on-the-dashboard") in the API, with tokens replacing each other on registration. Now the page keeps
+a random key per phone (`rf.devKey`, 6 chars) and the server makes `phone-<tester name>-<key>`
+(`phone_capture.phone_device_id`). The device id is part of the calibration hash, so two phones never share a
+certificate. Old pages without a key fall back to the previous id.
+
+## D35. Pretrained pothole detector replaces the trained model (user request 2026-11-18)
+The user saw the model miss most potholes in Sathwik's walk (39 frames of a broken Hyderabad street) and asked for a
+pretrained pothole model. Checked: the current model found 0 of the 13 frames that clearly show a pothole (judged by
+eye), even at confidence 0.05. It called "manhole" in almost every frame, so this was not a threshold problem.
+- **Candidates**: 15 ultralytics checkpoints from 11 Hugging Face repos (`hf models list --search pothole`).
+  Downloaded to `data/raw/hf_pothole/` and pickle-scanned with `ml.pipeline.checkpoint_globals`: all safe. Copied to
+  `weights/pretrained/hf_*.pt`; metadata in `reports/pretrained_scan_D35.json`. cazzz307 failed to download;
+  RF-DETR (infra-intelligence) skipped (needs `rfdetr`).
+- **Locked RDD-India test (514 images, AP50)**: harisanth 0.812, logesshhh rdd2022_multiclass 0.725, **logesshhh
+  pothole_yolov8 0.598**, engjameso yolov9c 0.322, samdutse 0.320, current 0.249, others <= 0.27 (keremberke m 0.003).
+  Caveat: the test images are public RDD2022 India, and rdd2022_multiclass was trained on "rdd_JapanIndia", so it has
+  probably seen them. Any score here can be inflated by such leakage. mfranzon/pothole-yolo26 scores exactly like our
+  old "bootstrap" model (the same model).
+- **Sathwik's frames** (never public; 13 pothole frames and 20 clean frames by eye; 6 unclear frames left out), found
+  / false alarms at conf 0.25:
+  - **logesshhh pothole_yolov8 9/13 and 3/20** (boxes on the broken surface);
+  - engjameso yolov9c 12/11; keremberke 12/13; spatel02 11/11; harisanth 7/11 (boxes plants, a mat, a pigeon,
+    image edges);
+  - current model 0/3.
+- **Chosen: `Logesshhh/road-anomaly-pothole-yolov8m` `pothole_yolov8.pt`** (YOLOv8m, 7 classes: vehicles, pedestrian,
+  crack, severe crack, pothole, speed bump; Apache-2.0 card; sha256 0ba816b66b588b6e...). Its negative classes keep
+  it from boxing street objects. `SEG_WEIGHTS` in .env points to `weights/pretrained/hf_logesshhh_pothole_yolov8.pt`.
+  The old model stays on disk (`runs/seg/y26m_seg_india_v2ft_geo`); switch back by editing .env.
+- **Box model -> outline**: `capture_replay.default_detector` keeps segmentation models as they were. For a box model
+  it keeps only the pothole class and gets the outline from SAM2.1-small (box prompt, `measure.detect.box_to_mask`:
+  sam2 -> grabcut -> ellipse), because the size measurement needs an outline. Speed: ~50-90 ms per frame after
+  loading. Edge confidence 0.35 -> 0.25.
+- **Re-run of Sathwik's walk**: 12 potholes (was 3 false alarms). Still wrong: a dark repaired asphalt patch (frames
+  15-16) and a pale patch (frame 38). Repaired patches are the known confusion; fix with labelled phone frames +
+  fine-tuning this model later.
+- **Stale environment trap**: shells that sourced the old .env export SEG_WEIGHTS / DEPTH_BACKEND, which override
+  .env. `make api / capture / capture-public / capture-replay` now run with `env -u SEG_WEIGHTS -u DEPTH_BACKEND`, and
+  the capture server prints the model it loaded.
+- Not deleted (ask first): the other 14 candidate checkpoints (data/raw/hf_pothole 648 MB + copies in
+  weights/pretrained), kept for comparison.
+
+## D36. New pothole dataset + user-supplied model: analysis (user request 2026-11-18; no switch yet)
+Supplied: `new dataset for pathole/pothole_dataset_trained_20260907`, the pothole subset of the "Nagar Netra"
+16-class set (710 images / 1,482 boxes; 568/71/71 split; YOLO boxes, class id 1). Also
+`new trained model/weights/best.pt|last.pt`: the YOLO11n 16-class `civic_services_oversampled` model trained on it
+(2026-09-07, 100 epochs; all-class mAP50 0.603). Pickle scan clean.
+- **Dataset** (`reports/new_dataset_analysis_D36.json`):
+  - mostly Roboflow 640x640 exports;
+  - test = "pothole_intel" (public Intel set) 30, "PotHoles" 16, RDD2022 "India" 13, "ashrith" 11, "AN" 1;
+  - train dominated by "AN" 288 and "PotHoles" 226;
+  - **leakage**: 15 test images have a near-copy (256-bit dHash <= 24; checked by eye: same scene, consecutive
+    shots) in the new train/val, although the README calls the split leakage-free. 4 test images are near-copies of
+    our own training data. "Clean" test = without those: 78 boxes.
+- **New test, box AP50 (full / clean)** (`reports/new_dataset_eval_test_D36.json`):
+  - engjameso yolov11 0.569 / 0.705, samdutse 0.548 / 0.672, engjameso yolov9c 0.530 / 0.647, harisanth 0.520 /
+    0.631, potbot 0.509 / 0.624;
+  - **new civic best.pt 0.483 / 0.505**, last.pt 0.458 / 0.471;
+  - in use (logesshhh, D35) 0.385 / 0.443; old trained y26m 0.298 / 0.387.
+
+  By source, the HF models win only on the public sets they were probably trained on (pothole_intel 0.86, ashrith
+  0.86 vs new 0.57 / 0.45). **On RDD India dashcam images the new model is about twice as good** (0.23-0.27 vs
+  <= 0.11; in use 0.03), and also on "PotHoles" (0.48-0.53 vs <= 0.36).
+- **Sathwik's real street frames** (seen by no model; 13 pothole and 20 clean frames by eye), conf 0.25:
+  - **new best.pt 11/13 found, 2/20 false alarms** (best of all);
+  - last.pt 11/3; in use 9/3; engjameso 9/10; samdutse 9/8; potbot 8/8.
+- **Locked RDD-India test (514)**: new best.pt AP50 0.056 (R@0.25 = 5 %). Looked at: RDD's pothole labels are
+  mostly tiny, faint, distant marks, and on 6 random samples neither the new nor the in-use model boxes them at 0.25.
+  The test rewards models that learned RDD's labelling style; in-use 0.598 and harisanth 0.812 are probably helped by
+  RDD exposure. It stays our historical benchmark, but it is not a good judge of street use for these models.
+- **Conclusion**: the highest number on the new test (engjameso yolov11) comes from probably-seen public images. On
+  the independent evidence (unseen phone frames, India dashcam subset) the **user-supplied civic YOLO11n best.pt** is
+  the best and smallest (5.5 MB, a few ms per image). Switching `SEG_WEIGHTS` is the user's call (asked 2026-11-18).
+
+## D37. Switched to the user-supplied civic YOLO11n (user decision 2026-11-18)
+After D36 the user chose to switch. `new trained model/weights/best.pt` (sha256 1b542fe9d0fadc0f...) was copied to
+`weights/pretrained/civic_services_yolo11n_best.pt`; the original folder is untouched. `.env SEG_WEIGHTS` now points
+to the copy. The detector is unchanged: box model, pothole class only (id 1), SAM2 outline, conf 0.25. Re-run of
+Sathwik's walk: 13 potholes, confidences 0.62-0.84 on the clear ones; the D35 model found 12 at 0.26-0.72. Previous
+models stay on disk (D35 logesshhh; trained y26m). Known gaps: tiny distant potholes (RDD-India locked test AP50
+0.056) and repaired patches. Both need labelled phone/bus frames and fine-tuning of this model.
+
+## D38. Re-organisation around the supplied base model and base dataset (user request 2026-11-18)
+User: use the supplied YOLO11n (`new trained model/`) as the BASE model and the supplied dataset
+(`new dataset for pathole/`) as the BASE dataset; every earlier dataset becomes a TEST set; rebuild and organise the
+project for an end-to-end test. User choices: fine-tune now and adopt only if better on all test sets; fix the leaky
+split; keep old material as an archive (delete nothing).
+- **Base dataset** `data/datasets/nagar_netra_pothole` (`data/build_base_dataset.py`, `make base-dataset`). The 710
+  supplied images and labels are copied unchanged, keeping the 16 names with pothole = 1, so the base model's head
+  lines up. Images are grouped by near-duplicate (256-bit dHash <= 24, union-find) and each group goes to the split
+  most of its members had (ties -> train). Result: 597 / 57 / 56 images (1,263 / 131 / 88 potholes); 15 test->train
+  and 14 val->train moved; 0 near-copies across splits afterwards. `split_manifest.json` keeps the supplied split.
+- **Base model** `weights/base/civic_yolo11n.pt` (+ `_last.pt`, `.onnx`, `_int8.tflite`) = the supplied files; the
+  `.env SEG_WEIGHTS` points there. The source folders stay untouched (git-ignored, with `weights/base/` and
+  `data/testsets/`).
+- **Registries**: `configs/datasets.yaml` holds the base + 6 test sets:
+  - Nagar Netra test (leak-free);
+  - RDD-India locked 514, scored on the original RDD D40 boxes;
+  - BharatPotHole bh_ and web ws_ (from the v2 test);
+  - eYantra ey_ (534 images without potholes -> false-alarm rate);
+  - `data/testsets/phone_street_20261118`: Sathwik's 39 frames, upright, with the frame-level labels by eye.
+
+  `configs/models.yaml` holds the base, adopted fine-tunes and the archive.
+- **`ml/benchmark.py`** (`make benchmark`): every model x every test set, with the same COCO matching / 101-point AP
+  as ml.eval and only the model's pothole class (pothole / potholes / D40). Rates at conf 0.25. Output:
+  reports/benchmark.json and reports/BENCHMARK.md. **`ml/train_det.py`** (`make train`):
+  - fine-tunes the base on the base dataset: AdamW lr0 1e-3 cosine, AutoBatch 80 % of free GPU memory,
+    `runs/detect/<name>`, live files for `make dashboard`;
+  - benchmarks the candidate against the model in use;
+  - adopts it (copy to weights/candidates, .env, registry) only if no test set is worse (AP50 -0.01, false-alarm rate
+    +0.01, phone frames +-0) and the mean box AP50 is better (`benchmark.no_test_worse`).
+- **First fine-tune** `det_yolo11n_ft_v1` (80 epochs): base test 0.507 (base 0.471) and web 0.411 (0.378), but
+  eYantra false alarms 24.9 % (2.8 %), phone 11/13 with 8/20 false (2/20), RDD 0.042 (0.055). **Not adopted.** The
+  pothole-only base data (no clean roads, the other classes absent) teaches it to call more things potholes. Archived
+  in the registry. Next lever: real phone/bus frames with potholes and clean-road negatives in the base dataset.
+- **Tools on the new base**:
+  - dataset review opens the base dataset: box labels drawn as rectangles, list-style names, its own DB
+    `review_nagar_netra_pothole.sqlite`; the v2 decisions stay in review.sqlite;
+  - model test page: box models get SAM2 outlines, scores = base-test AP50 from the benchmark, the model in use
+    first;
+  - training dashboard: reads runs/detect and runs/seg;
+  - project control: new check kind `bench`, and the model / export areas rewritten around the base and the
+    benchmark.
+- **Makefile** in sections (`make help`): setup, model (base-dataset / benchmark / train / dashboard), services, demo,
+  and archive (`seg-*`: the old YOLO26-seg pipeline and the v2 data builds, still runnable). README, HANDOFF section 0,
+  WORKFLOW and CLAUDE.md describe the new layout.
+
+## D39. Combined fine-tuning set: base + the earlier dataset's train/val (user request 2026-11-18)
+The pothole-only fine-tune (D38) raised false alarms. The user asked to use the earlier dataset to improve it.
+`data/build_combined_dataset.py` (`make combined-dataset`) builds `data/datasets/combined_ft` (symlinks + box labels):
+- base train repeated x5: 2,985 images;
+- earlier `india_pothole_seg4_v2` train + val: 10,329 images. Pothole polygons become boxes with id 1 (the base
+  model's pothole). Crack, alligator-crack and manhole labels are dropped, so those regions are background.
+- train 13,314 images / 21,593 potholes / 3,819 images without potholes. Val: base val 57 + 300 earlier val (seed 0).
+- no test part is read for training, and 4 earlier train images were dropped as near-copies (256-bit dHash <= 24) of a
+  test image (base test, earlier test incl. the locked RDD-India 514, the phone frames).
+
+`make train DATA=combined [EPOCHS=60]` fine-tunes from `weights/base/civic_yolo11n.pt` with the same benchmark +
+adoption rule (D38). `SMOKE=1`: 1 epoch on 10 %, 2 test sets, never adopts. The trial ran end to end: AutoBatch batch
+73 at 80 %, ~10 it/s, so ~30 s per full epoch and ~30 min for 60 epochs plus ~4 min benchmark; rejected as expected.
+`train_sets` in configs/datasets.yaml names the training sets (base, combined).
+
+## D40. On-the-fly augmentation and a responsive system during fine-tuning (user request 2026-11-18)
+The user asked whether `make train` augments on the fly, and asked that training not stall the PC. Before: Ultralytics
+defaults only (mosaic, HSV jitter, left-right flip, scale 0.5, translate 0.1). The project's own augmentations and
+the D20 display reserve were only wired into the archived segmentation trainer. Now `ml/train_det.py`:
+- **Geometry** (D21 bus mount, every image as it loads): scale 0.5, translate 0.15, degrees 5, perspective 0.0005;
+  no up-down flip, no shear (fixed forward camera); left-right flip 0.5, mosaic 1.0 (off for the last 10 epochs),
+  HSV defaults. Boxes follow the warp.
+- **India road conditions** (`ml/augment/india.py`, pixel-only, so boxes stay valid; `AUG=off|light|default|strong`,
+  default `default`): rain / wet asphalt, sun glare, hard shadows, dusk and haze, motion blur <= 7 px, downscale,
+  JPEG 60-90.
+- **Gentle mode**:
+  - process at nice 10 with the lowest best-effort I/O priority (dataloader workers inherit both);
+  - workers = a quarter of the CPU threads (max 8); 4 PyTorch CPU threads; no RAM image cache;
+  - D20 display reserve: with the monitor on the RTX 5080, PyTorch is capped at 10.7 of 15.5 GiB and the 80 %
+    batch fraction is scaled to that cap.
+- **Smoke check**:
+  - batch 57; peak GPU 7.0 GB; load average below 2 of 32 threads; >= 32 GB RAM free while training;
+  - albumentations transforms logged; `train_batch*.jpg` shows shadows, perspective, zoom-out and darkening with the
+    boxes still on the potholes.
+
+## D41. Annotation dashboard: the user draws the potholes (user request 2026-11-18)
+The combined fine-tune (D39/D40, `det_yolo11n_ft_20261118_1717`) beat the base model on every public test set and on
+false alarms (base test 0.604 vs 0.471, RDD-India 0.368 vs 0.055, eYantra 1.5 % vs 2.8 %) but found only 5 / 13
+phone-walk pothole frames (base: 11 / 13). It was not adopted. The phone-walk labels are frame-level and by eye, so it
+was unclear which model was right. The user asked for a page to outline the potholes themselves.
+- `scripts/annotate.py` + `annotate.html`: `make annotate` (LAN :8775) and `<capture link>/annotate` (mounted on the
+  phone capture server, same access code, own cookie).
+- **Photo sets**: the phone-walk test set (39 frames), plus every phone drive with usable photos (turned upright as
+  D31; black frames hidden). The test walk's own drive is never offered, to avoid leaking the test set.
+- **Tools**: outline (click points or press-and-drag freehand) and box. Each photo is marked "potholes", "no pothole"
+  or "not sure". The guesses of the `suggest: true` models in `configs/models.yaml` (base + combined fine-tune) are
+  shown as dashed boxes, and one click accepts a guess.
+- **Storage**: `data/annotate/annotations.sqlite`. Every save is kept (who, when); the newest mark per photo counts.
+- **`make annotate-export`**:
+  - test walk:
+    - `labels/<stem>.txt` YOLO class 1 (outline = polygon, box = cx cy w h); "no pothole" = empty file; "not sure"
+      = no file;
+    - `labels.json` frame lists use the hand marks per photo; unmarked photos keep the by-eye label, which is
+      kept as `eyeball_v1`;
+    - new test set `phone_street_marked` (kind yolo, `require_label`) scores box AP50 on hand-marked photos only;
+      the benchmark skips a test set with no images yet.
+  - drives: `data/datasets/phone_marked` (upright JPEG copies + labels), train set `phone`; near-copies (dHash ≤ 24)
+    of test photos are left out. No run uses it until the user chooses to.
+- The model choice (base vs combined vs a retrain with more phone data) is made after the user's marks exist, with
+  `make benchmark` on `phone_street_marked`.
+
+## D42. Clean-roads fine-tune and the two-phone keyframe-vs-video test (user request 2026-11-18)
+D41 marks (25 pothole photos, 41 outlines, 14 clean): the base-only fine-tune `det_yolo11n_ft_v1` found 25 / 41
+outlines, the base model 14 / 41, the combined fine-tune 7 / 41. All three flagged 3–4 of the 14 clean photos.
+- **Training set `base_neg`** (`make negatives-dataset`, `data/build_combined_dataset.py --earlier negatives`):
+  - base train ×5 (2,985) plus at most 1,250 earlier images with NO pothole label: all 747 eYantra clean roads first,
+    then cracks / manholes at random (seed 0); about 30 % background, because more risks recall;
+  - validation = base val + 300 earlier pothole-free val images;
+  - the earlier pothole labels are not used (they pulled close-range phone recall down);
+  - test-set near-copies are guarded as in D39;
+  - `make train DATA=base_neg`; adoption rule unchanged (D38).
+- **Phone side or model side?** The user suspects the frames the phone page sends, not the model.
+  - The page sends 1280×720 frames from the browser camera stream, JPEG quality 0.75, one keyframe every 4 m.
+  - Evidence so far points partly at the model: on the SAME 39 keyframes another model finds 25 / 41 vs 14 / 41.
+    The comparison measures the rest.
+  - `scripts/phone_vs_video.py` (`make compare-video TRIP= VIDEO= [OFFSET=] [MODELS=]`):
+    - phone B records a normal video next to phone A running the capture page. One Android camera cannot serve
+      two apps at once, so the test needs two phones.
+    - Alignment by picture similarity (MP4 `mvhd` creation time narrows it; `OFFSET` = video time of keyframe 1
+      overrides it).
+    - Per keyframe, each model runs on the keyframe and on the ONE video frame at that moment. A ±0.5 s window
+      would favour the video, so it is reported only as extra information.
+    - Outcomes: both / video only / keyframe only / neither, plus sharpness (Laplacian variance at 640 px),
+      brightness, size and JPEG kB.
+    - Pothole runs in the 2 fps video scan with no keyframe during them = misses due to keyframe spacing.
+  - The matched video frames become annotation photo set `video:<name>`; marks there and on the drive are scored
+    on the next run. Video sets are never exported to training.
+  - Report: `reports/phone_vs_video/<name>/index.html` + `summary.json`.

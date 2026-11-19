@@ -157,6 +157,7 @@
     "mono+imu": "ఒకే కెమెరా + IMU",
     "stereo": "స్టీరియో కెమెరా",
     "lidar_phone": "ఫోన్ LiDAR",
+    "mono_ground": "పరిమాణం మాత్రమే (లోతు లేదు)",
     "manual_gauge": "చేతి కొలత",
     "citizen": "పౌరుల ఫిర్యాదు",
     "synthetic": "కృత్రిమ (సింథటిక్)"

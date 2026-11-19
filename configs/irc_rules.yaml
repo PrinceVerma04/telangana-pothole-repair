@@ -26,6 +26,10 @@ repair:
   cut_margin_m: 0.125          # configurable 0.10-0.15
   min_patch_depth_m: 0.050     # IRC:116 Cl. 5.2
   max_layer_m: 0.075
+  depth_unknown_assumed_max_mm:  # D27 size-only mode: assumed upper patch depth per width class (NOT an IRC value;
+    small: 50                    # engineer-editable). Low end = min_patch_depth_m. Gives the bags low-high range.
+    medium: 75
+    large: 100
   round_depth_to_m: 0.005      # ceil to 5 mm
   merge_within_m: 0.5          # potholes on the same lane band -> one cut
   mix_density_kg_m3: 2200      # compacted; HINCOL rule-of-thumb 100 kg/m2 @ 50 mm = 2000

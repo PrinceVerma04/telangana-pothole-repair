@@ -34,6 +34,9 @@ web/dist/
 data/*.db-shm
 data/*.db-wal
 data/*.db-journal
+# DB backups made before a CHECK-constraint refresh (D28)
+data/backups/
+data/*/backups/
 # web test output
 web/test-results/
 web/playwright-report/
@@ -49,3 +52,13 @@ data/review/secret.key
 # model test page uploads (D23)
 data/playground/
 test data/
+# phone capture (D28): drives (frames with faces/plates), TLS key, per-phone calibrations
+data/capture/
+configs/cameras/phonecap_*.json
+# D38 base model files and the user-supplied source folders (data, not code)
+weights/base/
+new dataset for pathole/
+new trained model/
+data/testsets/
+# annotation dashboard (D41): marks DB and model suggestions stay local
+data/annotate/

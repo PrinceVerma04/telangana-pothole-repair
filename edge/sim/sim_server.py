@@ -109,11 +109,13 @@ def build_app(db_path: Path, store: Path, port: int, depth: str = "roadrender", 
     from server.app.main import create_app
     from server.workers import stages
 
+    # roadrender: synthetic depth for the composed sim frames; settings: whatever .env / the Settings default says
+    # (D27 default "off" = size only), never a hard-coded depth model
+    depth_kw = {"DEPTH_BACKEND": "synthetic"} if depth == "roadrender" else (
+        {"DEPTH_BACKEND": os.environ["DEPTH_BACKEND"]} if "DEPTH_BACKEND" in os.environ else {})
     settings = Settings(DATABASE_URL=f"sqlite:///{db_path.resolve().as_posix()}", STORAGE_ROOT=str(store.resolve()),
-                        DEMO_MODE=True, PIPELINE_INLINE=True, VERIFIER="off",
-                        DEPTH_BACKEND="synthetic" if depth == "roadrender" else os.environ.get("DEPTH_BACKEND",
-                                                                                                 "da2_metric"),
-                        API_BASE_URL=f"http://{host}:{port}", OPEN_DEVICE_REGISTRATION=True)
+                        DEMO_MODE=True, PIPELINE_INLINE=True, VERIFIER="off", API_BASE_URL=f"http://{host}:{port}",
+                        OPEN_DEVICE_REGISTRATION=True, **depth_kw)
     app = create_app(settings)
     if depth == "roadrender":
         stages.set_measurer(roadrender_measurer)

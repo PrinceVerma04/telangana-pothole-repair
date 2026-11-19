@@ -17,7 +17,7 @@ type Dict = Record<string, unknown>;
 export const SEVERITIES = ['small', 'medium', 'large', 'unknown_water'] as const;
 export type Severity = (typeof SEVERITIES)[number];
 
-export const METHODS = ['mono', 'mono+imu', 'stereo', 'lidar_phone', 'manual_gauge', 'citizen', 'synthetic'] as const;
+export const METHODS = ['mono', 'mono+imu', 'stereo', 'lidar_phone', 'manual_gauge', 'citizen', 'synthetic', 'mono_ground'] as const;
 export type Method = (typeof METHODS)[number];
 
 export type DepthQuality = 'ok' | 'unknown_water' | 'rejected';

@@ -183,6 +183,8 @@ async def measure_image(
     mask_png = _decode_image(await mask.read(limit + 1), cv2.IMREAD_UNCHANGED) if mask and mask.filename else None
     masks = masks_from_inputs(h, w, mask_png, _json_form(polygons, "polygons"), _json_form(bboxes, "bboxes"))
     cfg = _measure_cfg()
+    if cfg is not None:  # same backend as the workers (.env DEPTH_BACKEND; off = size only, D27)
+        cfg["depth"]["backend"] = settings.DEPTH_BACKEND
 
     t0 = time.perf_counter()
     if not masks and not hasattr(mp, "measure_image"):

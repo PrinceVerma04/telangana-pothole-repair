@@ -56,12 +56,14 @@ class Method(str, Enum):
     manual_gauge = "manual_gauge"
     citizen = "citizen"
     synthetic = "synthetic"
+    mono_ground = "mono_ground"  # D27: size only, outline projected on the calibrated road plane, no depth
 
 
 class DepthQuality(str, Enum):
     ok = "ok"
     unknown_water = "unknown_water"
     rejected = "rejected"
+    not_measured = "not_measured"  # D27: size-only mode (depth.backend off), depth fields stay None
 
 
 class SurfaceModel(str, Enum):

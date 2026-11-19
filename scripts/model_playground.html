@@ -286,7 +286,7 @@ function render() {
     const d = det[key(m, frame)], box = el("div", "view"), h = el("h3");
     const n = d ? d.detections.filter((x) => x.conf >= conf()).length : null, info = SETUP.models.find((x) => x.id === m) || {};
     h.append(document.createTextNode(info.label || m), el("small", null, d ? `${n} found ≥ ${conf().toFixed(2)} · ${fmt(d.ms)} ms` : "analysing…"),
-             el("small", null, info.rdd_india_ap50 != null ? `test AP50 ${info.rdd_india_ap50.toFixed(3)}` : ""));
+             el("small", null, info.test_ap50 != null ? `base-test AP50 ${info.test_ap50.toFixed(3)}` : ""));
     const st = el("div", "stage"), im = el("img"), cv = el("canvas"); im.src = src; im.alt = cur.name; st.append(im, cv);
     if (d) drawDets(cv, d);
     box.append(h, st); V.append(box);
@@ -344,8 +344,8 @@ function reasonShort(r) {
   return "the measurement was not reliable";
 }
 function modelNote(m) {
-  const ap = (SETUP.models.find((x) => x.id === m) || {}).rdd_india_ap50;
-  return ap != null && ap < 0.7 ? `This model scores ${ap.toFixed(2)} on the test set (target 0.70): it misses some potholes and makes some false alarms, so check by eye.` : "Check the result by eye.";
+  const ap = (SETUP.models.find((x) => x.id === m) || {}).test_ap50;
+  return ap != null && ap < 0.7 ? `This model scores ${ap.toFixed(2)} on the base test set (target 0.70): it misses some potholes and makes some false alarms, so check by eye.` : "Check the result by eye.";
 }
 function renderSummary() {
   const box = $("summary"); box.replaceChildren(el("h2", null, "Summary"));
@@ -369,16 +369,18 @@ function renderSummary() {
   if (ot) add(`Also found: ${ot}.`);
   const r = measureRes[key(m, frame)];
   if (!ph.length) { add(modelNote(m), "fine"); return; }
-  if (!r || r.error || r.conf !== c) { add("Press Measure potholes to estimate depth, size and the repair needed."); add(modelNote(m), "fine"); return; }
+  if (!r || r.error || r.conf !== c) { add("Press Measure potholes to estimate the size, severity and the repair needed."); add(modelNote(m), "fine"); return; }
   let lo = 0, hi = 0, cost = 0, kg = null, nPlan = 0;
   r.measured.forEach((q, i) => {
     const name = r.measured.length > 1 ? `Pothole ${i + 1}` : "The pothole";
     if (!q.reliable) { add(`${name}: found, but its size could not be measured reliably, because ${reasonShort(q.unreliable_why || q.reject_reason)}.`); return; }
-    const size = q.water_filled ? "is full of water, so its depth is unknown" : `is about ${fmt(q.depth_p95_mm)} mm deep (±${fmt(q.depth_sigma_mm)})`;
-    let t = `${name} ${size}, covers about ${fmt(q.area_m2, 2)} m²` + (q.volume_l != null ? ` and holds about ${fmt(q.volume_l, 1)} litres` : "") + `. Severity: ${SEV[q.severity] || q.severity || "not rated"}.`;
+    const size = q.water_filled ? "is full of water, so its depth is unknown"
+      : q.size_only ? `is about ${fmt(q.width_m, 2)} m wide and ${fmt(q.length_m, 2)} m long`
+      : `is about ${fmt(q.depth_p95_mm)} mm deep (±${fmt(q.depth_sigma_mm)})`;
+    let t = `${name} ${size}, covers about ${fmt(q.area_m2, 2)} m²` + (q.volume_l != null ? ` and holds about ${fmt(q.volume_l, 1)} litres` : "") + `. Severity: ${SEV[q.severity] || q.severity || "not rated"}` + (q.size_only ? " (by its width; depth is not measured)." : ".");
     if (q.repair && !q.repair.error) {
       const rp = q.repair; lo += rp.bags_low; hi += rp.bags_high; cost += rp.cost_inr; kg = rp.bag_kg; nPlan++;
-      t += ` Repair: cut a ${rp.cut_m[0]} × ${rp.cut_m[1]} m patch and fill with ${rp.bags_low === rp.bags_high ? rp.bags_low : `${rp.bags_low}–${rp.bags_high}`} bags (${rp.bag_kg} kg) of cold mix, about ${fmt(rp.labour_h, 1)} h of work, roughly ${inr(rp.cost_inr)}${rp.lower_bound ? " (at least: re-measure when dry)" : ""}.`;
+      t += ` Repair: cut a ${rp.cut_m[0]} × ${rp.cut_m[1]} m patch and fill with ${rp.bags_low === rp.bags_high ? rp.bags_low : `${rp.bags_low}–${rp.bags_high}`} bags (${rp.bag_kg} kg) of cold mix, about ${fmt(rp.labour_h, 1)} h of work, roughly ${inr(rp.cost_inr)}${rp.lower_bound ? " (at least: re-measure when dry)" : ""}${rp.depth_assumed_mm ? ` (bag range assumes a ${fmt(rp.depth_assumed_mm[0])}–${fmt(rp.depth_assumed_mm[1])} mm deep patch; the crew checks the depth on site)` : ""}.`;
     }
     add(t);
   });
@@ -392,7 +394,7 @@ $("cam").onchange = syncCam;
 $("measure").onclick = runMeasure;
 async function runMeasure() {
   if (!cur) return; const m = models()[0], k = key(m, frame);
-  $("meas").replaceChildren(busy("measuring depth, area and volume… (first run loads the depth model)"));
+  $("meas").replaceChildren(busy("measuring size… (with a depth model on, the first run loads it)"));
   try { measureRes[k] = await post("/api/measure", { item: cur.id, frame, model: m, conf: conf(), camera: $("cam").value, h_true_m: $("hgt").value, pitch_deg: $("pitch").value }); }
   catch (e) { measureRes[k] = { error: e.message }; }
   render();
@@ -410,14 +412,17 @@ function renderMeasure() {
     const c = el("div", "mcard"), top = el("div", "top");
     top.append(el("span", null, `Pothole ${i + 1} · conf ${m.conf.toFixed(2)}`), el("span", "sub", m.severity ? `IRC:82 ${m.severity}` : ""));
     c.append(top);
-    if (!m.reliable && (m.depth_p95_mm != null || m.water_filled)) c.append(el("div", "callout err", `Not reliable (${m.unreliable_why}): numbers below are shown for checking only, no repair estimate.`));
-    if (m.depth_p95_mm == null && !m.water_filled) {
+    if (!m.reliable && (m.depth_p95_mm != null || m.water_filled || m.size_only)) c.append(el("div", "callout err", `Not reliable (${m.unreliable_why}): numbers below are shown for checking only, no repair estimate.`));
+    if (m.depth_p95_mm == null && !m.water_filled && !m.size_only) {
       const p = el("div", "refused"); p.append(el("b", null, "Not measured: "), document.createTextNode(explain(m.reject_reason)));
       c.append(p);
     } else {
       const g = el("div", "mgrid");
       const cell = (k, v, s, u) => { const d = el("div"); d.append(el("div", "k", k)); const vv = el("div", "v", v); if (s) vv.append(el("small", null, ` ±${s}`)); if (u) vv.append(el("small", null, ` ${u}`)); d.append(vv); return d; };
-      g.append(cell("depth p95", m.water_filled ? "water" : fmt(m.depth_p95_mm), m.depth_sigma_mm != null ? fmt(m.depth_sigma_mm) : null, "mm"),
+      if (m.size_only) g.append(cell("width", fmt(m.width_m, 2), m.width_sigma_m != null ? fmt(m.width_sigma_m, 2) : null, "m"),
+               cell("length", fmt(m.length_m, 2), m.length_sigma_m != null ? fmt(m.length_sigma_m, 2) : null, "m"),
+               cell("area", fmt(m.area_m2, 3), fmt(m.area_sigma, 3), "m²"));
+      else g.append(cell("depth p95", m.water_filled ? "water" : fmt(m.depth_p95_mm), m.depth_sigma_mm != null ? fmt(m.depth_sigma_mm) : null, "mm"),
                cell("area", fmt(m.area_m2, 3), fmt(m.area_sigma, 3), "m²"),
                cell("volume", m.volume_l == null ? "–" : fmt(m.volume_l, 1), m.volume_sigma != null ? fmt(m.volume_sigma, 1) : null, "L"));
       c.append(g);
@@ -426,7 +431,7 @@ function renderMeasure() {
     box.append(c);
   });
   box.append(el("div", "sub", `${r.depth_model || ""} · ${fmt(r.elapsed_ms)} ms`));
-  if (r.overlay) { const o = el("div", "overlay"), im = el("img"); im.src = r.overlay; im.alt = "measurement overlay: depth map and fitted road plane"; o.append(el("div", "sub", "Measurement overlay (depth map, masks, road plane)"), im); box.append(o); }
+  if (r.overlay) { const o = el("div", "overlay"), im = el("img"); im.src = r.overlay; im.alt = "measurement overlay"; o.append(el("div", "sub", r.measured.some((x) => x.size_only) ? "Measurement overlay (masks; no depth map in size-only mode)" : "Measurement overlay (depth map, masks, road plane)"), im); box.append(o); }
 }
 function explain(reason) {
   if (!reason) return "no reason given";
@@ -453,11 +458,11 @@ async function start() {
   $("login").classList.add("hidden"); $("app").classList.remove("hidden");
   if ($("mA").options.length) return;
   for (const m of SETUP.models) {
-    const txt = `${m.label}${m.rdd_india_ap50 != null ? ` · AP50 ${m.rdd_india_ap50.toFixed(3)}` : ""}${m.in_use ? " · in use" : ""}`;
+    const txt = `${m.label}${m.test_ap50 != null ? ` · AP50 ${m.test_ap50.toFixed(3)}` : ""}${m.in_use ? " · in use" : ""}`;
     $("mA").append(new Option(txt, m.id)); $("mB").append(new Option(txt, m.id));
   }
-  const best = SETUP.models.filter((m) => m.rdd_india_ap50 != null).sort((a, b) => b.rdd_india_ap50 - a.rdd_india_ap50)[0];
-  if (best) $("mA").value = best.id;
+  const use = SETUP.models.find((m) => m.in_use) || SETUP.models[0];  // D38: start with the model in use
+  if (use) $("mA").value = use.id;
   for (const c of SETUP.cameras) $("cam").append(new Option(`${c.id} (${c.kind || "?"}, ${c.h_true_m} m, ${c.pitch_deg}°)${c.certified ? "" : " · demo"}`, c.id));
   $("cam").value = SETUP.cameras.some((c) => c.id === "phone_demo") ? "phone_demo" : SETUP.cameras[0].id; syncCam();
   const prev = (await api("/api/items")).items;

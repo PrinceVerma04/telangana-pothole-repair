@@ -74,6 +74,19 @@ def water_lower_bound(width_mm: Optional[float], imu_peak_g: Optional[float] = N
     return Severity.small
 
 
+def severity_size_only(width_mm: Optional[float], jolt: bool = False, *,
+                       rules_path: Optional[str] = None) -> Severity:
+    """D27 size-only mode (no depth): IRC:82 width class, raised one level when the bus felt the pothole (IMU jolt).
+
+    The width bins alone are a lower bound of the IRC class (depth could only raise it); the jolt is the evidence
+    that a narrow pothole is deep or sharp enough to matter.
+    """
+    sev = severity(None, width_mm, False, rules_path=rules_path)
+    if jolt:
+        sev = {Severity.small: Severity.medium, Severity.medium: Severity.large}.get(sev, sev)
+    return sev
+
+
 def severity_from_measurement(m: Any, imu_peak_g: Optional[float] = None, complaints: int = 0) -> Severity:
     """Convenience for FrameMeasurement / PassMeasurement / PotholeFused objects."""
     return severity(m.depth_p95_mm, (m.width_m or 0.0) * 1000.0, bool(m.water_filled))

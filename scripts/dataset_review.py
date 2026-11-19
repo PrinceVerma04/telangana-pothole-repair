@@ -37,9 +37,17 @@ from pathlib import Path
 from typing import Any, Iterator, Optional
 
 REPO = Path(__file__).resolve().parents[1]
-DATASET = REPO / "data" / "datasets" / "india_pothole_seg4_v2"
+DATASET = REPO / "data" / "datasets" / "nagar_netra_pothole"  # D38: the BASE dataset (was india_pothole_seg4_v2)
 STATE = REPO / "data" / "review"
-DB_PATH = STATE / "review.sqlite"
+LEGACY = "india_pothole_seg4_v2"  # its decisions stay in the original review.sqlite
+
+
+def db_path_for(dataset: Path) -> Path:
+    """One decisions DB per dataset (D38), so the base dataset's review starts clean and the old one is kept."""
+    return STATE / ("review.sqlite" if dataset.name == LEGACY else f"review_{dataset.name}.sqlite")
+
+
+DB_PATH = db_path_for(DATASET)
 EXPORTS = STATE / "exports"
 PAGE = Path(__file__).with_name("dataset_review.html")
 SPLITS = ("train", "val", "test")
@@ -48,7 +56,9 @@ BATCH = 20
 CLAIM_TTL_S = 30 * 60
 COOKIE = "gm_review"
 IST = timezone(timedelta(hours=5, minutes=30))
-SOURCES = {"bh": "BharatPotHole (India dashcam)", "rddin": "RDD2022 India", "rddfx": "RDD2022 other countries",
+SOURCES = {"AN": "AN set (unpaved roads)", "PotHoles": "PotHoles set", "pothole": "Intel pothole set",
+           "India": "RDD2022 India", "ashrith": "ashrith set",  # D38 base dataset sources
+           "bh": "BharatPotHole (India dashcam)", "rddin": "RDD2022 India", "rddfx": "RDD2022 other countries",
            "rddng": "RDD2022 negatives", "ws": "Web, human masks", "ey": "eYantra Indian roads"}
 DECISIONS = ("keep", "reject", "fix")
 REASONS = {
@@ -64,11 +74,18 @@ def source_of(stem: str) -> str:
     return stem.split("_", 1)[0]
 
 
-def read_index(dataset: Path = DATASET) -> dict[str, dict[str, Any]]:
-    """stem -> {split, source, file, n, classes{name: count}} from the YOLO-seg dataset (labels read once)."""
+def class_names(dataset: Path) -> dict[int, str]:
+    """data.yaml names as {id: name}, whether written as a mapping or as a list (the base dataset uses a list)."""
     import yaml
 
-    names = {int(k): v for k, v in (yaml.safe_load((dataset / "data.yaml").read_text())["names"]).items()}
+    names = yaml.safe_load((dataset / "data.yaml").read_text())["names"]
+    return {int(k): v for k, v in names.items()} if isinstance(names, dict) else dict(enumerate(names))
+
+
+def read_index(dataset: Path = DATASET) -> dict[str, dict[str, Any]]:
+    """stem -> {split, source, file, n, classes{name: count}} from the YOLO-seg dataset (labels read once)."""
+
+    names = class_names(dataset)
     idx: dict[str, dict[str, Any]] = {}
     for split in SPLITS:
         idir = dataset / "images" / split
@@ -89,15 +106,18 @@ def read_index(dataset: Path = DATASET) -> dict[str, dict[str, Any]]:
 
 
 def read_polygons(stem: str, meta: dict[str, Any], dataset: Path = DATASET) -> list[dict[str, Any]]:
-    import yaml
 
-    names = {int(k): v for k, v in (yaml.safe_load((dataset / "data.yaml").read_text())["names"]).items()}
+    names = class_names(dataset)
     lab = dataset / "labels" / meta["split"] / f"{stem}.txt"
     out = []
     if lab.is_file():
         for line in lab.read_text(encoding="utf-8").splitlines():
             v = line.split()
-            if len(v) >= 7:
+            if len(v) == 5:  # box label (cx cy w h): drawn as its rectangle (D38 base dataset)
+                cx, cy, w, h = (float(x) for x in v[1:])
+                out.append({"cls": names.get(int(v[0]), "?"), "pts": [cx - w / 2, cy - h / 2, cx + w / 2, cy - h / 2,
+                                                                      cx + w / 2, cy + h / 2, cx - w / 2, cy + h / 2]})
+            elif len(v) >= 7:
                 out.append({"cls": names.get(int(v[0]), "?"), "pts": [float(x) for x in v[1:]]})
     return out
 
@@ -412,9 +432,8 @@ def make_app(dataset: Path = DATASET) -> Any:
     @app.get("/api/meta")
     def meta(req: Request) -> dict:
         who(req)
-        import yaml
 
-        names = list(yaml.safe_load((dataset / "data.yaml").read_text())["names"].values())
+        names = list(class_names(dataset).values())
         return {"dataset": dataset.name, "total": len(idx), "splits": list(SPLITS), "locked_splits": sorted(LOCKED_SPLITS),
                 "sources": {s: SOURCES.get(s, s) for s in sorted({m["source"] for m in idx.values()})},
                 "classes": names, "reasons": REASONS, "batch": BATCH}

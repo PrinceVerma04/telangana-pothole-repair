@@ -91,7 +91,9 @@ def run_measure(image: str, calib: str, *, mask: Optional[str] = None, detect: O
         return resp
     notroad = None
     timings: dict[str, Any] = {}
-    if roadseg:
+    from measure.pipeline import size_only
+
+    if roadseg and not size_only(cfg):  # the road mask only helps the depth-based plane fit
         try:
             from measure.roadseg import notroad_mask
 
@@ -131,7 +133,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     r.add_argument("--conf", type=float, default=0.25)
     r.add_argument("--max-det", type=int, default=5)
     r.add_argument("--cfg", help="measure.yaml (default configs/measure.yaml)")
-    r.add_argument("--backend", help="override depth.backend (da2_metric|da3_metric|metric3d_onnx|...)")
+    r.add_argument("--backend", help="override depth.backend (off = size only, D27 | da2_metric | da3_metric | ...)")
     r.add_argument("--no-roadseg", action="store_true", help="skip SegFormer road mask for the plane fit")
     r.add_argument("--json", required=True, help="output JSON path")
     r.add_argument("--overlay", help="optional overlay PNG path")

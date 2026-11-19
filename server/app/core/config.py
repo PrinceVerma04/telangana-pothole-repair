@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     SEG_WEIGHTS: str = "runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt"  # D24
     VERIFIER_WEIGHTS: str = ""  # D24: no second model
     VERIFIER: str = "off"
-    DEPTH_BACKEND: str = "da2_metric"
+    DEPTH_BACKEND: str = "off"  # D27: size-only (no depth model); da2_metric to measure depth again
     DEPTH_MODEL_ID: str = "depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf"
     CUDA_DEVICE: int = 0
 

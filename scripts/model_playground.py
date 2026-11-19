@@ -8,11 +8,11 @@ What it does (DECISIONS D23):
     are sampled (default 1 frame/s, at most 150 frames). Files stay in data/playground/ on this PC.
   * Detection runs once per frame and model at a low confidence (0.05); the page filters by its confidence slider, so
     moving the slider or comparing two models needs no new GPU work.
-  * Measure: the pothole masks at or above the slider are measured by measure.cli.run_measure (metric mono depth +
-    road-plane fit + scale lock to the camera height) with a camera preset from configs/cameras and optional height /
-    pitch for this photo. Output: depth p95 (mm), area (m2), volume (L), each with sigma, IRC:82 severity, quality, and
-    the reason when the pipeline refuses (e.g. the road plane does not fit the assumed camera). Demo calibrations are
-    certified=false: never billing-grade.
+  * Measure: the pothole masks at or above the slider are measured by measure.cli.run_measure with a camera preset
+    from configs/cameras and optional height / pitch for this photo. Default (D27, depth.backend off): size only, the
+    outline projected on the road plane of that camera -> width, length, area with sigma, IRC:82 severity by width,
+    bags as a range for an assumed depth. With a depth backend: depth p95, area, volume too. The reason is shown when
+    the pipeline refuses. Demo calibrations are certified=false: never billing-grade.
   * Models: every runs/seg/*/weights/best_pothole.pt plus weights/*.pt; each checkpoint passes the D17 pickle scan
     (ml.pipeline.checkpoint_globals) before it is loaded. One GPU job at a time.
 """
@@ -49,9 +49,19 @@ GPU = threading.Lock()
 
 
 # ================================================================================================ models
-def model_scores(report: Path = REPO / "reports" / "model_eval.json") -> dict[str, float]:
-    """weights path -> latest pothole box AP50 on the locked RDD-India test images (the WP3 acceptance basis)."""
+def model_scores(report: Path = REPO / "reports" / "model_eval.json",
+                 bench: Path = REPO / "reports" / "benchmark.json") -> dict[str, float]:
+    """weights path -> pothole box AP50 on the leak-free base test (D38 benchmark, reports/benchmark.json); models the
+    benchmark has not scored fall back to the old RDD-India score (reports/model_eval.json)."""
     out: dict[str, float] = {}
+    try:
+        for m in json.loads(bench.read_text())["models"]:
+            ap = (m.get("results") or {}).get("base_test", {}).get("ap50")
+            if ap is not None:
+                p = Path(m["path"])
+                out[str(p.relative_to(REPO) if p.is_absolute() and p.is_relative_to(REPO) else p)] = ap
+    except (OSError, ValueError, KeyError):
+        pass
     try:
         runs = json.loads(report.read_text())["runs"]
     except (OSError, ValueError, KeyError):
@@ -63,7 +73,7 @@ def model_scores(report: Path = REPO / "reports" / "model_eval.json") -> dict[st
         if ap is None and m.get("n_images") == 514:  # older runs scored on the RDD-India test set alone
             ap = (m.get("pothole") or {}).get("box_ap50")
         if r.get("weights") and ap is not None and r.get("split", "test") == "test":
-            out[r["weights"]] = ap
+            out.setdefault(r["weights"], ap)
     return out
 
 
@@ -79,23 +89,32 @@ def list_models(show_all: bool = False) -> list[dict[str, Any]]:
     except OSError:
         pass
     env = os.environ.get("SEG_WEIGHTS", env)
-    paths = sorted((REPO / "runs" / "seg").glob("*/weights/best_pothole.pt"), key=lambda p: -p.stat().st_mtime)
+    # D38: base model, fine-tuned candidates, the registry (configs/models.yaml), old segmentation runs
+    paths = sorted((REPO / "weights" / "base").glob("*.pt")) + sorted((REPO / "weights" / "candidates").glob("*.pt"))
+    try:
+        import yaml
+
+        for m in yaml.safe_load((REPO / "configs" / "models.yaml").read_text())["models"]:
+            if (REPO / m["path"]).is_file():
+                paths.append(REPO / m["path"])
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    paths += sorted((REPO / "runs" / "seg").glob("*/weights/best_pothole.pt"), key=lambda p: -p.stat().st_mtime)
     # weights/: pothole models only; the COCO-pretrained yolo26*-seg.pt bases know nothing about potholes
     paths += sorted(p for p in (REPO / "weights").glob("*.pt") if not re.fullmatch(r"yolo\w*?\d+[nsmlx]-seg", p.stem))
+    paths = list(dict.fromkeys(p for p in paths if not p.name.endswith("_last.pt")))
     if env and (REPO / env).is_file() and REPO / env not in paths:
         paths.append(REPO / env)
     out = []
     for p in paths:
         rel = str(p.relative_to(REPO))
         name = p.parts[-3] if p.parent.name == "weights" and p.parts[-4:-3] == ("seg",) else p.stem
-        out.append({"id": rel, "label": name, "rdd_india_ap50": scores.get(rel), "in_use": rel == env,
+        out.append({"id": rel, "label": name, "test_ap50": scores.get(rel), "in_use": rel == env,
                      "updated": p.stat().st_mtime})
     if show_all:
         return out
-    # D24: only models worth testing: scored on the RDD-India test set and at least as good as the model in use
-    bar = max([m["rdd_india_ap50"] for m in out if m["in_use"] and m["rdd_india_ap50"] is not None], default=0.0)
-    keep = [m for m in out if m["in_use"] or (m["rdd_india_ap50"] is not None and m["rdd_india_ap50"] >= bar)]
-    return sorted(keep, key=lambda m: -(m["rdd_india_ap50"] or 0.0))
+    # D38: the model in use first, then the rest by their score on the leak-free base test
+    return sorted(out, key=lambda m: (not m["in_use"], -(m["test_ap50"] or 0.0)))
 
 
 class Models:
@@ -198,6 +217,27 @@ def frame_path(iid: str, i: int, root: Optional[Path] = None) -> Path:
 
 
 # ================================================================================================ detect + measure
+def outline_boxes(img: Any, dets: list) -> None:
+    """Box-only models (the D38 base model): give every pothole box an outline (SAM2 with the box as prompt, then
+    grabcut / ellipse) so the page can draw it and the measurement has a mask."""
+    import cv2
+    import numpy as np
+
+    from measure.detect import box_to_mask
+
+    for d in dets:
+        if d.mask is not None or d.polygon or d.cls not in ("pothole", "pothole_water"):
+            continue
+        try:
+            mk, _ = box_to_mask(img, list(map(float, d.bbox)), "auto")
+        except Exception:  # noqa: BLE001 - a box without an outline is still shown
+            continue
+        cs, _ = cv2.findContours(mk.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if cs:
+            d.mask = mk.astype(bool)
+            d.polygon = max(cs, key=cv2.contourArea).reshape(-1, 2).astype(float).tolist()
+
+
 class Engine:
     def __init__(self) -> None:
         self.models = Models()
@@ -215,6 +255,7 @@ class Engine:
             seg = self.models.get(model)
             t0 = time.perf_counter()
             dets = seg.predict(img, conf=DET_CONF)
+            outline_boxes(img, dets)  # D38: box-only models get their outline from SAM2
             ms = (time.perf_counter() - t0) * 1000.0
         out = {"frame": int(i), "model": model, "ms": round(ms, 1), "w": img.shape[1], "h": img.shape[0],
                "detections": [{**d.to_wire(), "k": k} for k, d in enumerate(dets)]}
@@ -274,12 +315,19 @@ class Engine:
         measured = []
         for d, m, sev in zip(chosen, res.get("measurements", []), res.get("severities", []), strict=False):
             ok, why = reliable(m)
-            measured.append({"k": d["k"], "conf": d["conf"], "severity": sev, **{k: m.get(k) for k in keys},
+            measured.append({"k": d["k"], "conf": d["conf"], "severity": sev, "size_only": is_size_only(m),
+                             "length_sigma_m": m.get("length_sigma_m"), "width_sigma_m": m.get("width_sigma_m"),
+                             **{k: m.get(k) for k in keys},
                              "reliable": ok, "unreliable_why": why, "repair": repair_estimate(m) if ok else None})
         return {**base, "measured": measured, "user_geometry": user_geo or None,
                 "certified": res.get("certified"), "depth_model": res.get("depth_model_version"),
                 "elapsed_ms": round(res.get("elapsed_ms", 0.0)),
                 "overlay": f"/media/{iid}/measure/{overlay.name}" if overlay.is_file() else None}
+
+
+def is_size_only(m: dict[str, Any]) -> bool:
+    """D27: measured without a depth model (outline on the calibrated road plane): size and severity, no depth."""
+    return str(m.get("method") or "") == "mono_ground"
 
 
 def reliable(m: dict[str, Any]) -> tuple[bool, Optional[str]]:
@@ -292,7 +340,7 @@ def reliable(m: dict[str, Any]) -> tuple[bool, Optional[str]]:
     lo, hi = (float(x) for x in cfg["scale_lock"]["clip"])
     if m.get("reject_reason"):
         return False, str(m["reject_reason"])
-    if m.get("depth_p95_mm") is None and not m.get("water_filled"):
+    if m.get("depth_p95_mm") is None and not m.get("water_filled") and not is_size_only(m):
         return False, "not measured"
     sf = m.get("scale_factor")
     if sf is not None and not (lo <= float(sf) <= hi):
@@ -306,7 +354,7 @@ def repair_estimate(m: dict[str, Any]) -> Optional[dict[str, Any]]:
     """IRC:116 cold-mix plan (repair.planner) for one measured pothole; None when it was not measured.
 
     Bags are a low-high range (never an exact count); cost uses the configured rate card (estimate only)."""
-    if m.get("depth_p95_mm") is None and not m.get("water_filled"):
+    if m.get("depth_p95_mm") is None and not m.get("water_filled") and not is_size_only(m):
         return None
     if not (m.get("area_m2") or (m.get("length_m") and m.get("width_m"))):
         return None
@@ -319,7 +367,8 @@ def repair_estimate(m: dict[str, Any]) -> Optional[dict[str, Any]]:
         return {"error": f"{type(e).__name__}: {e}"}
     return {"bags_low": p.bags_low, "bags_high": p.bags_high, "bag_kg": p.bag_kg, "labour_h": p.labour_h,
             "cost_inr": round(p.est_cost_inr), "method": p.method, "spec": str(getattr(p.spec_code, "value", p.spec_code)),
-            "lower_bound": bool(p.pending_remeasure), "cut_m": [round(p.l_cut_m, 2), round(p.w_cut_m, 2)]}
+            "lower_bound": bool(p.pending_remeasure) and not is_size_only(m),
+            "depth_assumed_mm": p.extras.get("depth_assumed_range_mm"), "cut_m": [round(p.l_cut_m, 2), round(p.w_cut_m, 2)]}
 
 
 # ================================================================================================ web app

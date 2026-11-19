@@ -4,7 +4,7 @@ Any work package that needs to change one of these files updates this document i
 
 | Contract | File | Consumers |
 |---|---|---|
-| Measurement types, units, frames of reference | `measure/types.py` | WP2, WP4, WP5, WP6, WP8 |
+| Measurement types, units, frames of reference | `measure/types.py` | WP2, WP4, WP5, WP6, WP8 (D27 added `Method.mono_ground`, `DepthQuality.not_measured`: size-only mode, depth fields None) |
 | Repair plan | `repair/types.py` | WP8, WP4, WP9 |
 | API DTOs | `server/app/schemas/api.py` | WP4, WP6, WP7, WP8, WP9 |
 | State machines + RBAC on WO transitions | `server/app/schemas/states.py` | WP4, WP5, WP8 |

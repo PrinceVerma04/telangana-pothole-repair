@@ -256,6 +256,10 @@ def detection_mask(d: m.Detection, obs: m.Observation, H: int, W: int) -> np.nda
 def depth_backend(settings: Any, cfg: dict[str, Any]) -> Any:
     if _OVERRIDES["depth_backend"] is not None:
         return _OVERRIDES["depth_backend"]
+    from measure.pipeline import size_only
+
+    if size_only(cfg):
+        return None  # D27: size-only, measure_frames projects the outline on the calibrated road plane
     name = cfg["depth"].get("backend", "da2_metric")
     if name != "synthetic" and _under_pytest():
         raise RuntimeError(f"refusing to load depth model '{name}' under pytest (use set_depth_backend)")
@@ -980,6 +984,10 @@ def update_severity(p: m.Pothole) -> None:
 
     if p.water_filled:
         p.severity = "unknown_water"
+    elif p.depth_p95_mm is None and (p.width_m or 0.0) > 0:
+        # D27 size-only: IRC:82 width class, one level up when a bus felt the jolt (IMU corroboration)
+        p.severity = irc.severity_size_only((p.width_m or 0.0) * 1000.0,
+                                            jolt=(p.imu_corroborations or 0) >= 1).value
     elif p.depth_p95_mm is not None or (p.width_m or 0.0) > 0:
         p.severity = irc.severity(p.depth_p95_mm, (p.width_m or 0.0) * 1000.0, False).value
 

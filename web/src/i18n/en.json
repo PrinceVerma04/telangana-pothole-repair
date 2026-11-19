@@ -157,6 +157,7 @@
     "mono+imu": "Mono camera + IMU",
     "stereo": "Stereo",
     "lidar_phone": "Phone LiDAR",
+    "mono_ground": "Size only (no depth)",
     "manual_gauge": "Manual gauge",
     "citizen": "Citizen report",
     "synthetic": "Synthetic"

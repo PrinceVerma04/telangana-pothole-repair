@@ -75,6 +75,15 @@ class Database:
         from server.app.db.models import Base
 
         Base.metadata.create_all(self.engine)
+        if self.engine.dialect.name == "sqlite":  # D28: older demo DBs get the current enum CHECK constraints
+            from server.app.db.migrate import refresh_sqlite_checks
+
+            res = refresh_sqlite_checks(self.engine, Base.metadata)
+            if res["rebuilt"]:
+                import logging
+
+                logging.getLogger(__name__).warning("database %s: CHECK constraints refreshed on %s (backup %s)",
+                                                    self.url, ", ".join(res["rebuilt"]), res["backup"])
 
     def drop_all(self) -> None:
         from server.app.db.models import Base

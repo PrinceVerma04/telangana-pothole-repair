@@ -28,7 +28,7 @@ flowchart TD
 
     subgraph SERVER["On the server (GPU)"]
         B0["Ingest API"] --> B1["1. Verify<br/>confidence gate<br/>(+ optional MODEL 3 verifier)"]
-        B1 --> B2["2. Depth<br/>(MODEL 2: Depth Anything V2 Metric)"]
+        B1 --> B2["2. Size (D27: outline on the calibrated road plane;<br/>MODEL 2 depth is off)"]
         B2 --> B3["3. Measure<br/>road plane fit -> depth, area,<br/>volume, length, width, each with σ"]
         B3 --> B4["4. Locate<br/>GPS + distance ahead -> ground point"]
         B4 --> B5["5. Map-match<br/>OSM road, direction, chainage"]
@@ -62,7 +62,7 @@ flowchart TD
 | 4 | Bus | Each keyframe is sent with masks, confidence, GPS (position, speed, heading) and IMU (vertical shake) | GPS places the pothole on the road; IMU feels the wheel hitting it | `edge/schema/` |
 | 5 | Bus | A 1 Hz trip log says where the bus drove with a working camera | Proves "a bus passed here and saw nothing" (needed to close repairs) | `trip_fix.schema.json` |
 | 6 | Server | **Verify**: detections below the confidence gate are dropped; MODEL 3 can double-check (off now) | Removes false alarms (shadows, patches, wet road) | `server/workers/stages.py` |
-| 7 | Server | **Depth**: MODEL 2 gives the distance of every pixel in metres | A phone cannot run this model; the server can, and can re-measure later with a better one | `measure/depth_backends/` |
+| 7 | Server | **Size** (D27, default): the pothole outline is projected onto the road plane known from the camera height and tilt -> width, length, area in metres with σ. Depth (MODEL 2) is **off**; `DEPTH_BACKEND=da2_metric` turns it back on | Monocular depth on bus frames was unproven; IRC:82 can grade by width | `measure/ground_geom.py` (`measure/depth_backends/` when depth is on) |
 | 8 | Server | **Measure**: fit the flat road around the pothole, lock the scale to the camera height, measure how far the pothole surface lies below the road | Gives depth (p95 and max, mm), area (m²), volume (litres), length and width (m), each with σ and a quality score; bad frames are rejected with a reason | `measure/surface.py`, `measure/pothole_geom.py` |
 | 9 | Server | **Locate + map-match**: GPS fix moved forward by the measured distance, snapped to the OSM road and direction | Two potholes in opposite lanes stay separate | `geo/` |
 | 10 | Server | **Fuse + cluster**: frames of the same pothole are combined (inverse-variance); detections within 6 m on the same road and lane become one pothole | One pothole = one record, however many buses see it | `measure/fuse.py`, `geo/cluster.py` |
@@ -82,9 +82,9 @@ Units everywhere: depth mm, area m², volume litres, lengths m, money INR; times
 
 | # | Model | Used at | What it does | Status today |
 |---|---|---|---|---|
-| **1** | **YOLO26m-seg, fine-tuned on Indian roads** (`runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt`, Ultralytics 8.4.211) | Server detection, the model test page, and the starting point for the bus model | Finds potholes and draws their outline (mask). Classes: pothole, alligator crack, crack, manhole (only potholes are measured) | Trained 2026-11-17: 80 epochs, 640 px, AdamW, camera height / angle augmentation. **RDD-India pothole AP50 0.2494** (target 0.70, not met yet). Set as `SEG_WEIGHTS` in `.env` |
+| **1** | **Since D38: the base model `weights/base/civic_yolo11n.pt`** (user-supplied Nagar Netra civic_services YOLO11n, pothole = class 1) + SAM2 outline from its box; fine-tunes via `make train`, scores in `reports/BENCHMARK.md`. Before: D35 pretrained YOLOv8m, earlier **YOLO26m-seg, fine-tuned on Indian roads** (`runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt`, Ultralytics 8.4.211) | Server detection, the model test page, and the starting point for the bus model | Finds potholes and draws their outline (mask). Classes: pothole, alligator crack, crack, manhole (only potholes are measured) | Trained 2026-11-17: 80 epochs, 640 px, AdamW, camera height / angle augmentation. **RDD-India pothole AP50 0.2494** (target 0.70, not met yet). Set as `SEG_WEIGHTS` in `.env` |
 | 1-edge | **YOLO26n-seg** (the small version), exported to LiteRT (Android) or TensorRT (Jetson) | On the bus | Same job, small enough for a ₹10–12k phone | Planned: train from the same data, then export. Android app is a skeleton |
-| **2** | **Depth Anything V2 Metric Outdoor Base** (`depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf`) | Server, step 7 | Distance of every pixel in metres from one photo. The road-plane fit and the known camera height correct its scale | In use (`DEPTH_BACKEND=da2_metric`). Options: `da3_metric` (DA3 METRIC-LARGE), `metric3d_onnx` for Jetson, `stereo_sgbm` for stereo vans |
+| **2** | **Depth Anything V2 Metric Outdoor Base** (`depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf`) | Server, step 7 | Distance of every pixel in metres from one photo. The road-plane fit and the known camera height correct its scale | **Off since 2026-11-18 (D27, `DEPTH_BACKEND=off`)**: severity comes from the width instead. Code kept; options: `da3_metric` (DA3 METRIC-LARGE), `metric3d_onnx` for Jetson, `stereo_sgbm` for stereo vans |
 | **3** | **Verifier: RF-DETR-Seg-Small** (second, different detector) | Server, step 6 | Double-checks each detection; weak ones it does not confirm are dropped | **Off** (`VERIFIER=off`): the trained verifier scored 0.004 and was deleted. Turn on only with a model that scores well |
 | 4 | **SAM2.1 Hiera Small** (`facebook/sam2.1-hiera-small`) | Dataset building only | Turns pothole boxes from RDD2022 into pothole outlines for training | Used when the dataset is rebuilt (`make dataset`) |
 | 5 | **BoT-SORT tracker** (not a neural model) | On the bus | Gives each pothole one id across frames | Part of Ultralytics |
@@ -120,11 +120,15 @@ always a range, never an exact count.
 
 | Tool | Command | Address | For |
 |---|---|---|---|
+| Phone as bus camera + Drives dashboard | `make capture` (office LAN) or `make capture-public` (any network, ngrok); processing is automatic | https://&lt;pc-ip&gt;:8443 or the printed ngrok URL; results at `/dashboard` | A phone in a mount records keyframes every 4 m, GPS and jolts; upload on Wi-Fi; the PC runs the model and sends the trip to the API (D28) |
+| Project control | `make control` | http://127.0.0.1:8790 | Everything left to finish the project: gates, progress, next actions, commands; tick manual items (D26) |
 | Model test page | `make playground` | http://&lt;pc-ip&gt;:8780 | Upload photos or videos; see detection, depth, size, severity, repair estimate, plain-English summary |
 | Dataset review | `make review` | http://&lt;pc-ip&gt;:8770 | Several people mark training images keep / reject / fix |
+| Benchmark | `make benchmark` | `reports/BENCHMARK.md` | Every model on every test set (configs/datasets.yaml): base test, RDD-India, BharatPotHole, web, false alarms, phone walk (D38) |
+| Fine-tune | `make train` | terminal | Fine-tune the base model on the base dataset; adopted only if not worse on any test set (D38) |
 | Training dashboard | `make dashboard` | http://127.0.0.1:8765 | Watch training live (loss, accuracy, GPU, time left) |
 | Full demo | `make demo` | API :8000, web :5173 | 3 simulated buses over 2 days: survey, repair, bus verification, DLP |
-| Retrain | `make train-gpu PROFILE=rtx5080_gpu95_ft_geo NAME=<run>` | terminal | Train a new detector (foreground; keeps 3 GB GPU for the display) |
+| Old segmentation pipeline (archive) | `make seg-retrain`, `make seg-train-gpu` | terminal | YOLO26-seg training (D17-D24), kept runnable |
 
 ---
 
