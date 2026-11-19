@@ -3,35 +3,35 @@
 # for comparison (nothing is deleted).
 models:
   - id: civic_yolo11n_base
-    path: weights/base/civic_yolo11n.pt
+    path: models/base_model/civic_yolo11n.pt
     role: base
     suggest: true
     label: "your model (base)"
     note: "user-supplied Nagar Netra civic_services YOLO11n (16 classes, pothole = 1), trained 2026-09-07"
   - id: logesshhh_pothole_yolov8
-    path: weights/pretrained/hf_logesshhh_pothole_yolov8.pt
+    path: models/downloaded_pretrained/hf_logesshhh_pothole_yolov8.pt
     role: archive
     note: "D35 pretrained (HF Logesshhh/road-anomaly-pothole-yolov8m)"
   - id: engjameso_yolov11
-    path: weights/pretrained/hf_engjameso_yolov11.pt
+    path: models/downloaded_pretrained/hf_engjameso_yolov11.pt
     role: archive
     note: "best HF candidate on the supplied test (public-set overlap, D36)"
   - id: samdutse
-    path: weights/pretrained/hf_samdutse_best.pt
+    path: models/downloaded_pretrained/hf_samdutse_best.pt
     role: archive
   - id: harisanth
-    path: weights/pretrained/hf_harisanth_best.pt
+    path: models/downloaded_pretrained/hf_harisanth_best.pt
     role: archive
   - id: y26m_seg_india_v2ft_geo
-    path: runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt
+    path: models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt
     role: archive
     note: "our trained YOLO26m-seg (D21/D24)"
   - id: det_yolo11n_ft_v1
-    path: runs/detect/det_yolo11n_ft_v1/weights/best.pt
+    path: models/training_runs/detect/det_yolo11n_ft_v1/weights/best.pt
     role: archive
     note: "D38 fine-tune of the base on the base dataset, NOT adopted: base test 0.507 (+0.04) but false alarms 2.8 % -> 24.9 % on eYantra and 2 -> 8 on the phone walk (pothole-only training data)"
   - id: det_yolo11n_ft_20261118_1717
-    path: runs/detect/det_yolo11n_ft_20261118_1717/weights/best.pt
+    path: models/training_runs/detect/det_yolo11n_ft_20261118_1717/weights/best.pt
     role: archive
     suggest: true
     label: "combined fine-tune"

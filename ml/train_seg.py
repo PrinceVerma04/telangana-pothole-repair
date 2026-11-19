@@ -2,14 +2,14 @@
 
 New run (laptop, MX330):
     python -m ml.train_seg --profile laptop_mx330 --name y26n_seg_india_laptop --session-hours 8
-Continue the same run later (same command with --resume; picks up runs/seg/<name>/weights/last.pt):
+Continue the same run later (same command with --resume; picks up models/training_runs/seg/<name>/weights/last.pt):
     python -m ml.train_seg --name y26n_seg_india_laptop --resume --session-hours 8
 Smoke (5 % of train, 1 epoch, short val; measures s/it, VRAM, extrapolates a full epoch):
     python -m ml.train_seg --profile smoke_mx330 --name smoke_y26n
 
 What it does
   * Resolves ``configs/model/india_pothole_seg.yaml`` (relative ``path:``) at run time into
-    ``runs/seg/_data/<name>.yaml`` with an absolute path, so the same code runs on this laptop and the Linux 5080 box;
+    ``models/training_runs/seg/_data/<name>.yaml`` with an absolute path, so the same code runs on this laptop and the Linux 5080 box;
     checks the class order against the frozen ``configs/classes.yaml``.
   * Device policy from ``measure.depth_backends.base`` (D12/D14): GPU only if ``cuda_usable()``; fp16 (``amp``) only
     if ``cuda_half_ok()`` (compute >= 7.0) -> fp32 on the MX330; ``batch: auto`` from free VRAM; Ultralytics halves
@@ -18,7 +18,7 @@ What it does
     **resumable** (it aborts before Ultralytics' final step, which would strip the optimizer). Ultralytics' own
     ``time=`` budget is available as ``--time`` but it re-plans the epoch count and finishes the run (``last.pt`` is
     stripped, nothing to resume), and on resume it counts epochs from the resume point; use it only for one-shot runs.
-  * Records seconds/iteration, per-epoch train/val time and peak VRAM in ``runs/seg/<name>/gm_timing.json`` and
+  * Records seconds/iteration, per-epoch train/val time and peak VRAM in ``models/training_runs/seg/<name>/gm_timing.json`` and
     ``reports/train/<name>.json`` (updated every epoch, so a killed run still leaves numbers).
   * Ultralytics is never allowed to pip-install anything (``YOLO_AUTOINSTALL=False``).
   * ``batch`` as a fraction (profile ``rtx5080_gpu95``: 0.95) = Ultralytics AutoBatch sized to that share of the GPU
@@ -74,11 +74,11 @@ EXIT_OOM = 3  # the run ended on CUDA out-of-memory; ml/pipeline.py restarts it 
 DISPLAY_RESERVE_GIB = 3.0  # GPU memory kept free for the desktop when the training GPU drives a monitor (D20)
 MIN_TRAIN_GIB = 2.0  # below this after the reserve, refuse to start instead of crawling at batch 1-2
 DRM_SYSFS = Path("/sys/class/drm")
-LIVE_EVERY_S = 2.0  # gm_live.json refresh while training (dashboard: scripts/train_dashboard.py)
+LIVE_EVERY_S = 2.0  # gm_live.json refresh while training (dashboard: tools/train_dashboard.py)
 
 
 def write_live(run_dir: Path, state: dict[str, Any]) -> None:
-    """Atomically replace runs/seg/<name>/gm_live.json (readers never see a half-written file)."""
+    """Atomically replace models/training_runs/seg/<name>/gm_live.json (readers never see a half-written file)."""
     tmp = Path(run_dir) / ".gm_live.json.tmp"
     tmp.write_text(json.dumps(state, default=str), encoding="utf-8")
     os.replace(tmp, Path(run_dir) / "gm_live.json")
@@ -508,7 +508,7 @@ class GMCallbacks:
         self._write_live(trainer, "validating")
 
     def _write_live(self, trainer: Any, phase: str) -> None:
-        """Small, frequently rewritten progress file for scripts/train_dashboard.py; never breaks training."""
+        """Small, frequently rewritten progress file for tools/train_dashboard.py; never breaks training."""
         self._t_live = time.time()
         try:
             names = list(getattr(trainer, "loss_names", ()) or ())
@@ -749,8 +749,8 @@ def resume_command(name: str, session_hours: Optional[float]) -> str:
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description="YOLO26-seg training (RoadFix WP3)")
     ap.add_argument("--profile", default="laptop_mx330", help="configs/model/train_profiles.yaml profile")
-    ap.add_argument("--name", required=True, help="run name -> runs/seg/<name>")
-    ap.add_argument("--resume", action="store_true", help="continue runs/seg/<name>/weights/last.pt")
+    ap.add_argument("--name", required=True, help="run name -> models/training_runs/seg/<name>")
+    ap.add_argument("--resume", action="store_true", help="continue models/training_runs/seg/<name>/weights/last.pt")
     ap.add_argument("--session-hours", type=float, default=None, help="pause (resumable) after the last epoch that fits")
     ap.add_argument("--time", type=float, default=None, help="Ultralytics time budget in hours (one-shot runs only)")
     ap.add_argument("--epochs", type=int, default=None,
@@ -827,7 +827,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     kwargs, gm = plan_run(profile, overrides, dev)
     if run_dir.exists() and any(run_dir.iterdir()) and not args.dry_run:
         raise SystemExit(f"{rel(run_dir)} exists: use --resume to continue it, or choose another --name")
-    model_path = resolve_repo_path(gm.get("model", "weights/yolo26n-seg.pt"))
+    model_path = resolve_repo_path(gm.get("model", "models/yolo_starting_points/yolo26n-seg.pt"))
     data_yaml = prepare_data(args.name, gm.get("val_limit"), gm.get("data"))
     gm["batch_requested"] = kwargs.get("batch")
     names = list(yaml.safe_load(Path(data_yaml).read_text(encoding="utf-8"))["names"].values())

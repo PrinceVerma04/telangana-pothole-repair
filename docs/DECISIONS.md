@@ -933,3 +933,44 @@ outlines, the base model 14 / 41, the combined fine-tune 7 / 41. All three flagg
   - The matched video frames become annotation photo set `video:<name>`; marks there and on the drive are scored
     on the next run. Video sets are never exported to training.
   - Report: `reports/phone_vs_video/<name>/index.html` + `summary.json`.
+
+## D43. Folder re-organisation: one folder for training data, one for test data (user request 2026-11-19)
+User: rearrange the project so each folder name says what it holds; all datasets in one folder and the test datasets
+in a separate one. User choices: data / model / tool folders only (code packages `ml`, `measure`, `geo`, `gis`,
+`priority`, `repair`, `server`, `edge`, `web` keep their names, they are imported everywhere); old v1 datasets moved
+to an archive folder, nothing deleted; a git checkpoint commit first; running servers stopped and restarted.
+
+| Old | New |
+|---|---|
+| `data/datasets/nagar_netra_pothole` (train, val) | `datasets/base_nagar_netra_pothole` |
+| `data/datasets/nagar_netra_pothole/images\|labels/test` | `test_datasets/nagar_netra_test/images\|labels` |
+| `data/datasets/combined_ft`, `base_neg`, `phone_marked` | `datasets/finetune_base_plus_earlier`, `finetune_base_plus_clean_roads`, `finetune_phone_marked` (train-set ids `combined`, `base_neg`, `phone` unchanged) |
+| `data/datasets/india_pothole_seg4_v2` (train, val) | `datasets/earlier_india_pothole_v2` |
+| its test split (`rddin_`, `bh_`, `ws_`, `ey_` files) | `test_datasets/rdd_india_locked`, `bharatpothole_dashcam`, `web_pothole_photos`, `eyantra_clean_roads` |
+| `data/datasets/india_pothole_seg_v2`, `india_pothole_seg4`, `india_pothole_seg` | `datasets/archive/india_pothole_v2_allclasses`, `india_pothole_v1`, `india_pothole_v1_allclasses` (unchanged inside, test splits included) |
+| `new dataset for pathole/` | `datasets/supplied_original/` |
+| `data/raw`, `data/interim`, `data/splits` | `datasets/downloads`, `datasets/extracted`, `datasets/splits` |
+| `data/review`, `data/annotate` | `datasets/labelling/review`, `datasets/labelling/annotate` |
+| `data/testsets/phone_street_20261118`, `test data/`, `data/video_compare`, `data/truth` | `test_datasets/phone_street_20261118`, `phone_videos`, `video_compare`, `staged_measurement_truth` |
+| `weights/base`, `candidates`, `pretrained`, `export`, `registry`, `weights/yolo26*-seg.pt` | `models/base_model`, `adopted_finetunes`, `downloaded_pretrained`, `exported`, `registry`, `yolo_starting_points/` |
+| `new trained model/` | `models/supplied_original/` |
+| `runs/` | `models/training_runs/` |
+| `data/gunthameter.db`, `store`, `capture`, `playground`, `demo`, `backups`, `tiles`, `tmp_wp7` | `app_data/...` (`tmp_wp7` -> `fleet_sim`) |
+| `data/*.py` (Python package `data`) | `dataset_tools/` (package `dataset_tools`) |
+| `scripts/` | `tools/` |
+
+- **Test splits outside the training folders:** `dataset_tools/test_split.py` moves `images/test` + `labels/test` to
+  `test_datasets/<name>/` and points the dataset's `data.yaml` `test:` there (absolute; a list for the earlier set).
+  `make base-dataset` and `make seg-derive-dataset` call it (`--separate-test`), so rebuilds keep the layout; unit
+  tests never pass the flag. `ml.common.split_dirs` / `split_images` read one folder or a list; the archive config
+  `configs/model/india_pothole_seg.yaml` lists the four earlier test folders, so `make seg-*`, the RDD-India lock check
+  and `ml.eval` still see the same 1,843 test images. `configs/datasets.yaml` test sets point at their own folders (no
+  file-prefix filters). The combined / negatives builders guard against near-copies of every `test_datasets/*/images`.
+- Dataset review reads split folders from `data.yaml`, so locked test images are still shown; its decisions DB for the
+  base set is now `review_base_nagar_netra_pothole.sqlite` (none existed yet), the earlier one stays `review.sqlite`.
+- `.env`: `SEG_WEIGHTS=models/base_model/civic_yolo11n.pt`, `DATABASE_URL=sqlite:///app_data/gunthameter.db`,
+  `STORAGE_ROOT=app_data/store`. A shell that sourced the old .env must `unset` them.
+- History in DECISIONS D1-D42, `docs/design_candidates.json`, `tools/workflows/wave1.js`, `reports/` and stored run
+  records (`replay.json`, `model_eval.json`, `model_registry` rows) keeps the old paths as written at the time.
+- The data moves are listed in `app_data/restructure_moves.json`, with `app_data/restructure_undo.sh` to reverse them.
+

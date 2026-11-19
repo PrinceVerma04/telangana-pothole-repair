@@ -1,4 +1,4 @@
-# RoadFix — what is left to finish the project end to end (D26). Read by scripts/project_control.py (`make control`).
+# RoadFix — what is left to finish the project end to end (D26). Read by tools/project_control.py (`make control`).
 #
 # Each item has a gate (what "done" means), the command or document to act on, and a check that the dashboard
 # evaluates live on every refresh. Check kinds (all paths relative to the repo root):
@@ -25,10 +25,10 @@ areas:
     items:
       - id: model.base_dataset
         title: Base dataset built with a leak-free split
-        gate: data/datasets/nagar_netra_pothole/data.yaml (near-copies never straddle splits)
+        gate: datasets/base_nagar_netra_pothole/data.yaml (near-copies never straddle splits)
         cmd: make base-dataset
         ref: docs/DECISIONS.md D38
-        check: {kind: file, glob: data/datasets/nagar_netra_pothole/data.yaml}
+        check: {kind: file, glob: datasets/base_nagar_netra_pothole/data.yaml}
       - id: model.benchmark
         title: Benchmark of the model in use on every test set
         gate: reports/benchmark.json newer than the model registry
@@ -37,7 +37,7 @@ areas:
         check: {kind: newer, path: reports/benchmark.json, than: configs/models.yaml}
       - id: model.finetune
         title: Fine-tune the base model on the base dataset (adopted only if not worse anywhere)
-        gate: a runs/detect/*/weights/best.pt with its reports/train_<name>.json
+        gate: a models/training_runs/detect/*/weights/best.pt with its reports/train_<name>.json
         cmd: make train
         depends: [model.base_dataset]
         check: {kind: file, glob: "reports/train_*.json"}
@@ -73,17 +73,17 @@ areas:
     items:
       - id: export.onnx
         title: ONNX of the model in use
-        gate: weights/base/civic_yolo11n.onnx (supplied) or an export of an adopted fine-tune
-        check: {kind: file, glob: "weights/base/*.onnx"}
+        gate: models/base_model/civic_yolo11n.onnx (supplied) or an export of an adopted fine-tune
+        check: {kind: file, glob: "models/base_model/*.onnx"}
       - id: export.litert
         title: LiteRT (TFLite) of the model in use for Android
-        gate: weights/base/civic_yolo11n_int8.tflite (supplied)
-        check: {kind: file, glob: "weights/base/*.tflite"}
+        gate: models/base_model/civic_yolo11n_int8.tflite (supplied)
+        check: {kind: file, glob: "models/base_model/*.tflite"}
       - id: export.prune_v1
         title: Delete the v1 datasets and laptop run
         gate: v1 paths gone (approved 2026-11-16)
         cmd: make seg-prune-v1
-        check: {kind: absent, paths: [data/datasets/india_pothole_seg, data/datasets/india_pothole_seg4]}
+        check: {kind: absent, paths: [datasets/archive/india_pothole_v1_allclasses, datasets/archive/india_pothole_v1]}
 
   - id: measure
     title: Real-camera size accuracy
@@ -96,14 +96,14 @@ areas:
         check: {kind: file, glob: reports/measure_demo/summary.json}
       - id: measure.session
         title: Staged foam-board session filmed and filled in
-        gate: data/truth/staged_*.csv with measurements
-        cmd: .venv/bin/python scripts/staged_pothole_truth.py template --out data/truth/template.csv
+        gate: test_datasets/staged_measurement_truth/staged_*.csv with measurements
+        cmd: .venv/bin/python tools/staged_pothole_truth.py template --out test_datasets/staged_measurement_truth/template.csv
         ref: docs/CALIBRATION_SOP.md, PLAN §4.12
-        check: {kind: file, glob: "data/truth/staged_*.csv"}
+        check: {kind: file, glob: "test_datasets/staged_measurement_truth/staged_*.csv"}
       - id: measure.gates
         title: Staged test - width within 10 % and IRC width class right on >= 90 % of targets (size-only, D27)
         gate: measured width / area vs tape on the foam-board targets, bus calibration certificate in use
-        cmd: .venv/bin/python scripts/staged_pothole_truth.py compare data/truth/staged_<date>.csv --out reports/staged_truth
+        cmd: .venv/bin/python tools/staged_pothole_truth.py compare test_datasets/staged_measurement_truth/staged_<date>.csv --out reports/staged_truth
         depends: [measure.session]
         check: {kind: manual}
 
@@ -226,16 +226,16 @@ areas:
         check: {kind: newer, path: reports/REPORT.md, than: reports/benchmark.json}
       - id: demo.phone_drive
         title: Phone drive recorded and uploaded (route with 10-20 potholes, driven twice)
-        gate: a trip in data/capture/ from the phone page
+        gate: a trip in app_data/capture/ from the phone page
         cmd: make capture-public
         ref: docs/DECISIONS.md D28
-        check: {kind: file, glob: "data/capture/*/trip.json"}
+        check: {kind: file, glob: "app_data/capture/*/trip.json"}
       - id: demo.phone_replay
         title: Phone drive replayed into the demo API (map, severity, repair)
-        gate: data/capture/<trip>/replay.json written
+        gate: app_data/capture/<trip>/replay.json written
         cmd: make capture-replay TRIP=<trip id>
         depends: [demo.phone_drive]
-        check: {kind: file, glob: "data/capture/*/replay.json"}
+        check: {kind: file, glob: "app_data/capture/*/replay.json"}
       - id: demo.phone_truth
         title: Tape width/length of ~10 driven potholes compared with the measured size
         gate: width within 10 %, IRC width class right on >= 90 %

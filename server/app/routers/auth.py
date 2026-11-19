@@ -1,6 +1,6 @@
 """/v1/auth: OTP (citizens / field staff by phone) and password login.
 
-Demo users (seeded by scripts/seed_demo.py, password ``demo1234``): admin, zonal_khairatabad, engineer1,
+Demo users (seeded by tools/seed_demo.py, password ``demo1234``): admin, zonal_khairatabad, engineer1,
 contractor1, contractor2, citizen1 - see ``server/app/seed.py:DEMO_USERS``.
 """
 

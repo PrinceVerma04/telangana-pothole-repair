@@ -1,11 +1,11 @@
 """Model evaluation -> ``reports/model_eval.json`` (PLAN 3.4 eval metrics, WP3 acceptance).
 
-    python -m ml.eval --weights runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt --stage trained_y26m_seg_india_v2ft_geo
-    python -m ml.eval --weights runs/seg/<name>/weights/best.pt --stage smoke --compare runs/.../best.onnx --limit 50
+    python -m ml.eval --weights models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt --stage trained_y26m_seg_india_v2ft_geo
+    python -m ml.eval --weights models/training_runs/seg/<name>/weights/best.pt --stage smoke --compare runs/.../best.onnx --limit 50
 
 Ground truth
   * Box GT for the test split (RDD-India D40 held-out, 514 images) defaults to the **original RDD2022 boxes**
-    (``data/interim/rdd2022/india/labels/<id>.txt``, class ids from ``meta.json``) when every image resolves; the
+    (``datasets/extracted/rdd2022/india/labels/<id>.txt``, class ids from ``meta.json``) when every image resolves; the
     dataset label polygons are SAM2 pseudo-masks whose bounding boxes differ from the annotated boxes. The polygon-bbox
     numbers are reported as well (``vs_label_polygons``) because Ultralytics' own val uses that convention.
   * Mask GT = the dataset polygons. On the test split these are SAM2.1 pseudo-masks from RDD boxes (962 of 1,038
@@ -47,7 +47,7 @@ from ml.common import (
 from ml.metrics import Evaluator, eval_hw
 
 REPORT_PATH = REPORTS / "model_eval.json"
-RDD_INTERIM = REPO_ROOT / "data" / "interim" / "rdd2022"
+RDD_INTERIM = REPO_ROOT / "datasets" / "extracted" / "rdd2022"
 TARGETS = {
     "box_map50_pothole_rdd_india_test": {"floor": 0.70, "target": 0.75, "source": "PLAN WP3 acceptance / 3.4"},
     "box_map50_95_pothole_rdd_india_test": {"target": 0.45, "source": "PLAN 3.4"},
@@ -139,7 +139,7 @@ def choose_gt_boxes(images: Sequence[Path], mode: str) -> str:
 
 
 # ============================================================================================ evaluation
-# Test images by source (uid prefix written by data/build_dataset.py), scored separately next to the whole split.
+# Test images by source (uid prefix written by dataset_tools/build_dataset.py), scored separately next to the whole split.
 # RDD-India is the acceptance basis (``rdd_india_subset``, original RDD boxes); the others use the label polygons.
 SOURCE_SUBSETS = {"bharat": "bh_", "webseg_human_masks": "ws_", "eyantra": "ey_"}
 
@@ -344,10 +344,10 @@ def ultralytics_val(weights: Path, split: str, imgsz: int, device: str, batch: i
     ds_names = names_tuple(load_dataset_cfg(data_cfg)["names"])
     if names != ds_names:
         return {"status": "skipped", "reason": f"model classes {names} != dataset classes {ds_names}"}
-    data = write_resolved_data_yaml(REPO_ROOT / "runs" / "seg" / "_data" / "eval_data.yaml", data_cfg)
+    data = write_resolved_data_yaml(REPO_ROOT / "models" / "training_runs" / "seg" / "_data" / "eval_data.yaml", data_cfg)
     t0 = time.perf_counter()
     m = model.val(data=str(data), split=split, imgsz=imgsz, batch=batch, device=device, plots=False, verbose=False,
-                  project=str(REPO_ROOT / "runs" / "seg" / "_val"), name=weights.stem, exist_ok=True, workers=0,
+                  project=str(REPO_ROOT / "models" / "training_runs" / "seg" / "_val"), name=weights.stem, exist_ok=True, workers=0,
                   half=False)
     out: dict[str, Any] = {"wall_s": round(time.perf_counter() - t0, 1), "box_map50_all": _r(m.box.map50),
                            "box_map50_95_all": _r(m.box.map)}

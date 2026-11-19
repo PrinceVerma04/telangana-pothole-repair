@@ -1,4 +1,4 @@
-"""WP11: scripts/staged_pothole_truth.py and scripts/make_report.py on small synthetic inputs (tmp_path only).
+"""WP11: tools/staged_pothole_truth.py and tools/make_report.py on small synthetic inputs (tmp_path only).
 
 No model weights, no database, no geo files: measurements are hand-built FrameMeasurement JSONs or come from the
 synthetic depth backend (measure/synthetic.py) through the production measurement path.
@@ -24,7 +24,7 @@ PY = sys.executable
 
 
 def _load(name: str):
-    spec = importlib.util.spec_from_file_location(f"wp11_{name}", REPO / "scripts" / f"{name}.py")
+    spec = importlib.util.spec_from_file_location(f"wp11_{name}", REPO / "tools" / f"{name}.py")
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)
@@ -271,14 +271,14 @@ def test_make_report_reads_model_eval_and_staged_summary(tmp_path: Path):
 def test_cli_smoke(tmp_path: Path):
     md = _measure_dir(tmp_path)
     env = {**os.environ, "GM_DEVICE": "cpu", "PYTHONUTF8": "1"}
-    r = subprocess.run([PY, str(REPO / "scripts" / "make_report.py"), "--out", str(tmp_path / "REPORT.md"),
+    r = subprocess.run([PY, str(REPO / "tools" / "make_report.py"), "--out", str(tmp_path / "REPORT.md"),
                         "--measure-dir", str(md), "--model-eval", str(tmp_path / "none.json"),
                         "--truth-summary", str(tmp_path / "none2.json"), "--rehearsal-summary", ""],
                        capture_output=True, text=True, env=env, cwd=tmp_path, timeout=120)
     assert r.returncode == 0, r.stderr
     assert "model metrics: pending" in r.stdout and "staged truth: pending" in r.stdout
     assert (tmp_path / "REPORT.md").read_text(encoding="utf-8").startswith("# RoadFix validation report")
-    r = subprocess.run([PY, str(REPO / "scripts" / "staged_pothole_truth.py"), "template", "--out",
+    r = subprocess.run([PY, str(REPO / "tools" / "staged_pothole_truth.py"), "template", "--out",
                         str(tmp_path / "t.csv"), "--targets", "T20-S", "--passes", "1"],
                        capture_output=True, text=True, env=env, cwd=tmp_path, timeout=120)
     assert r.returncode == 0, r.stderr
@@ -326,7 +326,7 @@ def test_make_report_wp3_schema_baseline_only_is_pending(tmp_path: Path):
     assert "thresholds, not results" in text
 
     env = {**os.environ, "GM_DEVICE": "cpu", "PYTHONUTF8": "1"}
-    r = subprocess.run([PY, str(REPO / "scripts" / "make_report.py"), "--out", str(tmp_path / "R.md"),
+    r = subprocess.run([PY, str(REPO / "tools" / "make_report.py"), "--out", str(tmp_path / "R.md"),
                         "--measure-dir", str(md), "--model-eval", str(me), "--truth-summary",
                         str(tmp_path / "none.json"), "--rehearsal-summary", ""],
                        capture_output=True, text=True, env=env, cwd=tmp_path, timeout=120)

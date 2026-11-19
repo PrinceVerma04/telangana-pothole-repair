@@ -115,8 +115,8 @@ model (z_rms 0.25–0.92); it is to be refitted per device from truth data (`mea
 recovered an injected k within 13.2 %).
 
 ### Level 2 — staged known-depth targets (protocol ready; **real-camera run pending**)
-Protocol and scripts: `scripts/staged_pothole_truth.py` (`template` → film foam-board targets of 20/40/70 mm at
-3–12 m with a calibrated camera → `measure` → `compare`), template `data/truth/template.csv`. Pass criteria for the
+Protocol and scripts: `tools/staged_pothole_truth.py` (`template` → film foam-board targets of 20/40/70 mm at
+3–12 m with a calibrated camera → `measure` → `compare`), template `test_datasets/staged_measurement_truth/template.csv`. Pass criteria for the
 demo: fused depth MAE ≤ 10 mm, IRC class accuracy ≥ 90 %, volume MAPE ≤ 25 %.
 
 A **rehearsal on rendered targets** (synthetic depth, production measurement path; `reports/staged_truth_rehearsal/`)
@@ -131,7 +131,7 @@ exercised the protocol end to end. It is *not* a camera result:
 | single frames 10–12 m | 2 | 7.0 | 14.6 % | 13.5 % | 100 % | 100 % |
 
 The real table replaces this one once `staged_pothole_truth.py compare` writes `reports/staged_truth/summary.json`;
-`scripts/make_report.py` then shows it in `reports/REPORT.md` §5.
+`tools/make_report.py` then shows it in `reports/REPORT.md` §5.
 
 ### Real Indian road images (chain runs; **not measurements**)
 `measure-demo` also runs DA-V2 on 6 dataset images (RDD-India, BharatPotHole, eYantra) with the uncertified

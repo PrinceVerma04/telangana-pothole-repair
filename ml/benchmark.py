@@ -1,7 +1,7 @@
 """Benchmark (D38): every model on every test set of configs/datasets.yaml.
 
     make benchmark                                   # all models of configs/models.yaml + the model in use
-    .venv/bin/python -m ml.benchmark --models weights/base/civic_yolo11n.pt runs/detect/x/weights/best.pt
+    .venv/bin/python -m ml.benchmark --models models/base_model/civic_yolo11n.pt models/training_runs/detect/x/weights/best.pt
 
 Box test sets are scored with the same COCO matching and 101-point AP as ml.eval (ml.metrics): pothole AP50,
 AP50-95, precision / recall at confidence 0.25 and the best F1. Only the model's pothole class counts, whatever it is

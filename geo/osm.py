@@ -3,7 +3,7 @@
 Everything comes from a Geofabrik PBF via pyrosm (no Overpass, no osmium CLI):
 
 1. ``crop_pbf`` cuts the 560 MB southern-zone extract down to the Hyderabad bbox once
-   (complete ways, ~38 MB) and caches it under ``data/interim/geo/``.
+   (complete ways, ~38 MB) and caches it under ``datasets/extracted/geo/``.
 2. ``read_highway_ways`` reads drivable ways with their ordered node ids.
 3. ``split_ways`` splits ways at every node shared by >= 2 ways (or visited twice by one
    way) - the classic "split at intersections" - fully vectorised with numpy.
@@ -61,7 +61,7 @@ def crop_pbf(src: str | Path, dst: str | Path, bbox: Sequence[float] = HYD_BBOX,
         return dst
     if not src.exists():
         raise FileNotFoundError(f"{src} is missing and there is no crop at {dst}: download the OSM extract again "
-                                "(python -I data/download.py --osm --fetch)")
+                                "(python -I dataset_tools/download.py --osm --fetch)")
     from pyrosm import OSM
 
     dst.parent.mkdir(parents=True, exist_ok=True)

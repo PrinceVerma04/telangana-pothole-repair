@@ -121,7 +121,7 @@ def test_getattr_only_for_old_yolov8_forward_refs(case: str):
 
 
 def test_project_checkpoints_pass_the_scan():
-    for w in ("weights/yolo26s-seg.pt", "runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt"):
+    for w in ("models/yolo_starting_points/yolo26s-seg.pt", "models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt"):
         p = ROOT / w
         if p.exists():
             assert pl.unsafe_globals(pl.checkpoint_globals(p)) == [], w

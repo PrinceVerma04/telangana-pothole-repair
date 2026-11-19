@@ -1,8 +1,8 @@
 """Pseudo-labels for unlabelled road frames (WP3): current segmenter (+ optional second model) -> YOLO-seg labels
 that a human reviews before they are ever trained on.
 
-    python -m ml.pseudo_label --images data/store/frames --weights runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt \
-        --out data/interim/pseudo/bus_frames_2026w46 [--verifier <second model .pt>] \
+    python -m ml.pseudo_label --images app_data/store/frames --weights models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt \
+        --out datasets/extracted/pseudo/bus_frames_2026w46 [--verifier <second model .pt>] \
         [--mask auto|sam2|grabcut|ellipse] [--limit 500]
 
 For every image (``*.jpg|*.jpeg|*.png``, searched recursively; read with OpenCV only, never executed):
@@ -18,8 +18,8 @@ For every image (``*.jpg|*.jpeg|*.png``, searched recursively; read with OpenCV 
 
 Output (``--out``): ``images/`` (copies), ``labels/`` (YOLO-seg, accepted only), ``review/``, ``review.csv``,
 ``manifest.json`` (weights + sha256, thresholds, counts, ``status: needs_human_review``). Nothing here touches
-``data/datasets``: merging reviewed pseudo-labels into a training split is a separate, explicit step
-(``data/build_dataset.py``), so an unreviewed label can never reach a model by accident.
+``datasets``: merging reviewed pseudo-labels into a training split is a separate, explicit step
+(``dataset_tools/build_dataset.py``), so an unreviewed label can never reach a model by accident.
 """
 
 from __future__ import annotations

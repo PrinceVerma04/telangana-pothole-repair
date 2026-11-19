@@ -5,10 +5,10 @@
     python -m geo.build_geo --fixture             # only re-clip tests/fixtures/geo_small from existing outputs
 
 Outputs (WGS84 GeoJSON / JSON):
-  data/interim/geo/road_segments.geojson   LineStrings split at intersections (contract properties)
-  data/interim/geo/pois.geojson            school|hospital|clinic|bus_stop|metro_station|marketplace
-  data/interim/geo/gtfs_routes.json        [{route_id, short_name, long_name, shape, trips_per_day}]
-  data/interim/geo/build_summary.json      counts (owner, admin, POI kinds, timings)
+  datasets/extracted/geo/road_segments.geojson   LineStrings split at intersections (contract properties)
+  datasets/extracted/geo/pois.geojson            school|hospital|clinic|bus_stop|metro_station|marketplace
+  datasets/extracted/geo/gtfs_routes.json        [{route_id, short_name, long_name, shape, trips_per_day}]
+  datasets/extracted/geo/build_summary.json      counts (owner, admin, POI kinds, timings)
   gis/layers/{ghmc_zones,circles,wards,crmp_packages,waterlogging_hotspots,road_owner_overrides}.geojson
   tests/fixtures/geo_small/*               the same files clipped to Ameerpet/Punjagutta (17.42-17.44, 78.44-78.46)
 
@@ -43,9 +43,9 @@ from geo import osm as O
 log = logging.getLogger("geo.build_geo")
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_PBF = ROOT / "data/raw/osm/southern-zone-latest.osm.pbf"
-DEFAULT_GTFS = ROOT / "data/raw/gtfs_tgsrtc/tgsrtc_gtfs.zip"
-DEFAULT_OUT = ROOT / "data/interim/geo"
+DEFAULT_PBF = ROOT / "datasets/downloads/osm/southern-zone-latest.osm.pbf"
+DEFAULT_GTFS = ROOT / "datasets/downloads/gtfs_tgsrtc/tgsrtc_gtfs.zip"
+DEFAULT_OUT = ROOT / "datasets/extracted/geo"
 DEFAULT_LAYERS = ROOT / "gis/layers"
 DEFAULT_FIXTURE = ROOT / "tests/fixtures/geo_small"
 DEFAULT_AGENCIES = ROOT / "configs/agencies.yaml"

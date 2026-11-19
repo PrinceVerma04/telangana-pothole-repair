@@ -1,7 +1,7 @@
 """Extract named arterial roads around five Hyderabad localities from the OSM extract for the web mock seed.
 
 Run (isolated, reads untrusted OSM data only as data):
-  .venv/bin/python -I web/scripts/extract_roads.py data/interim/geo/hyderabad.osm.pbf web/src/lib/mock/roads.json
+  .venv/bin/python -I web/scripts/extract_roads.py datasets/extracted/geo/hyderabad.osm.pbf web/src/lib/mock/roads.json
 """
 
 from __future__ import annotations

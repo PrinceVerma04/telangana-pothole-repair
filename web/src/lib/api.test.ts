@@ -26,7 +26,7 @@ function stubFetch(routes: Record<string, (u: URL, init: RequestInit) => unknown
   }) as typeof fetch;
 }
 
-// Trimmed copies of real responses from the live API (data/gunthameter.db seed).
+// Trimmed copies of real responses from the live API (app_data/gunthameter.db seed).
 const ZONES = {
   kind: 'zone', window_days: 30, generated_at: '2026-11-13T17:58:07Z', items: [
     { id: 3, code: 'GHMC-KHT', kind: 'zone', name_en: 'Khairatabad', name_te: 'ఖైరతాబాద్', name_hi: 'खैरताबाद', parent_id: null, official: false, open: 0, open_large: 0, repaired_30d: 0, repair_ratio: null, rank: 1 },

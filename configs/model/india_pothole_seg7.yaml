@@ -1,6 +1,6 @@
 # Original 7-class WP1 build (frozen class order; 3 classes have no labels). Kept to reproduce earlier evals.
 # Paths are relative to `path`. Names must match configs/classes.yaml.
-path: ../../data/datasets/india_pothole_seg
+path: ../../datasets/archive/india_pothole_v1_allclasses
 train: images/train
 val: images/val
 test: images/test

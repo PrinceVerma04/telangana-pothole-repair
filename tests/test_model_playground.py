@@ -1,4 +1,4 @@
-"""scripts/model_playground.py (D23): upload checks, video sampling, ids, model list. CPU only, no model loading."""
+"""tools/model_playground.py (D23): upload checks, video sampling, ids, model list. CPU only, no model loading."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
-_spec = importlib.util.spec_from_file_location("model_playground", ROOT / "scripts" / "model_playground.py")
+sys.path.insert(0, str(ROOT / "tools"))
+_spec = importlib.util.spec_from_file_location("model_playground", ROOT / "tools" / "model_playground.py")
 mp = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(mp)
 
@@ -85,7 +85,7 @@ def test_ids_and_frame_paths_reject_tricks(tmp_path):
 def test_models_listed_with_test_scores():
     models = mp.list_models()
     ids = {m["id"] for m in models}
-    assert any(i.endswith("best_pothole.pt") for i in ids) or any(i.startswith("weights/") for i in ids)
+    assert any(i.endswith("best_pothole.pt") for i in ids) or any(i.startswith("models/") for i in ids)
     assert all(not m["id"].startswith("/") for m in models)
 
 

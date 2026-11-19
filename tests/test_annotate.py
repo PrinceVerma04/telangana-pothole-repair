@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tools"))
 
 import annotate as A  # noqa: E402
 
@@ -156,7 +156,7 @@ def test_capture_server_offers_the_annotation_page(tmp_path: Path):
 
     from fastapi.testclient import TestClient
 
-    spec = importlib.util.spec_from_file_location("phone_capture", ROOT / "scripts" / "phone_capture.py")
+    spec = importlib.util.spec_from_file_location("phone_capture", ROOT / "tools" / "phone_capture.py")
     pc = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(pc)
     c = TestClient(pc.make_app(tmp_path / "capture", tmp_path / "cameras", min_free=0), base_url="https://testserver")

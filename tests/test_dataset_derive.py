@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 import yaml
 
-from data import derive_dataset as D
+from dataset_tools import derive_dataset as D
 from ml import common as C
 from ml import eval as E
 

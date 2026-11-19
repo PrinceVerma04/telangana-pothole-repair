@@ -1,11 +1,11 @@
-"""WP1: pure geometry helpers used by the dataset build (data/seg_geometry.py, data/sam2_masks.postprocess_mask)."""
+"""WP1: pure geometry helpers used by the dataset build (dataset_tools/seg_geometry.py, dataset_tools/sam2_masks.postprocess_mask)."""
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from data.seg_geometry import (
+from dataset_tools.seg_geometry import (
     box_iou,
     box_polygon,
     dhash64,
@@ -88,7 +88,7 @@ def test_dhash_near_duplicates_close_and_different_images_far():
 
 
 def test_postprocess_mask_iou_and_clip():
-    from data.sam2_masks import postprocess_mask
+    from dataset_tools.sam2_masks import postprocess_mask
 
     m = np.zeros((100, 100), bool)
     m[20:60, 20:60] = True

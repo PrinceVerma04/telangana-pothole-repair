@@ -1,6 +1,6 @@
 """Runtime settings (WP4). Reads environment variables and the project ``.env`` (keys of ``.env.example``).
 
-Relative paths (``sqlite:///data/gunthameter.db``, ``STORAGE_ROOT=data/store``) are resolved against the project
+Relative paths (``sqlite:///app_data/gunthameter.db``, ``STORAGE_ROOT=app_data/store``) are resolved against the project
 root, so the API, seed script, workers and tests agree no matter which directory they are started from.
 
 Usage::
@@ -42,12 +42,12 @@ class Settings(BaseSettings):
     DEMO_LITE: bool = True
 
     # database (DECISIONS D1)
-    DATABASE_URL: str = "sqlite:///data/gunthameter.db"
+    DATABASE_URL: str = "sqlite:///app_data/gunthameter.db"
     DB_ECHO: bool = False
 
     # storage (D3)
     STORAGE_BACKEND: str = "fs"
-    STORAGE_ROOT: str = "data/store"
+    STORAGE_ROOT: str = "app_data/store"
     S3_ENDPOINT: Optional[str] = None
     S3_BUCKET: str = "gunthameter"
     S3_ACCESS_KEY: Optional[str] = None
@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     REDIS_URL: Optional[str] = None
 
     # models
-    SEG_WEIGHTS: str = "runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt"  # D24
+    SEG_WEIGHTS: str = "models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt"  # D24
     VERIFIER_WEIGHTS: str = ""  # D24: no second model
     VERIFIER: str = "off"
     DEPTH_BACKEND: str = "off"  # D27: size-only (no depth model); da2_metric to measure depth again

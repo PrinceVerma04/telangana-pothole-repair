@@ -5,23 +5,22 @@ __pycache__/
 .ruff_cache/
 .env
 .env.linux-old
-data/raw/
-data/interim/
-data/datasets/
-data/tiles/
-data/store/
-data/*.db
-data/demo/
-data/tmp_wp7/
-runs/
+# D43 layout: data and models are not in git (only each folder's README.md and the tracked split lists)
+datasets/*
+!datasets/README.md
+!datasets/splits/
+test_datasets/*
+!test_datasets/README.md
+!test_datasets/staged_measurement_truth/
+models/*
+!models/README.md
+app_data/*
+!app_data/README.md
 reports/*.json
+# Ultralytics defaults if a run forgets project=/weights dir (AMP check downloads a .pt into the cwd)
+/runs/
+/*.pt
 reports/train/
-weights/*.pt
-weights/*.onnx
-weights/*.engine
-weights/*.tflite
-weights/pretrained/
-weights/export/
 web/node_modules/
 web/dist/
 *.log
@@ -30,13 +29,6 @@ web/dist/
 # archives (GitHub rejects files > 100 MB)
 *.tar
 *.tar.gz
-# SQLite sidecar files of a live DB
-data/*.db-shm
-data/*.db-wal
-data/*.db-journal
-# DB backups made before a CHECK-constraint refresh (D28)
-data/backups/
-data/*/backups/
 # web test output
 web/test-results/
 web/playwright-report/
@@ -45,20 +37,5 @@ web/playwright-report/
 CLAUDE.md
 .claude/
 
-# dataset review (D22): decisions DB, access code and signing key stay local; exports are reviewable
-data/review/*.sqlite*
-data/review/access_code.txt
-data/review/secret.key
-# model test page uploads (D23)
-data/playground/
-test data/
 # phone capture (D28): drives (frames with faces/plates), TLS key, per-phone calibrations
-data/capture/
 configs/cameras/phonecap_*.json
-# D38 base model files and the user-supplied source folders (data, not code)
-weights/base/
-new dataset for pathole/
-new trained model/
-data/testsets/
-# annotation dashboard (D41): marks DB and model suggestions stay local
-data/annotate/

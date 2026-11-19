@@ -19,7 +19,7 @@ from geo import osm as O
 
 ROOT = Path(__file__).resolve().parents[1]
 FIX = ROOT / "tests/fixtures/geo_small"
-FULL = ROOT / "data/interim/geo"
+FULL = ROOT / "datasets/extracted/geo"
 L = B.layers_module()
 
 SEG_TYPES = {

@@ -22,10 +22,10 @@ CLASSES_YAML = REPO_ROOT / "configs" / "classes.yaml"
 ALIASES_YAML = REPO_ROOT / "configs" / "model" / "class_aliases.yaml"
 DATASET_CFG = REPO_ROOT / "configs" / "model" / "india_pothole_seg.yaml"
 PROFILES_YAML = REPO_ROOT / "configs" / "model" / "train_profiles.yaml"
-RUNS_SEG = REPO_ROOT / "runs" / "seg"
+RUNS_SEG = REPO_ROOT / "models" / "training_runs" / "seg"
 REPORTS = REPO_ROOT / "reports"
-REGISTRY_DIR = REPO_ROOT / "weights" / "registry"
-DEFAULT_SEG_WEIGHTS = "runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt"  # D24: best trained model (RDD-India AP50 0.2494)
+REGISTRY_DIR = REPO_ROOT / "models" / "registry"
+DEFAULT_SEG_WEIGHTS = "models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt"  # D24: best trained model (RDD-India AP50 0.2494)
 
 
 def ultralytics_env() -> None:
@@ -149,7 +149,7 @@ def resolve_dataset_root(cfg_path: str | Path = DATASET_CFG, cfg: Optional[dict[
     """Resolve the dataset `path:` of an Ultralytics data yaml at runtime.
 
     Order: env ``GM_DATASET_DIR`` > absolute `path` > `path` relative to the yaml's own directory > `path` relative to
-    the repo root > ``data/datasets/<name>`` by the yaml's dataset name. The same config therefore works on the Windows
+    the repo root > ``datasets/<name>`` by the yaml's dataset name. The same config therefore works on the Windows
     laptop (C:/gunthameter) and on the Linux RTX 5080 box without editing.
     """
     cfg_path = Path(cfg_path).resolve()
@@ -165,7 +165,7 @@ def resolve_dataset_root(cfg_path: str | Path = DATASET_CFG, cfg: Optional[dict[
             cands.append(p)
         else:
             cands += [(cfg_path.parent / p), (REPO_ROOT / p)]
-    cands.append(REPO_ROOT / "data" / "datasets" / (Path(raw).name if raw else "india_pothole_seg4_v2"))
+    cands.append(REPO_ROOT / "datasets" / (Path(raw).name if raw else "earlier_india_pothole_v2"))
     for c in cands:
         c = c.resolve()
         if (c / str(cfg.get("train", "images/train"))).exists() or (c / "images").is_dir():
@@ -184,7 +184,7 @@ def check_names(names: Any) -> None:
     """Raise unless a data yaml's names are an ordered subset of the frozen configs/classes.yaml list.
 
     The full list is the system-wide vocabulary (edge protocol, server). A training dataset may keep only the classes
-    it has labels for (DECISIONS D15, ``data/derive_dataset.py``), renumbered 0..k-1 but in canonical order; models are
+    it has labels for (DECISIONS D15, ``dataset_tools/derive_dataset.py``), renumbered 0..k-1 but in canonical order; models are
     mapped back to canonical classes by name (``canonical_class``)."""
     got = names_tuple(names)
     canon = class_names()
@@ -217,8 +217,9 @@ def write_resolved_data_yaml(out_path: str | Path, cfg_path: str | Path = DATASE
     root = resolve_dataset_root(cfg_path, cfg)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    test = [x.as_posix() for x in split_dirs("test", cfg_path)]  # D43: test folders live in test_datasets/
     d = {"path": root.as_posix(), "train": cfg.get("train", "images/train"), "val": cfg.get("val", "images/val"),
-         "test": cfg.get("test", "images/test"), "nc": len(names),
+         "test": test[0] if len(test) == 1 else test, "nc": len(names),
          "names": {i: n for i, n in enumerate(names)}}
     if val_list is not None:
         txt = out_path.with_suffix(".val.txt")
@@ -229,12 +230,18 @@ def write_resolved_data_yaml(out_path: str | Path, cfg_path: str | Path = DATASE
     return out_path
 
 
-def split_images(split: str, cfg_path: str | Path = DATASET_CFG) -> list[Path]:
+def split_dirs(split: str, cfg_path: str | Path = DATASET_CFG) -> list[Path]:
+    """Image folders of a split. A split may be one folder or a list (D43: the test split is several folders under
+    test_datasets/); relative entries are relative to the dataset root, absolute ones are used as they are."""
     cfg = load_dataset_cfg(cfg_path)
     root = resolve_dataset_root(cfg_path, cfg)
-    d = root / str(cfg.get(split, f"images/{split}"))
+    val = cfg.get(split, f"images/{split}")
+    return [(root / str(v)).resolve() for v in (val if isinstance(val, list) else [val])]
+
+
+def split_images(split: str, cfg_path: str | Path = DATASET_CFG) -> list[Path]:
     exts = {".jpg", ".jpeg", ".png", ".bmp"}
-    return sorted(p for p in d.iterdir() if p.suffix.lower() in exts)
+    return sorted(p for d in split_dirs(split, cfg_path) for p in d.iterdir() if p.suffix.lower() in exts)
 
 
 def label_path_for(img: Path) -> Path:

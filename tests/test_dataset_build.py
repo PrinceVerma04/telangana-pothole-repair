@@ -1,8 +1,8 @@
-"""WP1: data/build_dataset.py end to end.
+"""WP1: dataset_tools/build_dataset.py end to end.
 
-* CPU tests build from a small *synthetic* interim tree (same layout as data/download.py writes), so they need no
+* CPU tests build from a small *synthetic* interim tree (same layout as dataset_tools/download.py writes), so they need no
   downloaded data.
-* ``@pytest.mark.data``: a --limit 20 build from the real data/interim/ into a tmp dir.
+* ``@pytest.mark.data``: a --limit 20 build from the real datasets/extracted/ into a tmp dir.
 * ``@pytest.mark.gpu``: real SAM2.1 masks on a few real frames.
 """
 
@@ -15,11 +15,11 @@ import cv2
 import numpy as np
 import pytest
 
-import data.build_dataset as bd
-from data.seg_geometry import parse_yolo_seg_line, polygon_area
+import dataset_tools.build_dataset as bd
+from dataset_tools.seg_geometry import parse_yolo_seg_line, polygon_area
 
 ROOT = Path(__file__).resolve().parents[1]
-REAL_INTERIM = ROOT / "data" / "interim"
+REAL_INTERIM = ROOT / "datasets" / "extracted"
 RDD_IDS = {"0": "D00", "1": "D10", "2": "D20", "3": "OTHER", "4": "D40"}
 
 
@@ -251,7 +251,7 @@ class _FakeMasker:
 
 
 def test_sam2_gate_and_cache_with_fake_masker(interim: Path, tmp_path: Path, monkeypatch):
-    import data.sam2_masks as sm
+    import dataset_tools.sam2_masks as sm
 
     monkeypatch.setattr(sm, "Sam2BoxMasker", _FakeMasker)
     _FakeMasker.calls = 0
@@ -372,22 +372,22 @@ def test_test_near_duplicates_are_dropped_from_train():
 
 
 def test_build_script_never_reads_data_raw():
-    src = (ROOT / "data" / "build_dataset.py").read_text() + (ROOT / "data" / "sam2_masks.py").read_text()
-    assert '"raw"' not in src and "data/raw" not in src.replace("nothing under data/raw/ is read", "")
+    src = (ROOT / "dataset_tools" / "build_dataset.py").read_text() + (ROOT / "dataset_tools" / "sam2_masks.py").read_text()
+    assert '"raw"' not in src and "datasets/downloads" not in src.replace("nothing under datasets/downloads/ is read", "")
 
 
 # ------------------------------------------------------------------------------------------------ real data
 @pytest.mark.data
 def test_real_interim_limit20_build(tmp_path: Path):
     if not (REAL_INTERIM / "rdd2022" / "meta.json").exists() or not (REAL_INTERIM / "eyantra" / "val").is_dir():
-        pytest.skip("data/interim not populated - run data/download.py --all")
+        pytest.skip("datasets/extracted not populated - run dataset_tools/download.py --all")
     out = tmp_path / "ds20"
     stats = bd.build(bd.parse_args(["--out", str(out), "--limit", "20"]))
     assert stats["ultralytics_check"]["ok"], stats["ultralytics_check"]
     assert stats["totals"]["pothole_instances"] > 0
     assert stats["splits"]["val"]["gt_mask_images"] > 0
     assert stats["splits"]["test"]["images"] > 0
-    assert not (ROOT / "data" / "splits" / "limit").exists()
+    assert not (ROOT / "datasets" / "splits" / "limit").exists()
 
 
 @pytest.mark.gpu
@@ -400,9 +400,9 @@ def test_real_sam2_masks_on_rdd_india(tmp_path: Path):
         pytest.skip("needs CUDA with >= 1.2 GB free (GPU is shared)")
     img_dir = REAL_INTERIM / "rdd2022" / "india" / "images"
     if not img_dir.is_dir():
-        pytest.skip("data/interim/rdd2022 missing")
-    from data.sam2_masks import BoxJob, Sam2BoxMasker, Sam2Cache
-    from data.seg_geometry import yolo_box_to_xyxy
+        pytest.skip("datasets/extracted/rdd2022 missing")
+    from dataset_tools.sam2_masks import BoxJob, Sam2BoxMasker, Sam2Cache
+    from dataset_tools.seg_geometry import yolo_box_to_xyxy
 
     jobs = []
     for lab in sorted((REAL_INTERIM / "rdd2022" / "india" / "labels").glob("*.txt")):

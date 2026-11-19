@@ -1,15 +1,20 @@
 # Ultralytics dataset yaml for training: the CURRENT training set (DECISIONS D15, D16). Paths are relative to `path`.
-# 4-class v2 dataset derived by data/derive_dataset.py from data/datasets/india_pothole_seg_v2 (data/build_dataset.py
+# 4-class v2 dataset derived by dataset_tools/derive_dataset.py from datasets/archive/india_pothole_v2_allclasses (dataset_tools/build_dataset.py
 # --include-bharat --include-webseg): RDD2022-India + RDD2022 foreign potholes + eYantra manholes + BharatPotHole
 # (CC BY-SA 4.0, split by drive) + human-drawn pothole polygons from the web (Apache-2.0). The RDD2022 negative pool
 # added 0 images: the sources already give 33 % pothole-free training frames (> --negatives-frac 0.2).
-# The RDD-India test images are identical to v1 (data/splits/rdd_india_test.lock.txt), so scores stay comparable.
+# The RDD-India test images are identical to v1 (datasets/splits/rdd_india_test.lock.txt), so scores stay comparable.
 # Names are an ordered subset of configs/classes.yaml (the system-wide vocabulary); models map back to it by name.
 # Previous set: configs/model/india_pothole_seg4_v1.yaml. Rebuild: make dataset && make derive-dataset.
-path: ../../data/datasets/india_pothole_seg4_v2
+path: ../../datasets/earlier_india_pothole_v2
 train: images/train
 val: images/val
-test: images/test
+# D43: the test split lives outside the training folder, in test_datasets/ (one folder per source), relative to `path`
+test:
+  - ../../test_datasets/rdd_india_locked/images
+  - ../../test_datasets/bharatpothole_dashcam/images
+  - ../../test_datasets/web_pothole_photos/images
+  - ../../test_datasets/eyantra_clean_roads/images
 names:
   0: pothole
   1: alligator_crack

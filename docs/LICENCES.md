@@ -6,7 +6,7 @@ procurement**, and every attribution must reach the shipped product. Status word
 only), **CAVEAT** (usable with an obligation or a decision), **PROTOTYPE ONLY** (not in a deployed build without a
 different licence), **UNVERIFIED** (licence not confirmed; excluded by default).
 
-This table records what the project used and the licence noted at download time (`data/download.py`,
+This table records what the project used and the licence noted at download time (`dataset_tools/download.py`,
 `docs/RESEARCH.md`). It is not legal advice; the department's legal cell confirms each row against the source page
 before the pilot.
 
@@ -26,12 +26,12 @@ before the pilot.
 ## 2. Models and weights
 | Model | Used for | Licence | Status |
 |---|---|---|---|
-| Ultralytics YOLO26 (`weights/yolo26n-seg.pt`, `yolo26s-seg.pt`, `yolo26m-seg.pt` = the D17 training base) and the `ultralytics` library | segmenter base, training, export | **AGPL-3.0** (Ultralytics offers an Enterprise licence) | **CAVEAT**: a networked service built on AGPL code must offer its source to users, or buy the Enterprise licence. Budget line in the pilot; the `Segmenter` interface (`ml/segmenter.py`) allows an Apache-licensed RF-DETR-Seg swap (D5) |
+| Ultralytics YOLO26 (`models/yolo_starting_points/yolo26n-seg.pt`, `yolo26s-seg.pt`, `yolo26m-seg.pt` = the D17 training base) and the `ultralytics` library | segmenter base, training, export | **AGPL-3.0** (Ultralytics offers an Enterprise licence) | **CAVEAT**: a networked service built on AGPL code must offer its source to users, or buy the Enterprise licence. Budget line in the pilot; the `Segmenter` interface (`ml/segmenter.py`) allows an Apache-licensed RF-DETR-Seg swap (D5) |
 | Bootstrap detector `bootstrap_pothole_yolo26m.pt` (from `mfranzon/pothole-yolo26`) | day-0 detector (D9) | **UNVERIFIED** model-card licence; YOLO26 base → AGPL obligations apply in any case | replace with our trained model before the pilot |
 | Bootstrap/verifier `bootstrap_pothole_yolov8s.pt` (`vinothvikas1987/pothole-detection-yolov8`) | second-model verifier (D5) | Apache-2.0 (model card); trained with Ultralytics YOLOv8 | **CAVEAT** (the AGPL question of the Ultralytics runtime, as above) |
 | Depth-Anything-V2 Metric Outdoor Base (`depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf`) | default depth backend (D4) | **verify on the model card**: DA-V2 metric checkpoints were noted as Apache-2.0 for the VKITTI-Large card, while the *relative* Base/Large checkpoints are CC-BY-NC-4.0 | **must be confirmed before the pilot**. If the Base metric card is NC, switch the default to DA3METRIC-LARGE (Apache-2.0) or Metric3D v2 (BSD-2-Clause); both are backends already (`measure/depth_backends/`) |
 | Depth Anything 3 `DA3METRIC-LARGE` | optional depth backend | Apache-2.0 | **OK** (avoid `DA3NESTED-GIANT-LARGE`: CC-BY-NC-4.0) |
-| `keremberke/yolov8s-pothole-segmentation` (Hugging Face, `weights/pretrained/`) | zero-shot baseline only (`make baselines`, D17) | **none stated** on the model card | **evaluation only**, never deployed or used as training init; scored 0.001 RDD-India AP50 |
+| `keremberke/yolov8s-pothole-segmentation` (Hugging Face, `models/downloaded_pretrained/`) | zero-shot baseline only (`make baselines`, D17) | **none stated** on the model card | **evaluation only**, never deployed or used as training init; scored 0.001 RDD-India AP50 |
 | Metric3D v2 (ONNX) | optional depth backend | BSD-2-Clause | **OK** |
 | SAM 2.1 hiera-small (`facebook/sam2.1-hiera-small`) | box → mask pseudo-labels (dataset build, pseudo-labelling) | Apache-2.0 | **OK** |
 | UniDepth, Apple Depth Pro | evaluated in research only | CC-BY-NC-4.0 / Apple research licence | **not used** (non-commercial) |

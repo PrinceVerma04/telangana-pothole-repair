@@ -1,4 +1,4 @@
-"""Object storage behind one interface (DECISIONS D3): ``FsStorage`` (demo, ``data/store/``) | ``S3Storage``.
+"""Object storage behind one interface (DECISIONS D3): ``FsStorage`` (demo, ``app_data/store/``) | ``S3Storage``.
 
     st = storage_from_settings(settings)
     st.put("frames/dev/trip/42.jpg", jpeg_bytes, "image/jpeg")

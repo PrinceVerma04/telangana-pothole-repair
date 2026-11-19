@@ -90,7 +90,7 @@ Pilot hardware total, indicative: 17 × ₹35–50k + 3 × ₹1.0–1.5 lakh ≈
 | Week | Work |
 |---|---|
 | −4 to −2 | Procurement, server set-up, depot Wi-Fi, SIMs; train the detector on the full dataset (RTX 5080-class GPU) |
-| −2 to 0 | Install + calibrate 20 buses; staged foam-board accuracy test (`scripts/staged_pothole_truth.py`) |
+| −2 to 0 | Install + calibrate 20 buses; staged foam-board accuracy test (`tools/staged_pothole_truth.py`) |
 | 0–2 | **Shadow mode:** buses detect and measure; engineers verify a sample; no work orders yet |
 | 2–12 | Live: work orders from the queue, SLA ladder, bus-verified repair, DLP watch; truth campaign (50–100 potholes per zone) |
 | 12 | Pilot report: detection precision/recall vs engineer audit, depth MAE / volume MAPE per range bin, time-to-repair, reopen rate, ₹ vs baseline |

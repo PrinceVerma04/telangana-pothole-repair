@@ -131,7 +131,7 @@ def pick_images(images_dir: Path, n: int, min_label_area: float = 0.004) -> list
 
 
 # pothole class id in each demo folder's YOLO labels: BharatPotHole 0 = pothole; the RDD2022 mirror uses
-# 4 = D40 (pothole), see data/interim/rdd2022/meta.json "class_ids" (verified visually).
+# 4 = D40 (pothole), see datasets/extracted/rdd2022/meta.json "class_ids" (verified visually).
 POTHOLE_CLASS = {"rdd2022": "4"}
 
 
@@ -275,7 +275,7 @@ def write_readme(out: Path, syn: Optional[dict[str, Any]], real: Optional[dict[s
     (out / "README.md").write_text("\n".join(L) + "\n", encoding="utf-8")
 
 
-def run_demo(out: str | Path = "reports/measure_demo", *, images_dir: str | Path = "data/interim/measure_demo_imgs",
+def run_demo(out: str | Path = "reports/measure_demo", *, images_dir: str | Path = "datasets/extracted/measure_demo_imgs",
              n_images: int = 5, weights: Optional[str] = None, trials: int = 200,
              skip_real: bool = False, skip_synthetic: bool = False) -> dict[str, Any]:
     from datetime import datetime, timezone

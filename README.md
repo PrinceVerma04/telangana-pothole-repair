@@ -15,14 +15,14 @@ Built for the Telangana R&B / Municipal Administration challenge; India-only dat
 ## The model and the data (D38)
 | What | Where | Notes |
 |---|---|---|
-| **Base model** (in use) | `weights/base/civic_yolo11n.pt` (+ `.onnx`, `_int8.tflite`) | the supplied Nagar Netra *civic_services* YOLO11n: 16 classes, **pothole = class 1**; boxes, outlines from SAM2 |
-| **Base dataset** (training) | `data/datasets/nagar_netra_pothole/` | the supplied pothole set (710 images), re-split **leak-free** by `make base-dataset` (597 / 57 / 56) |
+| **Base model** (in use) | `models/base_model/civic_yolo11n.pt` (+ `.onnx`, `_int8.tflite`) | the supplied Nagar Netra *civic_services* YOLO11n: 16 classes, **pothole = class 1**; boxes, outlines from SAM2 |
+| **Base dataset** (training) | `datasets/base_nagar_netra_pothole/` | the supplied pothole set (710 images), re-split **leak-free** by `make base-dataset` (597 / 57 / 56) |
 | **Test sets** | `configs/datasets.yaml` | Nagar Netra test · RDD-India locked 514 · BharatPotHole · web photos · eYantra roads without potholes (false alarms) · a real phone street walk |
 | **Model registry** | `configs/models.yaml` | base, adopted fine-tunes, archived models (earlier trained / downloaded) |
 | **Model in use** | `.env` `SEG_WEIGHTS` | changed only by `make train` when its candidate passes the benchmark rule, or by hand |
 
 ```bash
-make base-dataset   # build data/datasets/nagar_netra_pothole from "new dataset for pathole/..."
+make base-dataset   # build datasets/base_nagar_netra_pothole from "datasets/supplied_original/..."
 make benchmark      # every model on every test set -> reports/BENCHMARK.md (+ benchmark.json)
 make train          # fine-tune the base on the base dataset, benchmark, adopt ONLY if not worse on any test set
 make combined-dataset && make train DATA=combined EPOCHS=60   # D39: + the earlier train/val (test parts never used)
@@ -63,18 +63,23 @@ billing-grade. The simulated end-to-end demo (`make demo`, ~12 min, logins with 
 `zonal_khairatabad`, `engineer1`, `contractor1`, `contractor2`, `citizen1`) still works for presentations.
 
 ## Project layout
+Every folder name says what is in it (D43). Data and models are not in git; each data folder has a README.
+
 | Path | What |
 |---|---|
+| `datasets/` | **all training data**: `base_nagar_netra_pothole/` (the base dataset, train + val), `finetune_*` (fine-tuning sets built from it), `earlier_india_pothole_v2/` (earlier train + val), `archive/` (v1 and all-class builds), `supplied_original/` (the dataset as delivered), `downloads/` (raw downloads, untrusted), `extracted/` (unpacked downloads, OSM/GTFS road data), `splits/` (split lists, in git), `labelling/` (review and annotation decisions) |
+| `test_datasets/` | **all test data, never trained on**: `nagar_netra_test/`, `rdd_india_locked/`, `bharatpothole_dashcam/`, `web_pothole_photos/`, `eyantra_clean_roads/`, `phone_street_20261118/`, `phone_videos/`, `video_compare/`, `staged_measurement_truth/` |
+| `models/` | `base_model/` (the model in use), `adopted_finetunes/`, `downloaded_pretrained/` (archive), `supplied_original/` (as delivered), `yolo_starting_points/` (COCO YOLO26-seg), `training_runs/` (`detect/` fine-tunes, `seg/` archive, `logs/`), `exported/`, `registry/` |
+| `app_data/` | what the running app writes: `gunthameter.db`, `store/` (frames), `capture/` (phone drives), `playground/` (model test uploads), `demo/`, `fleet_sim/`, `backups/`, `tiles/` |
+| `dataset_tools/` | code that builds datasets: `build_base_dataset.py`, `build_combined_dataset.py`, `test_split.py` (moves test splits to `test_datasets/`), archive builders (`download.py`, `build_dataset.py`, `derive_dataset.py`, SAM2 outlines) |
+| `tools/` | web tools and scripts: phone capture (`phone_capture.py`, `capture_worker.py`, `capture_replay.py`), model test page, annotation, dataset review, project control, training dashboard, demo, reports |
 | `ml/` | `benchmark.py` (all models × all test sets), `train_det.py` (fine-tune + adoption rule), detector interface (`segmenter.py`), metrics; archive: the YOLO26-seg pipeline (`pipeline.py`, `train_seg.py`, `eval.py`, `export.py`) |
-| `data/` | `build_base_dataset.py`; archive builders (`build_dataset.py`, `derive_dataset.py`); data: `datasets/` (base + test-set sources), `testsets/` (phone walk), `capture/` (phone drives), `raw/` (downloads, untrusted), `interim/`, `splits/` |
-| `scripts/` | phone capture (`phone_capture.py`, `capture_worker.py`, `capture_replay.py`, `capture_dashboard.html`), model test page, dataset review, project control, training dashboard, demo, reports |
-| `measure/`, `repair/`, `priority/`, `geo/` | size measurement (ground plane), IRC severity, repair planner, priority, map-matching, clustering |
+| `measure/`, `repair/`, `priority/`, `geo/`, `gis/` | size measurement (ground plane), IRC severity; repair planner; priority score; map-matching and clustering; map layers and tiles |
 | `server/`, `web/`, `edge/` | FastAPI app and pipeline stages; React PWA; bus protocol, simulator, Android / Jetson skeletons |
 | `configs/` | `datasets.yaml`, `models.yaml`, `roadmap.yaml`, frozen contracts (classes, IRC rules, priority, rate card, cameras) |
-| `weights/` | `base/` (the base model), `candidates/` (adopted fine-tunes), `pretrained/` (downloaded models, archive) |
-| `runs/`, `reports/` | `runs/detect/` (fine-tunes), `runs/seg/` (archive); benchmark, training and demo reports |
+| `reports/`, `docs/`, `tests/` | benchmark, training and demo reports; design, decisions, handoff; tests (`make test`) |
 
 ## Archive
 The earlier YOLO26 segmentation pipeline (D15–D24) is kept and runnable under `make seg-*` targets; its datasets
-(`data/datasets/india_pothole_seg4_v2`) are now the source of the RDD-India, BharatPotHole, web and eYantra test sets.
+(`datasets/earlier_india_pothole_v2`) are now the source of the RDD-India, BharatPotHole, web and eYantra test sets.
 Earlier trained and downloaded models are listed in `configs/models.yaml` with role `archive`. Nothing was deleted.

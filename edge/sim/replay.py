@@ -1,6 +1,6 @@
 """Virtual bus: replay labelled dataset frames along a real TGSRTC GTFS route against the API (PLAN WP7).
 
-    python edge/sim/replay.py --frames data/datasets/india_pothole_seg/images/val --route 10H \
+    python edge/sim/replay.py --frames datasets/archive/india_pothole_v1_allclasses/images/val --route 10H \
         --device sim-bus-01 --api http://localhost:8000 --gps-sigma 7 --passes 3 --use-labels \
         --fps-equiv 30 --speed-kmh 35
 
@@ -37,7 +37,7 @@ from edge.sim.route import DEFAULT_GTFS, load_route  # noqa: E402
 from edge.sim.scene import place_potholes  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_FRAMES = PROJECT_ROOT / "data" / "datasets" / "india_pothole_seg" / "images" / "val"
+DEFAULT_FRAMES = PROJECT_ROOT / "datasets" / "archive" / "india_pothole_v1_allclasses" / "images" / "val"
 POTHOLE_EVERY_M = 350.0
 
 

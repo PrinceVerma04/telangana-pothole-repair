@@ -9,10 +9,10 @@
 Stages (``--stages`` takes a comma list; the default runs them in this order):
   check     Python 3.11 venv; torch can run kernels on this GPU (the RTX 5080 is sm_120: cu128 wheel); GPU memory free
             right now; RAM for the image cache; the training dataset; and that its RDD-India test images equal
-            ``data/splits/rdd_india_test.lock.txt`` (the 514 images behind every earlier score).
-  data      Builds the v2 dataset only when it is missing (``--rebuild`` forces): data/download.py --all ->
-            data/build_dataset.py (BharatPotHole split by drive, human-drawn web masks, SAM2.1 outlines, test
-            near-duplicate guard) -> data/derive_dataset.py (4 classes) -> test-lock check.
+            ``datasets/splits/rdd_india_test.lock.txt`` (the 514 images behind every earlier score).
+  data      Builds the v2 dataset only when it is missing (``--rebuild`` forces): dataset_tools/download.py --all ->
+            dataset_tools/build_dataset.py (BharatPotHole split by drive, human-drawn web masks, SAM2.1 outlines, test
+            near-duplicate guard) -> dataset_tools/derive_dataset.py (4 classes) -> test-lock check.
   baseline  Zero-shot scores of pothole models that are already trained (the laptop model, the bootstrap detector and
             a pothole-segmentation model from Hugging Face) on the same test split. Reference only: they show whether
             a ready-made model would beat training our own. Downloaded checkpoints are pickles, so their imports are
@@ -22,7 +22,7 @@ Stages (``--stages`` takes a comma list; the default runs them in this order):
             nvidia-smi is sampled every 2 s and GPU memory and utilisation are reported at the end.
   eval      ml.eval on ``best_pothole.pt`` at the training image size -> reports/model_eval.json.
   export    ONNX export + signed model-registry entry (ml.export).
-  report    scripts/make_report.py -> reports/REPORT.md, then a one-screen summary against the 0.221 laptop model.
+  report    tools/make_report.py -> reports/REPORT.md, then a one-screen summary against the 0.221 laptop model.
   prune-v1  (only when asked) deletes the v1 datasets and the laptop run, once a v2 model has a better RDD-India
             pothole AP50 and .env no longer points at the laptop weights (user approval 2026-11-16, DECISIONS D18).
 
@@ -54,17 +54,17 @@ DEFAULT_NAME = "y26m_seg_india_v2"
 DEFAULT_PROFILE = "rtx5080_gpu95"
 EXIT_OOM = 3  # = ml.train_seg.EXIT_OOM (kept here so the pipeline does not import torch to start)
 OOM_STEP = 0.90  # batch multiplier after an out-of-memory restart
-TEST_LOCK = REPO_ROOT / "data" / "splits" / "rdd_india_test.lock.txt"
+TEST_LOCK = REPO_ROOT / "datasets" / "splits" / "rdd_india_test.lock.txt"
 LAPTOP_RUN = "y26n_seg_india_laptop"
 LAPTOP_AP50 = 0.2207  # reports/model_eval.json, trained_y26n_seg_india_laptop, RDD-India subset (2026-11-15)
-BUILD_CMD = ["data/build_dataset.py", "--out", "data/datasets/india_pothole_seg_v2", "--splits-dir", "data/splits/v2",
+BUILD_CMD = ["dataset_tools/build_dataset.py", "--out", "datasets/archive/india_pothole_v2_allclasses", "--splits-dir", "datasets/splits/v2",
              "--sam2", "--sam2-max-gpu-gb", "10", "--negatives-frac", "0.2", "--include-bharat", "--include-webseg"]
-DERIVE_CMD = ["data/derive_dataset.py", "--src", "data/datasets/india_pothole_seg_v2",
-              "--out", "data/datasets/india_pothole_seg4_v2", "--overwrite"]
+DERIVE_CMD = ["dataset_tools/derive_dataset.py", "--src", "datasets/archive/india_pothole_v2_allclasses",
+              "--out", "datasets/earlier_india_pothole_v2", "--overwrite"]
 # Pothole models already trained by others (Hugging Face). Evaluated only; licence terms in docs/LICENCES.md.
 WEB_MODELS = [
     {"stage": "baseline_web_keremberke_yolov8s_seg", "repo": "keremberke/yolov8s-pothole-segmentation",
-     "file": "best.pt", "local": "weights/pretrained/keremberke_yolov8s_pothole_seg.pt",
+     "file": "best.pt", "local": "models/downloaded_pretrained/keremberke_yolov8s_pothole_seg.pt",
      "note": "YOLOv8s-seg fine-tuned on a <1k-image Roboflow pothole set (2023); no licence stated: evaluation only"},
 ]
 # D24 (2026-11-17): the bootstrap and laptop weights were deleted; their scores stay in reports/model_eval.json
@@ -279,7 +279,7 @@ def stage_data(a: argparse.Namespace) -> dict[str, Any]:
     if exists and not a.rebuild:
         say(f"using the existing dataset {rel(root)} (--rebuild to build it again)")
     else:
-        run(["data/download.py", "--all"])
+        run(["dataset_tools/download.py", "--all"])
         run(BUILD_CMD)
         run(DERIVE_CMD)
     lock = check_test_lock()
@@ -567,14 +567,14 @@ def stage_export(a: argparse.Namespace) -> dict[str, Any]:
 
 def stage_report(a: argparse.Namespace) -> dict[str, Any]:
     banner("report: reports/REPORT.md")
-    run(["scripts/make_report.py"])
+    run(["tools/make_report.py"])
     return {"report": "reports/REPORT.md"}
 
 
 # =============================================================================================== prune v1
-V1_PATHS = ["data/datasets/india_pothole_seg", "data/datasets/india_pothole_seg4", f"runs/seg/{LAPTOP_RUN}",
-            "data/splits/india_pothole_seg.json", "data/splits/train.txt", "data/splits/val.txt",
-            "data/splits/test.txt"]
+V1_PATHS = ["datasets/archive/india_pothole_v1_allclasses", "datasets/archive/india_pothole_v1", f"models/training_runs/seg/{LAPTOP_RUN}",
+            "datasets/splits/india_pothole_seg.json", "datasets/splits/train.txt", "datasets/splits/val.txt",
+            "datasets/splits/test.txt"]
 
 
 def best_v2_ap50() -> tuple[Optional[str], Optional[float]]:
@@ -598,7 +598,7 @@ def stage_prune_v1(a: argparse.Namespace) -> dict[str, Any]:
         raise SystemExit(f"not pruning: best v2 RDD-India pothole AP50 is {ap} ({stage}); it must beat {LAPTOP_AP50}")
     env = REPO_ROOT / ".env"
     if env.exists() and LAPTOP_RUN in env.read_text(encoding="utf-8"):
-        raise SystemExit(f"not pruning: .env still points at runs/seg/{LAPTOP_RUN}; set SEG_WEIGHTS to the new model "
+        raise SystemExit(f"not pruning: .env still points at models/training_runs/seg/{LAPTOP_RUN}; set SEG_WEIGHTS to the new model "
                          "first (and check the verifier gate, DECISIONS D17)")
     removed = []
     for p in V1_PATHS:
@@ -630,7 +630,7 @@ def summary(results: dict[str, Any], a: argparse.Namespace) -> None:
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--stages", default=",".join(STAGES), help=f"comma list from {STAGES + ('prune-v1',)}")
-    ap.add_argument("--name", default=DEFAULT_NAME, help="run name -> runs/seg/<name>")
+    ap.add_argument("--name", default=DEFAULT_NAME, help="run name -> models/training_runs/seg/<name>")
     ap.add_argument("--profile", default=DEFAULT_PROFILE)
     ap.add_argument("--gpu-mem", type=float, default=0.95, help="share of free GPU memory for the batch (AutoBatch)")
     ap.add_argument("--batch", type=int, default=None, help="fixed batch instead of the GPU-memory share")

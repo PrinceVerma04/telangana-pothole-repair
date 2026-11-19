@@ -1,4 +1,4 @@
-"""scripts/train_dashboard.py: run discovery, status logic, results/log parsing. No server, no GPU."""
+"""tools/train_dashboard.py: run discovery, status logic, results/log parsing. No server, no GPU."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-_spec = importlib.util.spec_from_file_location("train_dashboard", ROOT / "scripts" / "train_dashboard.py")
+_spec = importlib.util.spec_from_file_location("train_dashboard", ROOT / "tools" / "train_dashboard.py")
 td = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(td)
 

@@ -82,7 +82,7 @@ Units everywhere: depth mm, area m², volume litres, lengths m, money INR; times
 
 | # | Model | Used at | What it does | Status today |
 |---|---|---|---|---|
-| **1** | **Since D38: the base model `weights/base/civic_yolo11n.pt`** (user-supplied Nagar Netra civic_services YOLO11n, pothole = class 1) + SAM2 outline from its box; fine-tunes via `make train`, scores in `reports/BENCHMARK.md`. Before: D35 pretrained YOLOv8m, earlier **YOLO26m-seg, fine-tuned on Indian roads** (`runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt`, Ultralytics 8.4.211) | Server detection, the model test page, and the starting point for the bus model | Finds potholes and draws their outline (mask). Classes: pothole, alligator crack, crack, manhole (only potholes are measured) | Trained 2026-11-17: 80 epochs, 640 px, AdamW, camera height / angle augmentation. **RDD-India pothole AP50 0.2494** (target 0.70, not met yet). Set as `SEG_WEIGHTS` in `.env` |
+| **1** | **Since D38: the base model `models/base_model/civic_yolo11n.pt`** (user-supplied Nagar Netra civic_services YOLO11n, pothole = class 1) + SAM2 outline from its box; fine-tunes via `make train`, scores in `reports/BENCHMARK.md`. Before: D35 pretrained YOLOv8m, earlier **YOLO26m-seg, fine-tuned on Indian roads** (`models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt`, Ultralytics 8.4.211) | Server detection, the model test page, and the starting point for the bus model | Finds potholes and draws their outline (mask). Classes: pothole, alligator crack, crack, manhole (only potholes are measured) | Trained 2026-11-17: 80 epochs, 640 px, AdamW, camera height / angle augmentation. **RDD-India pothole AP50 0.2494** (target 0.70, not met yet). Set as `SEG_WEIGHTS` in `.env` |
 | 1-edge | **YOLO26n-seg** (the small version), exported to LiteRT (Android) or TensorRT (Jetson) | On the bus | Same job, small enough for a ₹10–12k phone | Planned: train from the same data, then export. Android app is a skeleton |
 | **2** | **Depth Anything V2 Metric Outdoor Base** (`depth-anything/Depth-Anything-V2-Metric-Outdoor-Base-hf`) | Server, step 7 | Distance of every pixel in metres from one photo. The road-plane fit and the known camera height correct its scale | **Off since 2026-11-18 (D27, `DEPTH_BACKEND=off`)**: severity comes from the width instead. Code kept; options: `da3_metric` (DA3 METRIC-LARGE), `metric3d_onnx` for Jetson, `stereo_sgbm` for stereo vans |
 | **3** | **Verifier: RF-DETR-Seg-Small** (second, different detector) | Server, step 6 | Double-checks each detection; weak ones it does not confirm are dropped | **Off** (`VERIFIER=off`): the trained verifier scored 0.004 and was deleted. Turn on only with a model that scores well |
@@ -92,7 +92,7 @@ Units everywhere: depth mm, area m², volume litres, lengths m, money INR; times
 Non-AI methods that matter as much as the models: RANSAC road plane + local quadratic fit, scale lock to the
 tape-measured camera height, σ propagation, inverse-variance fusion, IMU jolt check, OSM map-matching.
 
-### Model 1 training data (`data/datasets/india_pothole_seg4_v2`)
+### Model 1 training data (`datasets/earlier_india_pothole_v2`)
 8,911 train / 1,722 val / 1,843 test images; 14,564 training potholes, 70 % on Indian roads (RDD2022 India,
 BharatPotHole, eYantra, human-drawn masks). The 514 RDD-India test images are locked, so every model is scored on the
 same images. Next accuracy gain comes from data, not more epochs: review the dataset (`make review`) and add real
@@ -142,5 +142,5 @@ always a range, never an exact count.
 | Bus app | Simulator works (`edge/sim`); Android and Jetson apps are skeletons |
 | Database | SQLite for the demo; PostGIS for production is designed, not run |
 
-Model weights are **not in git** (`runs/` and `weights/*.pt` are ignored). After cloning, retrain with `make retrain`
-or copy `best_pothole.pt` into `runs/seg/y26m_seg_india_v2ft_geo/weights/`.
+Model weights are **not in git** (`models/` is ignored, D43). After cloning, retrain with `make retrain`
+or copy `best_pothole.pt` into `models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/`.

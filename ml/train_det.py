@@ -6,14 +6,14 @@
     make train DATA=combined SMOKE=1         # ~3 min trial: 1 epoch on 10 % of the data, nothing adopted
     .venv/bin/python -m ml.train_det --name det_try --data combined --epochs 60 [--no-adopt]
 
-1. Train: start from weights/base/civic_yolo11n.pt (YOLO11n, 16 Nagar Netra classes, pothole = 1) on
-   data/datasets/nagar_netra_pothole (leak-free split). Same head, so nothing is re-initialised. AdamW, low learning
+1. Train: start from models/base_model/civic_yolo11n.pt (YOLO11n, 16 Nagar Netra classes, pothole = 1) on
+   datasets/base_nagar_netra_pothole (leak-free split). Same head, so nothing is re-initialised. AdamW, low learning
    rate (fine-tune), cosine schedule, batch sized by AutoBatch to `--gpu-frac` of the free GPU memory (D17; the
-   display keeps the rest, D20). Output in runs/detect/<name>/ with the live files the training dashboard reads
+   display keeps the rest, D20). Output in models/training_runs/detect/<name>/ with the live files the training dashboard reads
    (gm_live.json, results.csv).
 2. Benchmark: the candidate and the base model on every test set of configs/datasets.yaml (ml.benchmark).
 3. Adopt only if it is not worse than the reference (the model in use) on ANY test set, and better on the mean box
-   AP50 (ml.benchmark.no_test_worse). Then the weights are copied to weights/candidates/<name>.pt, .env SEG_WEIGHTS
+   AP50 (ml.benchmark.no_test_worse). Then the weights are copied to models/adopted_finetunes/<name>.pt, .env SEG_WEIGHTS
    points to them and configs/models.yaml lists them; otherwise nothing changes. reports/train_<name>.json records why.
 
 On-the-fly augmentation (D40), applied to every training image as it is loaded (labels follow; nothing is written to
@@ -27,7 +27,7 @@ quarter of the CPU threads, PyTorch CPU threads at 4, images are not cached in R
 training GPU 3 GiB of GPU memory stay free for the desktop (D20 display reserve, ml.train_seg.apply_display_reserve).
 
 Note: the base dataset holds only potholes, so a fine-tuned copy forgets the other 15 civic classes. RoadFix only
-uses the pothole class; the user's original multi-class model stays untouched in weights/base/.
+uses the pothole class; the user's original multi-class model stays untouched in models/base_model/.
 """
 
 from __future__ import annotations
@@ -44,9 +44,9 @@ from typing import Any, Optional
 from ml import benchmark as B
 
 REPO = Path(__file__).resolve().parents[1]
-BASE_WEIGHTS = REPO / "weights" / "base" / "civic_yolo11n.pt"
-RUNS = REPO / "runs" / "detect"
-CANDIDATES = REPO / "weights" / "candidates"
+BASE_WEIGHTS = REPO / "models" / "base_model" / "civic_yolo11n.pt"
+RUNS = REPO / "models" / "training_runs" / "detect"
+CANDIDATES = REPO / "models" / "adopted_finetunes"
 ENV = REPO / ".env"
 
 
@@ -164,7 +164,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--gpu-frac", type=float, default=0.8, help="AutoBatch share of free GPU memory")
     ap.add_argument("--base", type=Path, default=BASE_WEIGHTS)
     ap.add_argument("--no-adopt", action="store_true", help="benchmark only, never switch the model in use")
-    ap.add_argument("--skip-train", action="store_true", help="benchmark an existing runs/detect/<name>")
+    ap.add_argument("--skip-train", action="store_true", help="benchmark an existing models/training_runs/detect/<name>")
     a = ap.parse_args(argv)
     if not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", a.name):
         raise SystemExit("bad --name")

@@ -1,7 +1,7 @@
 """Run the real RoadFix API for a simulator run, with a synthetic depth source that keeps it in budget.
 
-    python edge/sim/sim_server.py --db data/tmp_wp7/fleet.db --copy-from data/gunthameter.db \
-        --store data/tmp_wp7/store --port 8002
+    python edge/sim/sim_server.py --db app_data/fleet_sim/fleet.db --copy-from app_data/gunthameter.db \
+        --store app_data/fleet_sim/store --port 8002
 
 This is ``server.app.main.create_app`` (DEMO_MODE, inline WP6 pipeline, WP8b ops) with one override: the depth
 of every frame comes from ``measure.synthetic.render`` instead of DA-V2 (5-20 s per frame on this laptop's CPU,
@@ -124,7 +124,7 @@ def build_app(db_path: Path, store: Path, port: int, depth: str = "roadrender", 
 
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--db", type=Path, default=PROJECT_ROOT / "data" / "tmp_wp7" / "fleet.db")
+    ap.add_argument("--db", type=Path, default=PROJECT_ROOT / "app_data" / "fleet_sim" / "fleet.db")
     ap.add_argument("--copy-from", type=Path, default=None, help="copy this SQLite DB to --db first")
     ap.add_argument("--fresh", action="store_true", help="overwrite --db with --copy-from even if it exists")
     ap.add_argument("--store", type=Path, default=None, help="storage root (default: <db dir>/store)")

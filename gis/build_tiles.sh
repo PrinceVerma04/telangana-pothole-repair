@@ -4,7 +4,7 @@
 # The web app uses the online OpenFreeMap "liberty" style by default
 # (https://tiles.openfreemap.org/styles/liberty) and overlays our own GeoJSON/MVT layers
 # (road segments, potholes, gis/layers/*). This script only matters for an OFFLINE demo:
-# it cuts a Protomaps PMTiles basemap for the Hyderabad bbox into data/tiles/hyd.pmtiles,
+# it cuts a Protomaps PMTiles basemap for the Hyderabad bbox into app_data/tiles/hyd.pmtiles,
 # which the PWA serves as /tiles/hyd.pmtiles (PLAN WP9/WP10, acceptance: file < 400 MB).
 #
 # Requirements: the `pmtiles` CLI (go-pmtiles, single static binary, no sudo):
@@ -26,7 +26,7 @@ BBOX="${BBOX:-78.1,17.1,78.8,17.7}"
 MAXZOOM="${MAXZOOM:-15}"
 BUILD_DATE="${BUILD_DATE:-20261101}"   # daily builds: https://maps.protomaps.com/builds/
 SOURCE="${SOURCE:-https://build.protomaps.com/${BUILD_DATE}.pmtiles}"
-OUT="${OUT:-$ROOT/data/tiles/hyd.pmtiles}"
+OUT="${OUT:-$ROOT/app_data/tiles/hyd.pmtiles}"
 PMTILES_BIN="${PMTILES_BIN:-$(command -v pmtiles || true)}"
 
 if [[ -z "$PMTILES_BIN" || ! -x "$PMTILES_BIN" ]]; then

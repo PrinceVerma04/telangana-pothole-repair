@@ -12,15 +12,15 @@ import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tools"))
 
-from data import build_base_dataset as bb  # noqa: E402
+from dataset_tools import build_base_dataset as bb  # noqa: E402
 from ml import benchmark as B  # noqa: E402
 from ml import train_det as T  # noqa: E402
 
 
 def _load(name: str):
-    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / f"{name}.py")
+    spec = importlib.util.spec_from_file_location(name, ROOT / "tools" / f"{name}.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -116,8 +116,8 @@ def test_repo_registries_are_consistent():
 def test_env_and_registry_updates(tmp_path: Path):
     env = tmp_path / ".env"
     env.write_text("A=1\nSEG_WEIGHTS=old.pt   # old\nB=2\n")
-    T.set_env_weights("weights/candidates/x.pt", "adopted", env)
-    assert "SEG_WEIGHTS=weights/candidates/x.pt   # adopted" in env.read_text() and "A=1" in env.read_text()
+    T.set_env_weights("models/adopted_finetunes/x.pt", "adopted", env)
+    assert "SEG_WEIGHTS=models/adopted_finetunes/x.pt   # adopted" in env.read_text() and "A=1" in env.read_text()
     models = tmp_path / "models.yaml"
     models.write_text("models:\n  - id: base\n    path: b.pt\n    role: base\n")
     for _ in range(2):  # idempotent
@@ -138,13 +138,13 @@ def test_review_reads_box_labels_and_list_names(tmp_path: Path):
     assert idx["AN_x"]["classes"] == {"pothole": 1} and idx["AN_x"]["source"] == "AN"
     (poly,) = dr.read_polygons("AN_x", idx["AN_x"], ds)
     assert poly["cls"] == "pothole" and poly["pts"] == pytest.approx([0.4, 0.3, 0.6, 0.3, 0.6, 0.7, 0.4, 0.7])
-    assert dr.db_path_for(ds).name == "review_ds.sqlite" and dr.db_path_for(Path("india_pothole_seg4_v2")).name == \
+    assert dr.db_path_for(ds).name == "review_ds.sqlite" and dr.db_path_for(Path("earlier_india_pothole_v2")).name == \
         "review.sqlite"
 
 
 def test_control_bench_check(tmp_path: Path):
     pc = _load("project_control")
-    (tmp_path / ".env").write_text("SEG_WEIGHTS=weights/base/m.pt   # x\n")
+    (tmp_path / ".env").write_text("SEG_WEIGHTS=models/base_model/m.pt   # x\n")
     (tmp_path / "reports").mkdir()
     (tmp_path / "reports" / "benchmark.json").write_text(json.dumps({"models": [
         {"path": "/abs/weights/base/m.pt", "results": {"base_test": {"ap50": 0.47}, "neg": {"false_alarm_rate": 0.02}}}]}))
@@ -158,7 +158,7 @@ def test_control_bench_check(tmp_path: Path):
 
 # ------------------------------------------------------------------------------------------------ D39 combined set
 def test_combined_set_keeps_tests_out_and_maps_classes(tmp_path: Path):
-    from data import build_combined_dataset as bc
+    from dataset_tools import build_combined_dataset as bc
 
     base, v2, phone = tmp_path / "base", tmp_path / "v2", tmp_path / "phone"
     def add(root, split, name, img, label):
@@ -175,7 +175,8 @@ def test_combined_set_keeps_tests_out_and_maps_classes(tmp_path: Path):
     add(v2, "val", "bh_9", _img(6), "")
     add(v2, "test", "rddin_7", _img(7), "0 0.5 0.5 0.1 0.1\n")
     phone.mkdir()
-    s = bc.build(tmp_path / "out", base_repeat=3, earlier_val=1, base=base, v2=v2, phone=phone)
+    s = bc.build(tmp_path / "out", base_repeat=3, earlier_val=1, base=base, v2=v2, phone=phone,
+                 test_root=tmp_path / "no_test_datasets")
     out = tmp_path / "out"
     names = sorted(p.name for p in (out / "images" / "train").iterdir())
     assert names == ["nn_b0.png", "nnr1_b0.png", "nnr2_b0.png", "v2_bh_1.png", "v2_ey_3.png"]

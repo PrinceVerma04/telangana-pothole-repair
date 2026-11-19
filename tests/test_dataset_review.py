@@ -1,4 +1,4 @@
-"""scripts/dataset_review.py workflow (D22): split work, second look, locked test, exports; derive --exclude."""
+"""tools/dataset_review.py workflow (D22): split work, second look, locked test, exports; derive --exclude."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-_spec = importlib.util.spec_from_file_location("dataset_review", ROOT / "scripts" / "dataset_review.py")
+_spec = importlib.util.spec_from_file_location("dataset_review", ROOT / "tools" / "dataset_review.py")
 dr = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(dr)
 
@@ -77,7 +77,7 @@ def test_session_cookie_is_signed():
 
 
 def test_derive_exclusion_never_touches_test(tmp_path):
-    from data.derive_dataset import Img, apply_exclusions, read_stem_list
+    from dataset_tools.derive_dataset import Img, apply_exclusions, read_stem_list
 
     f = tmp_path / "rej.txt"
     f.write_text("# header\nbh_1  # bad_mask\nrddin_9.jpg\nmissing_x\n")

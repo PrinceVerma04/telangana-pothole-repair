@@ -1,4 +1,4 @@
-"""WP1: data/download.py - safe, idempotent unpacking of untrusted archives (synthetic zips, no network)."""
+"""WP1: dataset_tools/download.py - safe, idempotent unpacking of untrusted archives (synthetic zips, no network)."""
 
 from __future__ import annotations
 
@@ -10,14 +10,14 @@ import cv2
 import numpy as np
 import pytest
 
-import data.download as dl
+import dataset_tools.download as dl
 
 
 @pytest.fixture()
 def sandbox(tmp_path: Path, monkeypatch) -> Path:
     monkeypatch.setattr(dl, "ROOT", tmp_path)
-    monkeypatch.setattr(dl, "RAW", tmp_path / "data" / "raw")
-    monkeypatch.setattr(dl, "INTERIM", tmp_path / "data" / "interim")
+    monkeypatch.setattr(dl, "RAW", tmp_path / "datasets" / "downloads")
+    monkeypatch.setattr(dl, "INTERIM", tmp_path / "datasets" / "extracted")
     return tmp_path
 
 
@@ -50,7 +50,7 @@ def test_read_member_size_cap(tmp_path: Path, monkeypatch):
 
 
 def test_extract_bharat_safe_and_idempotent(sandbox: Path):
-    raw = sandbox / "data" / "raw" / "bharatpothole" / "bharatpothole.zip"
+    raw = sandbox / "datasets" / "downloads" / "bharatpothole" / "bharatpothole.zip"
     raw.parent.mkdir(parents=True)
     pre = "BharatPotHole/BharatPotHole/"
     with zipfile.ZipFile(raw, "w") as zf:
@@ -62,13 +62,13 @@ def test_extract_bharat_safe_and_idempotent(sandbox: Path):
         zf.writestr(pre + "train/images/run.sh", b"rm -rf /")  # non-whitelisted extension
     src = dl.Source("bharatpothole", raw, 10)
     info = dl.extract_bharat(src, force=False)
-    out = sandbox / "data" / "interim" / "bharatpothole"
+    out = sandbox / "datasets" / "extracted" / "bharatpothole"
     assert (out / "train" / "images" / "a_b.jpg").exists() and (out / "train" / "labels" / "a_b.txt").exists()
     assert info["claimed_by_bundled_data_yaml"] == "CC BY 4.0"
     assert info["licence_status"] == "VERIFIED" and info["licence"] == "CC BY-SA 4.0"  # Kaggle metadata, D16
     files = {p.relative_to(sandbox).as_posix() for p in sandbox.rglob("*") if p.is_file()}
     assert not any(f.endswith((".cache", ".sh")) or "evil" in f for f in files), files
-    assert all(f.startswith(("data/raw/", "data/interim/bharatpothole/")) for f in files)
+    assert all(f.startswith(("datasets/downloads/", "datasets/extracted/bharatpothole/")) for f in files)
     # second run is a no-op (marker matches)
     (out / "train" / "images" / "a_b.jpg").unlink()
     dl.extract_bharat(src, force=False)
@@ -78,7 +78,7 @@ def test_extract_bharat_safe_and_idempotent(sandbox: Path):
 
 
 def test_extract_webseg_safe_and_idempotent(sandbox: Path):
-    raw = sandbox / "data" / "raw" / "pothole_seg_web" / "w.zip"
+    raw = sandbox / "datasets" / "downloads" / "pothole_seg_web" / "w.zip"
     raw.parent.mkdir(parents=True)
     pre = "Pothole_Segmentation_YOLOv8/"
     with zipfile.ZipFile(raw, "w") as zf:
@@ -91,7 +91,7 @@ def test_extract_webseg_safe_and_idempotent(sandbox: Path):
         zf.writestr(pre + "train/images/../../../evil.jpg", _jpg())  # traversal: never matches
     src = dl.Source("pothole_seg_web", raw, 10)
     info = dl.extract_webseg(src, force=False)
-    out = sandbox / "data" / "interim" / "pothole_seg_web"
+    out = sandbox / "datasets" / "extracted" / "pothole_seg_web"
     assert (out / "train" / "images" / "p_1.jpg").exists() and (out / "valid" / "labels" / "v.txt").exists()
     assert info["counts"] == {"train/images": 1, "train/labels": 1, "valid/images": 1, "valid/labels": 1}
     assert info["roboflow_origin_licence"] == "CC BY 4.0" and "Apache-2.0" in info["licence"]
@@ -104,7 +104,7 @@ def test_extract_webseg_safe_and_idempotent(sandbox: Path):
 
 def test_main_accepts_deleted_raw_when_extracted(sandbox: Path):
     """D18: the big raw archives were deleted after extraction; a complete extracted copy counts as OK."""
-    done = sandbox / "data" / "interim" / "eyantra" / ".done.json"
+    done = sandbox / "datasets" / "extracted" / "eyantra" / ".done.json"
     done.parent.mkdir(parents=True)
     done.write_text("{}")
     assert dl.main(["--eyantra"]) == 0
@@ -112,7 +112,7 @@ def test_main_accepts_deleted_raw_when_extracted(sandbox: Path):
 
 
 def test_extract_eyantra_layout(sandbox: Path):
-    raw = sandbox / "data" / "raw" / "eyantra" / "e.zip"
+    raw = sandbox / "datasets" / "downloads" / "eyantra" / "e.zip"
     raw.parent.mkdir(parents=True)
     base = "Indian_road_data/Indian_road_data/"
     with zipfile.ZipFile(raw, "w") as zf:
@@ -121,7 +121,7 @@ def test_extract_eyantra_layout(sandbox: Path):
         zf.writestr(base + "Masks/val/1_005/1_005_frame0007_gtFine_labelTrainIds.png", b"\x89PNG")
         zf.writestr("Indian_road_data_numpy_foramt/x.npy", b"\x93NUMPY")
     info = dl.extract_eyantra(dl.Source("eyantra", raw, 10), force=False)
-    out = sandbox / "data" / "interim" / "eyantra" / "val"
+    out = sandbox / "datasets" / "extracted" / "eyantra" / "val"
     assert (out / "images" / "1_005_frame0007.jpg").exists()
     assert (out / "polygons" / "1_005_frame0007.json").exists()
     assert (out / "label_ids" / "1_005_frame0007.png").exists()
@@ -129,7 +129,7 @@ def test_extract_eyantra_layout(sandbox: Path):
 
 
 def test_extract_rdd_india_by_size_and_class_ids(sandbox: Path):
-    raw = sandbox / "data" / "raw" / "rdd2022" / "road_damage_dataset.zip"
+    raw = sandbox / "datasets" / "downloads" / "rdd2022" / "road_damage_dataset.zip"
     raw.parent.mkdir(parents=True)
     with zipfile.ZipFile(raw, "w") as zf:
         zf.writestr("images/in1.jpg", _jpg(720, 720))
@@ -139,7 +139,7 @@ def test_extract_rdd_india_by_size_and_class_ids(sandbox: Path):
         zf.writestr("images/us1.jpg", _jpg(640, 640))
         zf.writestr("labels/us1.txt", "4 0.5 0.5 0.2 0.2\n")
     meta = dl.extract_rdd(dl.Source("rdd2022", raw, 10), force=False, neg_pool=10, deep_crc=True)
-    out = sandbox / "data" / "interim" / "rdd2022"
+    out = sandbox / "datasets" / "extracted" / "rdd2022"
     assert meta["n_india"] == 1 and meta["india_instances"]["D40"] == 1 and meta["india_instances"]["OTHER"] == 1
     assert (out / "india" / "images" / "in1.jpg").exists()
     assert (out / "neg_pool" / "images" / "jp1.jpg").exists()
@@ -148,7 +148,7 @@ def test_extract_rdd_india_by_size_and_class_ids(sandbox: Path):
 
 
 def test_verify_raw_rejects_small_or_missing(sandbox: Path):
-    p = sandbox / "data" / "raw" / "x.zip"
+    p = sandbox / "datasets" / "downloads" / "x.zip"
     assert not dl.verify_raw(dl.Source("x", p, 10), fetch=False)
     p.parent.mkdir(parents=True)
     with zipfile.ZipFile(p, "w") as zf:

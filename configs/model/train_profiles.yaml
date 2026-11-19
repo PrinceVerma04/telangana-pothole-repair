@@ -25,7 +25,7 @@ profiles:
   # Windows laptop: MX330 2 GB, sm_61 -> fp32 only, ~1.6 GB free VRAM, 15.8 GB RAM shared.
   laptop_mx330:
     <<: *common
-    model: weights/yolo26n-seg.pt
+    model: models/yolo_starting_points/yolo26n-seg.pt
     batch: 4
     amp: false
     workers: 2
@@ -40,7 +40,7 @@ profiles:
   # are used. Close the browser / other GPU apps while it runs.
   laptop_mx330_max:
     <<: *common
-    model: weights/yolo26n-seg.pt
+    model: models/yolo_starting_points/yolo26n-seg.pt
     batch: 0.90
     amp: false
     workers: 4
@@ -52,7 +52,7 @@ profiles:
   # 1-epoch smoke on ~5 % of train, short validation list; proves the loop and measures s/it + VRAM.
   smoke_mx330:
     <<: *common
-    model: weights/yolo26n-seg.pt
+    model: models/yolo_starting_points/yolo26n-seg.pt
     batch: 4
     amp: false
     workers: 2
@@ -65,14 +65,14 @@ profiles:
   # Linux RTX 5080 (16 GB, shared with another account: batch from free VRAM, D10).
   rtx5080_n:
     <<: *common
-    model: weights/yolo26n-seg.pt
+    model: models/yolo_starting_points/yolo26n-seg.pt
     batch: auto
     amp: auto
     workers: 8
     epochs: 100
   rtx5080_s:
     <<: *common
-    model: weights/yolo26s-seg.pt
+    model: models/yolo_starting_points/yolo26s-seg.pt
     imgsz: 960
     batch: auto
     amp: auto
@@ -95,7 +95,7 @@ profiles:
   #    y26s/m on the server/van); a phone model is a separate n run (rtx5080_n).
   #  * cuDNN autotuner left off: 4 % faster steps, but tuning time and 5x slower validation (rect batches) in a
   #    1-epoch test. Settable per run: --set cudnn_benchmark=true.
-  #  * PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (set by ml/pipeline.py and scripts/train_gpu.sh): same speed
+  #  * PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (set by ml/pipeline.py and tools/train_gpu.sh): same speed
   #    (0.173 s/step, batch 18), less fragmentation near the memory limit. torch.compile (--set compile=true) fails
   #    here: Triton needs the Python 3.11 headers (sudo apt install python3.11-dev); untested once they exist.
   #    CPU governor is already 'performance' and the GPU at its 360 W limit.
@@ -104,7 +104,7 @@ profiles:
   #    (the WP3 acceptance metric); Ultralytics' best.pt follows its own all-class box+mask fitness.
   rtx5080_gpu95:
     <<: *common
-    model: weights/yolo26m-seg.pt
+    model: models/yolo_starting_points/yolo26m-seg.pt
     imgsz: 640
     batch: 0.95
     amp: auto
@@ -125,7 +125,7 @@ profiles:
   # for the last 15, and early stopping off (patience 0) so the run always reaches the low-LR, no-mosaic epochs.
   rtx5080_gpu95_ft: &ft
     <<: *common
-    model: weights/yolo26m-seg.pt
+    model: models/yolo_starting_points/yolo26m-seg.pt
     imgsz: 640
     batch: 0.95
     amp: auto
@@ -167,7 +167,7 @@ profiles:
   # Same with the small model: about half the time per epoch, GPU load lower (see above).
   rtx5080_gpu95_s:
     <<: *common
-    model: weights/yolo26s-seg.pt
+    model: models/yolo_starting_points/yolo26s-seg.pt
     imgsz: 640
     batch: 0.95
     amp: auto

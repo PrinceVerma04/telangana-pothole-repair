@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dataset Review</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f4f2; --surface-1: #fcfcfb; --surface-2: #f0efec; --border: #e2e1dc; --grid: #e9e8e4;
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #77766f; --accent: #2a78d6; --accent-ink: #fff;
+    --c-pothole: #2a78d6; --c-alligator_crack: #eb6834; --c-crack: #1baf7a; --c-manhole: #eda100;
+    --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b; --neutral: #c9c8c2;
+    --shadow: 0 1px 2px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #111110; --surface-1: #1a1a19; --surface-2: #232321; --border: #2e2e2b; --grid: #2a2a28;
+      --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86; --accent: #3987e5;
+      --c-pothole: #3987e5; --c-alligator_crack: #d95926; --c-crack: #199e70; --c-manhole: #c98500;
+      --neutral: #3a3a37; --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #111110; --surface-1: #1a1a19; --surface-2: #232321; --border: #2e2e2b; --grid: #2a2a28;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86; --accent: #3987e5;
+    --c-pothole: #3987e5; --c-alligator_crack: #d95926; --c-crack: #199e70; --c-manhole: #c98500;
+    --neutral: #3a3a37; --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text-primary);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif; }
+  .wrap { max-width: 1500px; margin: 0 auto; padding: 12px 16px 24px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-bottom: 12px; }
+  h1 { font-size: 17px; margin: 0; font-weight: 650; } h1 span { color: var(--text-muted); font-weight: 500; }
+  nav { display: flex; gap: 4px; background: var(--surface-2); padding: 3px; border-radius: 10px; }
+  nav button { border: 0; background: transparent; padding: 6px 14px; border-radius: 8px; color: var(--text-secondary); font-weight: 600; }
+  nav button[aria-selected="true"] { background: var(--surface-1); color: var(--text-primary); box-shadow: var(--shadow); }
+  .who { margin-left: auto; display: flex; gap: 8px; align-items: center; color: var(--text-secondary); font-size: 13px; }
+  button, select, input, textarea { font: inherit; color: var(--text-primary); }
+  button { cursor: pointer; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  select, input[type=text], input[type=password], textarea { background: var(--surface-1); border: 1px solid var(--border);
+       border-radius: 8px; padding: 6px 8px; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
+  .card h2 { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+  .muted { color: var(--text-muted); } .small { font-size: 12.5px; }
+  .hidden { display: none !important; }
+  kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px;
+        padding: 0 4px; color: var(--text-secondary); background: var(--surface-2); }
+
+  /* progress bar in header */
+  .seg { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--neutral); gap: 2px; }
+  .seg i { display: block; height: 100%; transition: width .5s; }
+  .hdrprog { min-width: 220px; flex: 1 1 260px; max-width: 420px; }
+  .hdrprog .small { display: flex; justify-content: space-between; margin-bottom: 3px; }
+
+  /* review layout */
+  .review { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; }
+  @media (max-width: 900px) { .review { grid-template-columns: 1fr; } }
+  .filters { margin-bottom: 10px; }
+  .filters label { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text-secondary); }
+  .viewer { position: relative; background: #000; border-radius: 10px; overflow: auto; max-height: calc(100vh - 210px); min-height: 280px;
+            display: flex; align-items: center; justify-content: center; }
+  .viewer.zoom { display: block; }
+  .viewer .stage { position: relative; line-height: 0; }
+  .viewer img { max-width: 100%; max-height: calc(100vh - 210px); display: block; }
+  .viewer.zoom img { max-width: none; max-height: none; }
+  .viewer canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .vtools { margin-top: 8px; font-size: 13px; color: var(--text-secondary); }
+  .badge { display: inline-flex; gap: 6px; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600;
+           background: var(--surface-2); border: 1px solid var(--border); }
+  .badge .d { width: 8px; height: 8px; border-radius: 50%; }
+  .meta { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; font-size: 13px; margin: 10px 0; }
+  .meta dt { color: var(--text-muted); } .meta dd { margin: 0; overflow-wrap: anywhere; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--text-secondary); }
+  .legend span { display: inline-flex; gap: 6px; align-items: center; } .legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .decide { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 10px; }
+  .decide button { padding: 12px 6px; font-weight: 650; border-width: 2px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .decide button small { font-weight: 500; color: var(--text-muted); }
+  .decide button[data-d="keep"] { border-color: var(--good); } .decide button[data-d="reject"] { border-color: var(--critical); }
+  .decide button[data-d="fix"] { border-color: var(--warning); }
+  .decide button.on[data-d="keep"] { background: color-mix(in srgb, var(--good) 18%, var(--surface-1)); }
+  .decide button.on[data-d="reject"] { background: color-mix(in srgb, var(--critical) 18%, var(--surface-1)); }
+  .decide button.on[data-d="fix"] { background: color-mix(in srgb, var(--warning) 22%, var(--surface-1)); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button { padding: 4px 10px; border-radius: 999px; font-size: 12.5px; }
+  .chips button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .chips.dim { opacity: .5; }
+  textarea { width: 100%; min-height: 54px; resize: vertical; margin-top: 8px; }
+  .submit { width: 100%; margin-top: 8px; padding: 10px; font-weight: 650; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .note { font-size: 12.5px; color: var(--text-muted); margin-top: 8px; }
+  .callout { border-left: 3px solid var(--serious); background: var(--surface-2); padding: 8px 10px; border-radius: 6px; font-size: 13px; margin: 8px 0; }
+  .callout.lock { border-color: var(--warning); }
+  .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--text-primary); color: var(--bg);
+           padding: 8px 14px; border-radius: 8px; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
+  .toast.show { opacity: 1; }
+  .empty { padding: 60px 20px; text-align: center; color: #c3c2b7; line-height: 1.6; }
+
+  /* progress tab */
+  .grid { display: grid; gap: 12px; }
+  .tiles { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-bottom: 12px; }
+  .tile .v { font-size: 30px; font-weight: 650; line-height: 1.1; }
+  .tile .k { display: flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .tile .k i { width: 10px; height: 10px; border-radius: 50%; }
+  .two { grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); margin-bottom: 12px; }
+  .barrow { display: grid; grid-template-columns: 170px 1fr 70px; gap: 10px; align-items: center; margin: 7px 0; font-size: 13px; }
+  .barrow .seg { height: 12px; }
+  .barrow .n { text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .slegend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 6px; }
+  .slegend span { display: inline-flex; gap: 6px; align-items: center; } .slegend i { width: 10px; height: 10px; border-radius: 2px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; } th { color: var(--text-secondary); font-weight: 600; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--neutral); }
+  .dot.on { background: var(--good); }
+  .feed { max-height: 330px; overflow: auto; font-size: 13px; }
+  .feed div { padding: 5px 0; border-bottom: 1px solid var(--grid); color: var(--text-secondary); }
+  .feed b { color: var(--text-primary); font-weight: 600; }
+
+  /* browse */
+  .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-top: 10px; }
+  .thumb { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; padding: 0; text-align: left; }
+  .thumb img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; background: #000; }
+  .thumb div { padding: 6px 8px; font-size: 12px; }
+  .thumb .r { color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* login */
+  .login { max-width: 380px; margin: 12vh auto; }
+  .login label { display: block; margin: 10px 0 4px; font-size: 13px; color: var(--text-secondary); }
+  .login input { width: 100%; }
+  .err { color: var(--critical); font-weight: 600; font-size: 13px; min-height: 18px; margin-top: 8px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section id="login" class="card login hidden">
+    <h1>RoadFix <span>dataset review</span></h1>
+    <p class="muted small">Sign in with your name and the access code from the person running the server.</p>
+    <form id="loginform">
+      <label for="lname">Your name</label><input id="lname" type="text" autocomplete="name" maxlength="40" required>
+      <label for="lcode">Access code</label><input id="lcode" type="password" autocomplete="off" required>
+      <button class="submit" type="submit">Sign in</button>
+      <div class="err" id="lerr"></div>
+    </form>
+  </section>
+
+  <div id="app" class="hidden">
+    <header>
+      <h1>RoadFix <span>dataset review</span></h1>
+      <nav role="tablist">
+        <button role="tab" data-tab="review" aria-selected="true">Review</button>
+        <button role="tab" data-tab="progress" aria-selected="false">Progress</button>
+        <button role="tab" data-tab="browse" aria-selected="false">Browse</button>
+      </nav>
+      <div class="hdrprog"><div class="small"><span id="hdrpct">–</span><span class="muted" id="hdrcount"></span></div><div class="seg" id="hdrseg"></div></div>
+      <div class="who"><span id="whoname"></span><button id="theme" type="button">Theme</button><button id="logout" type="button">Sign out</button></div>
+    </header>
+
+    <!-- REVIEW -->
+    <section id="tab-review">
+      <div class="row filters">
+        <label>Split <select id="f-split"><option value="">all</option></select></label>
+        <label>Source <select id="f-source"><option value="">all</option></select></label>
+        <label>Class <select id="f-cls"><option value="">any</option><option value="__none__">no labels (negatives)</option></select></label>
+        <span class="muted small" id="queueinfo"></span>
+        <button id="backtoqueue" class="hidden" type="button">← Back to my queue</button>
+      </div>
+      <div class="review">
+        <div>
+          <div class="viewer" id="viewer"><div class="stage" id="stage"><img id="img" alt=""><canvas id="cv"></canvas></div></div>
+          <div class="row vtools">
+            <label><input type="checkbox" id="ov" checked> Labels <kbd>M</kbd></label>
+            <label>Fill <input type="range" id="op" min="0" max="80" value="30"></label>
+            <label><input type="checkbox" id="zoom"> Full size <kbd>Z</kbd></label>
+            <span class="muted small" id="imgsize"></span>
+          </div>
+        </div>
+        <aside class="card" id="side">
+          <div class="row"><span class="badge" id="roundbadge"></span><span class="badge" id="statusbadge"></span></div>
+          <div id="firstbox"></div>
+          <dl class="meta" id="meta"></dl>
+          <div class="legend" id="clslegend"></div>
+          <div class="decide">
+            <button type="button" data-d="keep">Keep<small><kbd>K</kbd></small></button>
+            <button type="button" data-d="reject">Reject<small><kbd>R</kbd></small></button>
+            <button type="button" data-d="fix">Needs fix<small><kbd>F</kbd></small></button>
+          </div>
+          <div class="small muted" style="margin-bottom:6px">Reason (required for reject / needs fix) · keys <kbd>1</kbd>–<kbd>9</kbd></div>
+          <div class="chips dim" id="chips"></div>
+          <textarea id="note" placeholder="Note (optional)" maxlength="500"></textarea>
+          <button class="submit" id="submit" type="button" disabled>Save <kbd>Enter</kbd></button>
+          <div class="row small" style="margin-top:8px; justify-content: space-between">
+            <button id="prev" type="button" disabled>← Previous <kbd>B</kbd></button>
+            <span class="muted" id="session"></span>
+          </div>
+          <p class="note"><b>Keep</b> saves straight away. A <b>Reject</b> needs a second reviewer to confirm before the image is
+            removed. Test images can be reviewed, but their rejects are only listed: the test split is locked.</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- PROGRESS -->
+    <section id="tab-progress" class="hidden">
+      <div class="grid tiles" id="tiles"></div>
+      <div class="grid two">
+        <div class="card"><h2>By split</h2><div class="slegend" id="lg1"></div><div id="bysplit"></div></div>
+        <div class="card"><h2>By source</h2><div class="slegend" id="lg2"></div><div id="bysource"></div></div>
+      </div>
+      <div class="grid two">
+        <div class="card"><h2>Reviewers</h2><div style="overflow:auto"><table id="people"></table></div></div>
+        <div class="card"><h2>Reasons <span class="muted small">(rejected, needs fix, waiting for second look)</span></h2><div id="reasons"></div></div>
+      </div>
+      <div class="grid two">
+        <div class="card"><h2>Recent decisions</h2><div class="feed" id="feed"></div></div>
+        <div class="card"><h2>Export</h2>
+          <p class="small">Writes <code>datasets/labelling/review/exports/</code>: <code>rejected_trainval.txt</code> (applied by
+            <code>make derive-dataset-reviewed</code>), <code>rejected_test_pending.txt</code> (not applied, test is locked),
+            <code>needs_fix.txt</code> and <code>decisions.csv</code> (every decision, for audit).</p>
+          <div class="row"><button id="doexport" type="button">Write export files</button><a id="csv" href="/api/decisions.csv"><button type="button">Download CSV</button></a></div>
+          <p class="small muted" id="exportres"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- BROWSE -->
+    <section id="tab-browse" class="hidden">
+      <div class="row filters">
+        <label>Status <select id="b-status"></select></label>
+        <label>Split <select id="b-split"><option value="">all</option></select></label>
+        <label>Source <select id="b-source"><option value="">all</option></select></label>
+        <label>Reason <select id="b-reason"><option value="">any</option></select></label>
+        <label>Reviewer <select id="b-reviewer"><option value="">anyone</option></select></label>
+        <span class="muted small" id="b-count"></span>
+        <button id="b-prev" type="button">←</button><button id="b-next" type="button">→</button>
+      </div>
+      <div class="thumbs" id="thumbs"></div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const STATUS = {
+  unreviewed:  { label: "Not reviewed", color: "--neutral", icon: "○" },
+  keep:        { label: "Kept", color: "--good", icon: "✓" },
+  fix:         { label: "Needs fix", color: "--warning", icon: "✎" },
+  second_look: { label: "Waiting for 2nd look", color: "--serious", icon: "⟳" },
+  rejected:    { label: "Rejected", color: "--critical", icon: "✕" },
+};
+const ORDER = ["keep", "fix", "second_look", "rejected", "unreviewed"];
+const DEC = { keep: "Keep", reject: "Reject", fix: "Needs fix" };
+let META = null, ME = null, cur = null, mode = null, reasons = new Set(), history = [], inspect = false, sessionCount = 0, bPage = 0;
+
+const api = async (path, opts = {}) => {
+  const r = await fetch(path, { credentials: "same-origin", headers: { "Content-Type": "application/json" }, ...opts });
+  if (r.status === 401) { showLogin(); throw new Error("signed out"); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.detail || `HTTP ${r.status}`);
+  return j;
+};
+const toast = (msg) => { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 1800); };
+const fmtIST = (iso) => iso ? new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+const pct = (n, t) => { const v = t ? 100 * n / t : 0; return `${v > 0 && v < 10 ? v.toFixed(1) : v.toFixed(0)} %`; };
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const opt = (sel, value, label) => sel.append(new Option(label, value));
+
+// ---------------------------------------------------------------- theme
+try { const t = localStorage.getItem("gm-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+$("theme").onclick = () => {
+  const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  document.documentElement.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("gm-theme", document.documentElement.dataset.theme); } catch (e) {}
+  drawLabels();
+};
+
+// ---------------------------------------------------------------- login
+function showLogin() { $("app").classList.add("hidden"); $("login").classList.remove("hidden"); $("lname").focus(); }
+$("loginform").onsubmit = async (ev) => {
+  ev.preventDefault(); $("lerr").textContent = "";
+  try { await api("/api/login", { method: "POST", body: JSON.stringify({ name: $("lname").value, code: $("lcode").value }) }); start(); }
+  catch (e) { $("lerr").textContent = e.message; }
+};
+$("logout").onclick = async () => { await api("/api/logout", { method: "POST" }).catch(() => {}); location.reload(); };
+
+// ---------------------------------------------------------------- tabs
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => showTab(b.dataset.tab));
+function showTab(t) {
+  document.querySelectorAll("nav button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === t));
+  for (const k of ["review", "progress", "browse"]) $(`tab-${k}`).classList.toggle("hidden", k !== t);
+  if (t === "progress") loadStats(); if (t === "browse") loadBrowse();
+}
+
+// ---------------------------------------------------------------- viewer
+const img = $("img"), cv = $("cv");
+function drawLabels() {
+  if (!cur || !img.naturalWidth) return;
+  const W = img.naturalWidth, H = img.naturalHeight; cv.width = W; cv.height = H;
+  const g = cv.getContext("2d"); g.clearRect(0, 0, W, H);
+  if (!$("ov").checked) return;
+  const alpha = $("op").value / 100, lw = Math.max(2, Math.round(W / 400));
+  for (const p of cur.polygons) {
+    const col = css(`--c-${p.cls}`) || "#ffffff";
+    g.beginPath();
+    for (let i = 0; i < p.pts.length; i += 2) { const x = p.pts[i] * W, y = p.pts[i + 1] * H; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.closePath();
+    g.globalAlpha = alpha; g.fillStyle = col; g.fill();
+    g.globalAlpha = 1; g.lineWidth = lw + 2; g.strokeStyle = "rgba(0,0,0,.55)"; g.stroke();
+    g.lineWidth = lw; g.strokeStyle = col; g.stroke();
+  }
+}
+img.onload = () => { $("imgsize").textContent = `${img.naturalWidth}×${img.naturalHeight}px`; drawLabels(); };
+$("ov").onchange = drawLabels; $("op").oninput = drawLabels;
+$("zoom").onchange = () => $("viewer").classList.toggle("zoom", $("zoom").checked);
+
+function badge(elm, key, text) {
+  const s = STATUS[key] || STATUS.unreviewed; elm.replaceChildren();
+  const d = el("span", "d"); d.style.background = css(s.color); elm.append(d, document.createTextNode(`${s.icon} ${text || s.label}`));
+}
+
+// ---------------------------------------------------------------- one image
+async function show(stem, round) {
+  const d = await api(`/api/image/${encodeURIComponent(stem)}`);
+  cur = { ...d, round };
+  mode = null; reasons = new Set(); $("note").value = "";
+  img.src = `/img/${encodeURIComponent(stem)}`;
+  const second = d.status === "second_look" && d.first && d.first.reviewer !== ME;
+  const rb = $("roundbadge"); rb.replaceChildren(document.createTextNode(inspect ? "Inspecting" : (second ? "Second look" : "First review")));
+  badge($("statusbadge"), d.status);
+  const fb = $("firstbox"); fb.replaceChildren();
+  if (d.first && d.first.decision === "reject" && d.status === "second_look") {
+    const c = el("div", "callout");
+    c.append(el("b", null, `${d.first.reviewer} rejected this: `), document.createTextNode(d.first.reasons.map((r) => META.reasons[r] || r).join(", ")));
+    if (d.first.note) c.append(el("div", "muted", `“${d.first.note}”`));
+    c.append(el("div", "small muted", d.first.reviewer === ME ? "You can still change your own decision." : "Reject again to remove it, or keep it."));
+    fb.append(c);
+  }
+  if (d.locked) fb.append(el("div", "callout lock", "Test image (locked split): a reject is listed for a future new test lock, not applied."));
+  if (d.history.length && (inspect || d.status !== "second_look")) {
+    const h = el("div", "small muted"); h.style.margin = "6px 0";
+    h.textContent = d.history.map((x) => `${x.round === 2 ? "2nd" : "1st"}: ${x.reviewer} → ${DEC[x.decision]}${x.reasons.length ? ` (${x.reasons.map((r) => META.reasons[r] || r).join(", ")})` : ""} · ${fmtIST(x.created_at)}`).join("\n");
+    h.style.whiteSpace = "pre-line"; fb.append(h);
+  }
+  const m = $("meta"); m.replaceChildren();
+  for (const [k, v] of [["image", stem], ["split", d.split + (d.locked ? " (locked)" : "")], ["source", META.sources[d.source] || d.source],
+                        ["labels", d.n ? `${d.n} instance${d.n > 1 ? "s" : ""}` : "none (negative example)"]]) { m.append(el("dt", null, k), el("dd", null, v)); }
+  const lg = $("clslegend"); lg.replaceChildren();
+  for (const [c, n] of Object.entries(d.classes)) { const s = el("span"), i = el("i"); i.style.background = css(`--c-${c}`); s.append(i, document.createTextNode(`${c.replace("_", " ")} ${n}`)); lg.append(s); }
+  document.querySelectorAll(".decide button, #chips button, #note").forEach((b) => b.disabled = !d.can_decide);
+  if (!d.can_decide) $("firstbox").append(el("div", "callout", "Final decision made by other reviewers: view only."));
+  renderMode();
+}
+
+function renderMode() {
+  document.querySelectorAll(".decide button").forEach((b) => b.classList.toggle("on", b.dataset.d === mode));
+  document.querySelectorAll("#chips button").forEach((b) => b.classList.toggle("on", reasons.has(b.dataset.r)));
+  $("chips").classList.toggle("dim", !(mode === "reject" || mode === "fix"));
+  $("submit").disabled = !cur || !cur.can_decide || !mode || ((mode === "reject" || mode === "fix") && !reasons.size);
+  $("submit").firstChild.textContent = mode ? `Save: ${DEC[mode]} ` : "Save ";
+}
+
+async function choose(d) {
+  if (!cur || !cur.can_decide) return;
+  mode = d; renderMode();
+  if (d === "keep") await save();
+}
+async function save() {
+  if ($("submit").disabled) return;
+  const stem = cur.image;
+  try {
+    const r = await api("/api/decide", { method: "POST", body: JSON.stringify({ image: stem, decision: mode, reasons: [...reasons], note: $("note").value }) });
+    if (!inspect) { history.push(stem); sessionCount++; }
+    toast(`${DEC[mode]} saved${r.status === "second_look" ? ": waiting for a second look" : r.status === "rejected" ? ": rejected" : ""}`);
+    refreshHeader();
+    if (inspect) { await show(stem, r.round); return; }
+    await next();
+  } catch (e) { toast(e.message); }
+}
+
+async function next() {
+  inspect = false; $("backtoqueue").classList.add("hidden");
+  const q = new URLSearchParams({ split: $("f-split").value, source: $("f-source").value, cls: $("f-cls").value });
+  const { item } = await api(`/api/next?${q}`);
+  $("prev").disabled = !history.length;
+  $("session").textContent = `${sessionCount} this session`;
+  if (!item) {
+    cur = null; img.removeAttribute("src"); cv.width = cv.height = 0;
+    $("queueinfo").textContent = "Nothing left for these filters.";
+    $("meta").replaceChildren(); $("clslegend").replaceChildren(); $("firstbox").replaceChildren();
+    $("firstbox").append(el("div", "callout", "No images left to review for these filters (or the rest is held by other reviewers for 30 min). Change the filters or check Progress."));
+    renderMode(); return;
+  }
+  $("queueinfo").textContent = `${item.round === 2 ? "second look" : "first review"} · ${item.batch_left} in your batch`;
+  for (const u of item.upcoming) { const p = new Image(); p.src = `/img/${encodeURIComponent(u)}`; }  // prefetch
+  await show(item.image, item.round);
+}
+async function previous() {
+  const stem = history.pop(); if (!stem) return;
+  inspect = true; $("backtoqueue").classList.remove("hidden"); $("prev").disabled = !history.length;
+  await show(stem);
+}
+$("backtoqueue").onclick = next;
+$("prev").onclick = previous;
+$("submit").onclick = save;
+document.querySelectorAll(".decide button").forEach((b) => b.onclick = () => choose(b.dataset.d));
+for (const id of ["f-split", "f-source", "f-cls"]) $(id).onchange = async () => { await api("/api/release", { method: "POST" }).catch(() => {}); next(); };
+
+document.addEventListener("keydown", (ev) => {
+  if ($("tab-review").classList.contains("hidden") || ev.target.matches("input, textarea, select") || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  const k = ev.key.toLowerCase();
+  if (k === "k") choose("keep"); else if (k === "r") choose("reject"); else if (k === "f") choose("fix");
+  else if (k === "enter") save(); else if (k === "b" || k === "backspace") { ev.preventDefault(); previous(); }
+  else if (k === "m") { $("ov").checked = !$("ov").checked; drawLabels(); }
+  else if (k === "z") { $("zoom").checked = !$("zoom").checked; $("zoom").onchange(); }
+  else if (/^[1-9]$/.test(k)) { const b = document.querySelectorAll("#chips button")[+k - 1]; if (b) b.click(); }
+  else return;
+  ev.preventDefault();
+});
+
+// ---------------------------------------------------------------- header + progress
+function segBar(box, counts, total) {
+  box.replaceChildren();
+  for (const s of ORDER) { const n = counts[s] || 0; if (!n) continue; const i = el("i"); i.style.width = `${(100 * n / total).toFixed(2)}%`;
+    i.style.background = css(STATUS[s].color); i.title = `${STATUS[s].label}: ${n.toLocaleString("en-IN")}`; box.append(i); }
+}
+function statusLegend(box) { box.replaceChildren(); for (const s of ORDER) { const sp = el("span"), i = el("i"); i.style.background = css(STATUS[s].color); sp.append(i, document.createTextNode(STATUS[s].label)); box.append(sp); } }
+async function refreshHeader() {
+  const s = await api("/api/stats"); const done = s.total - s.status.unreviewed;
+  $("hdrpct").textContent = `${(100 * done / s.total).toFixed(1)} % reviewed`;
+  $("hdrcount").textContent = `${done.toLocaleString("en-IN")} / ${s.total.toLocaleString("en-IN")}`;
+  segBar($("hdrseg"), s.status, s.total); return s;
+}
+async function loadStats() {
+  const s = await refreshHeader();
+  const T = $("tiles"); T.replaceChildren();
+  const done = s.total - s.status.unreviewed;
+  const tiles = [["Reviewed", `${(100 * done / s.total).toFixed(1)} %`, null, `${done.toLocaleString("en-IN")} of ${s.total.toLocaleString("en-IN")}`]]
+    .concat(ORDER.filter((k) => k !== "unreviewed").map((k) => [STATUS[k].label, s.status[k].toLocaleString("en-IN"), k, ""]));
+  for (const [label, v, k, sub] of tiles) {
+    const c = el("div", "card tile"), h = el("div", "k");
+    if (k) { const i = el("i"); i.style.background = css(STATUS[k].color); h.append(i, document.createTextNode(`${STATUS[k].icon} ${label}`)); } else h.textContent = label;
+    c.append(h, el("div", "v", v)); if (sub) c.append(el("div", "small muted", sub)); T.append(c);
+  }
+  statusLegend($("lg1")); statusLegend($("lg2"));
+  const rows = (box, data, names) => { box.replaceChildren(); for (const [k, c] of Object.entries(data)) {
+      const tot = Object.values(c).reduce((a, b) => a + b, 0), r = el("div", "barrow"), b = el("div", "seg");
+      segBar(b, c, tot); r.append(el("div", null, (names[k] || k) + (META.locked_splits.includes(k) ? " (locked)" : "")), b,
+        el("div", "n", `${pct(tot - c.unreviewed, tot)} of ${tot.toLocaleString("en-IN")}`)); box.append(r); } };
+  rows($("bysplit"), s.by_split, {}); rows($("bysource"), s.by_source, META.sources);
+  const P = $("people"); P.replaceChildren();
+  const hr = el("tr"); ["Reviewer", "Today", "Total", "Keep", "Reject", "Needs fix", "2nd looks"].forEach((h) => hr.append(el("th", null, h))); P.append(hr);
+  for (const p of s.reviewers) { const tr = el("tr"), td = el("td"), dot = el("span", `dot${p.active ? " on" : ""}`); dot.title = p.active ? "reviewing now" : "idle";
+    td.append(dot, document.createTextNode(p.name + (p.name === ME ? " (you)" : ""))); tr.append(td);
+    [p.today, p.total, p.keep, p.reject, p.fix, p.second_looks].forEach((v) => tr.append(el("td", null, (v || 0).toLocaleString("en-IN")))); P.append(tr); }
+  if (!s.reviewers.length) P.append(el("tr")).append(el("td", "muted", "No decisions yet."));
+  const R = $("reasons"); R.replaceChildren(); const mx = Math.max(1, ...Object.values(s.reasons));
+  for (const [k, n] of Object.entries(s.reasons)) { const r = el("div", "barrow"), b = el("div", "seg"), i = el("i");
+    b.style.background = css("--surface-2"); i.style.width = `${100 * n / mx}%`; i.style.background = css("--accent"); b.append(i);
+    r.append(el("div", null, META.reasons[k] || k), b, el("div", "n", n.toLocaleString("en-IN"))); R.append(r); }
+  if (!Object.keys(s.reasons).length) R.append(el("div", "muted small", "No rejects or fixes yet."));
+  const F = $("feed"); F.replaceChildren();
+  for (const r of s.recent) { const d = el("div"); d.append(el("b", null, r.reviewer), document.createTextNode(` ${r.round === 2 ? "second look → " : ""}${DEC[r.decision]} · ${r.image} · ${fmtIST(r.created_at)}`)); F.append(d); }
+}
+$("doexport").onclick = async () => { try { const r = await api("/api/export", { method: "POST" });
+  $("exportres").textContent = `Wrote ${r.dir}: ${r.rejected_trainval} train/val rejects, ${r.rejected_test_pending} test rejects (pending), ${r.needs_fix} needs-fix, ${r.decisions} decisions.`; } catch (e) { toast(e.message); } };
+
+// ---------------------------------------------------------------- browse
+async function loadBrowse() {
+  const q = new URLSearchParams({ status: $("b-status").value, split: $("b-split").value, source: $("b-source").value,
+                                  reason: $("b-reason").value, reviewer: $("b-reviewer").value, page: bPage });
+  const r = await api(`/api/list?${q}`);
+  const pages = Math.max(1, Math.ceil(r.total / r.per_page));
+  $("b-count").textContent = `${r.total.toLocaleString("en-IN")} images · page ${bPage + 1} of ${pages}`;
+  $("b-prev").disabled = bPage === 0; $("b-next").disabled = bPage + 1 >= pages;
+  const T = $("thumbs"); T.replaceChildren();
+  if (!r.rows.length) T.append(el("div", "muted", "No images match these filters yet."));
+  for (const row of r.rows) {
+    const b = el("button", "thumb"); b.type = "button"; const im = el("img"); im.loading = "lazy"; im.alt = row.image; im.src = `/img/${encodeURIComponent(row.image)}`;
+    const info = el("div"), st = el("span", "badge"); badge(st, row.status);
+    info.append(st, el("div", "r", `${row.split} · ${META.sources[row.source] || row.source}`),
+                el("div", "r", row.reasons.map((x) => META.reasons[x] || x).join(", ") || " "), el("div", "r", row.by.join(" → ")));
+    b.append(im, info); b.onclick = async () => { inspect = true; showTab("review"); $("backtoqueue").classList.remove("hidden"); await show(row.image); };
+    T.append(b);
+  }
+}
+for (const id of ["b-status", "b-split", "b-source", "b-reason", "b-reviewer"]) $(id).onchange = () => { bPage = 0; loadBrowse(); };
+$("b-prev").onclick = () => { bPage = Math.max(0, bPage - 1); loadBrowse(); };
+$("b-next").onclick = () => { bPage++; loadBrowse(); };
+
+// ---------------------------------------------------------------- start
+async function start() {
+  try { ME = (await api("/api/me")).name; } catch (e) { return; }
+  META = await api("/api/meta");
+  $("login").classList.add("hidden"); $("app").classList.remove("hidden"); $("whoname").textContent = `Signed in as ${ME}`;
+  if (!$("f-split").options.length || $("f-split").options.length < 2) {
+    for (const s of META.splits) { opt($("f-split"), s, s + (META.locked_splits.includes(s) ? " (locked)" : "")); opt($("b-split"), s, s); }
+    for (const [k, v] of Object.entries(META.sources)) { opt($("f-source"), k, v); opt($("b-source"), k, v); }
+    for (const c of META.classes) opt($("f-cls"), c, c.replace("_", " "));
+    for (const s of ["rejected", "second_look", "fix", "keep", "unreviewed"]) opt($("b-status"), s, STATUS[s].label);
+    for (const [k, v] of Object.entries(META.reasons)) opt($("b-reason"), k, v);
+    const chips = $("chips"); let n = 1;
+    for (const [k, v] of Object.entries(META.reasons)) { const b = el("button"); b.type = "button"; b.dataset.r = k;
+      b.textContent = `${n++} ${v}`; b.onclick = () => { if (!cur || !cur.can_decide) return; if (mode !== "reject" && mode !== "fix") mode = "reject";
+        reasons.has(k) ? reasons.delete(k) : reasons.add(k); renderMode(); }; chips.append(b); }
+  }
+  const st = await refreshHeader();
+  for (const p of st.reviewers) opt($("b-reviewer"), p.name, p.name);
+  await next();
+  const tab = location.hash.slice(1); if (["progress", "browse"].includes(tab)) showTab(tab);
+  setInterval(() => { refreshHeader().catch(() => {}); if (!$("tab-progress").classList.contains("hidden")) loadStats().catch(() => {}); }, 15000);
+}
+start().then(() => { if (!ME) showLogin(); });
+</script>
+</body>
+</html>

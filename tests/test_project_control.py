@@ -1,4 +1,4 @@
-"""scripts/project_control.py: roadmap validation, checks, blocking, next actions, manual state, HTTP rules."""
+"""tools/project_control.py: roadmap validation, checks, blocking, next actions, manual state, HTTP rules."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-_spec = importlib.util.spec_from_file_location("project_control", ROOT / "scripts" / "project_control.py")
+_spec = importlib.util.spec_from_file_location("project_control", ROOT / "tools" / "project_control.py")
 pc = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(pc)
 

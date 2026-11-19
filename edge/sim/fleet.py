@@ -1,7 +1,7 @@
 """Virtual fleet: several buses, several routes, several days, a repair day, jolts and a citizen report (PLAN WP7).
 
     python edge/sim/fleet.py --buses 3 --routes 10H,218,5K --days 2 --repair-day 2 --api http://127.0.0.1:8002
-    python edge/sim/fleet.py --in-process --db data/tmp_wp7/fleet.db --copy-from data/gunthameter.db --fresh
+    python edge/sim/fleet.py --in-process --db app_data/fleet_sim/fleet.db --copy-from app_data/gunthameter.db --fresh
 
 The run drives every lifecycle state through the real API (DEMO_MODE, inline WP6 pipeline, WP8b ops):
 
@@ -450,7 +450,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--summary-json", type=Path, default=None)
     ip = ap.add_argument_group("in-process API (no server)")
     ip.add_argument("--in-process", action="store_true")
-    ip.add_argument("--db", type=Path, default=PROJECT_ROOT / "data" / "tmp_wp7" / "fleet.db")
+    ip.add_argument("--db", type=Path, default=PROJECT_ROOT / "app_data" / "fleet_sim" / "fleet.db")
     ip.add_argument("--copy-from", type=Path, default=None)
     ip.add_argument("--fresh", action="store_true", help="re-copy --db from --copy-from and clear its store")
     ip.add_argument("--store", type=Path, default=None)

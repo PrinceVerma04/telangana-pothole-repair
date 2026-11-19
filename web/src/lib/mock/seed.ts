@@ -2,7 +2,7 @@
  * Deterministic Hyderabad demo seed for the mock API.
  *
  * Road geometry is REAL (OpenStreetMap, extracted by web/scripts/extract_roads.py from
- * data/interim/geo/hyderabad.osm.pbf). Potholes, measurements, work orders, contractors and admin-unit
+ * datasets/extracted/geo/hyderabad.osm.pbf). Potholes, measurements, work orders, contractors and admin-unit
  * stats are SYNTHETIC but internally consistent: severities follow IRC:82-2015 Cl. 7.5.3.4, priorities
  * follow PLAN 6 with the default weights, plans follow PLAN 7 (src/lib/planner.ts). Contractor names are
  * the CRMP package placeholders from configs/agencies.yaml, marked "(demo)". Ward boundaries are illustrative.

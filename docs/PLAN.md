@@ -89,21 +89,21 @@ In `DEMO_MODE=1`, Celery can run `task_always_eager=True` (no Redis needed) so t
 
 ## 3. Models & data
 
-### 3.1 Datasets (download commands; each into its own empty directory under `data/raw/<name>/`; downloaded content is untrusted — never execute from it)
+### 3.1 Datasets (download commands; each into its own empty directory under `datasets/downloads/<name>/`; downloaded content is untrusted — never execute from it)
 
 | Dataset | What | Command | Licence / notes |
 |---|---|---|---|
-| RDD2022 India | 7,706 train imgs, VOC boxes, D40 pothole 3,187, cracks D00/D10/D20 | `curl -L -o data/raw/rdd2022_india/RDD2022_India.zip https://bigdatacup.s3.ap-northeast-1.amazonaws.com/2022/CRDDC2022/RDD2022/Country_Specific_Data_CRDDC2022/RDD2022_India.zip && unzip -q -d data/raw/rdd2022_india data/raw/rdd2022_india/RDD2022_India.zip` | CC BY-SA 4.0. Delhi/Haryana imagery (domain gap noted) |
-| eYantra Indian Roads seg | 3,227 imgs, pixel masks road/pothole/shallow/footpath | `kaggle datasets download -d eyantraiit/semantic-segmentation-datasets-of-indian-roads -p data/raw/eyantra --unzip` | GPL-2.0 → prototype only; val/test mask metrics come from here |
-| BharatPotHole | ~7k 640² dashcam frames, YOLO boxes, monsoon-adjacent | `kaggle datasets download -d surbhisaswatimohanty/bharatpothole -p data/raw/bharatpothole --unzip` | Licence UNVERIFIED — `data/build_dataset.py --include-bharat` only if licence file permits; default off |
-| Roboflow seg sets | polygon masks (`vnr-project/pothole-segmentation-8esmn` possibly Hyderabad; `utm-cuu2y/potholes-segmentation`) | `python -I data/download.py --roboflow vnr-project/pothole-segmentation-8esmn utm-cuu2y/potholes-segmentation --format yolov11` (needs `ROBOFLOW_API_KEY`) | CC BY 4.0 (verify per project) |
-| chitholian potholes | 665 imgs VOC | `kaggle datasets download -d chitholian/annotated-potholes-dataset -p data/raw/chitholian --unzip` | ODbL |
-| IDD (IIIT-H) | Hyderabad/Bengaluru scenes, no pothole class → hard negatives + road mask | manual registration at idd.insaan.iiit.ac.in; place in `data/raw/idd/` | research licence; negatives only |
-| TGSRTC GTFS | 1,031 routes, shapes, stops | `curl -L -o data/raw/gtfs_tgsrtc/mdb-3361.zip https://files.mobilitydatabase.org/mdb-3361/mdb-3361-202607201528/mdb-3361-202607201528.zip` | open data |
-| OSM Hyderabad | roads, POIs, lit tag | `curl -L -o data/raw/osm/southern-zone-latest.osm.pbf https://download.geofabrik.de/asia/india/southern-zone-latest.osm.pbf && osmium extract -b 78.1,17.1,78.8,17.7 -o data/raw/osm/hyd.osm.pbf data/raw/osm/southern-zone-latest.osm.pbf` (osmium via `pip install osmium` fallback: `pyosmium` filter) | ODbL |
-| Telangana boundaries | districts/mandals GeoJSON | `git clone --depth 1 https://github.com/gggodhwani/telangana_boundaries data/raw/tg_boundaries` | OGD/community; GHMC wards = community GeoJSON, marked unofficial, swappable |
-| Overpass POIs | schools, hospitals, markets, metro stations in bbox | `python -I data/download.py --overpass` (query `amenity~"school|hospital|clinic|marketplace"`, `railway=station`+`station=subway`) | ODbL |
-| Basemap | Hyderabad PMTiles | `pmtiles extract https://build.protomaps.com/$(date +%Y%m%d).pmtiles data/tiles/hyd.pmtiles --bbox=78.1,17.1,78.8,17.7` (fallback online style `https://tiles.openfreemap.org/styles/liberty`) | ODbL |
+| RDD2022 India | 7,706 train imgs, VOC boxes, D40 pothole 3,187, cracks D00/D10/D20 | `curl -L -o datasets/downloads/rdd2022_india/RDD2022_India.zip https://bigdatacup.s3.ap-northeast-1.amazonaws.com/2022/CRDDC2022/RDD2022/Country_Specific_Data_CRDDC2022/RDD2022_India.zip && unzip -q -d datasets/downloads/rdd2022_india datasets/downloads/rdd2022_india/RDD2022_India.zip` | CC BY-SA 4.0. Delhi/Haryana imagery (domain gap noted) |
+| eYantra Indian Roads seg | 3,227 imgs, pixel masks road/pothole/shallow/footpath | `kaggle datasets download -d eyantraiit/semantic-segmentation-datasets-of-indian-roads -p datasets/downloads/eyantra --unzip` | GPL-2.0 → prototype only; val/test mask metrics come from here |
+| BharatPotHole | ~7k 640² dashcam frames, YOLO boxes, monsoon-adjacent | `kaggle datasets download -d surbhisaswatimohanty/bharatpothole -p datasets/downloads/bharatpothole --unzip` | Licence UNVERIFIED — `dataset_tools/build_dataset.py --include-bharat` only if licence file permits; default off |
+| Roboflow seg sets | polygon masks (`vnr-project/pothole-segmentation-8esmn` possibly Hyderabad; `utm-cuu2y/potholes-segmentation`) | `python -I dataset_tools/download.py --roboflow vnr-project/pothole-segmentation-8esmn utm-cuu2y/potholes-segmentation --format yolov11` (needs `ROBOFLOW_API_KEY`) | CC BY 4.0 (verify per project) |
+| chitholian potholes | 665 imgs VOC | `kaggle datasets download -d chitholian/annotated-potholes-dataset -p datasets/downloads/chitholian --unzip` | ODbL |
+| IDD (IIIT-H) | Hyderabad/Bengaluru scenes, no pothole class → hard negatives + road mask | manual registration at idd.insaan.iiit.ac.in; place in `datasets/downloads/idd/` | research licence; negatives only |
+| TGSRTC GTFS | 1,031 routes, shapes, stops | `curl -L -o datasets/downloads/gtfs_tgsrtc/mdb-3361.zip https://files.mobilitydatabase.org/mdb-3361/mdb-3361-202607201528/mdb-3361-202607201528.zip` | open data |
+| OSM Hyderabad | roads, POIs, lit tag | `curl -L -o datasets/downloads/osm/southern-zone-latest.osm.pbf https://download.geofabrik.de/asia/india/southern-zone-latest.osm.pbf && osmium extract -b 78.1,17.1,78.8,17.7 -o datasets/downloads/osm/hyd.osm.pbf datasets/downloads/osm/southern-zone-latest.osm.pbf` (osmium via `pip install osmium` fallback: `pyosmium` filter) | ODbL |
+| Telangana boundaries | districts/mandals GeoJSON | `git clone --depth 1 https://github.com/gggodhwani/telangana_boundaries datasets/downloads/tg_boundaries` | OGD/community; GHMC wards = community GeoJSON, marked unofficial, swappable |
+| Overpass POIs | schools, hospitals, markets, metro stations in bbox | `python -I dataset_tools/download.py --overpass` (query `amenity~"school|hospital|clinic|marketplace"`, `railway=station`+`station=subway`) | ODbL |
+| Basemap | Hyderabad PMTiles | `pmtiles extract https://build.protomaps.com/$(date +%Y%m%d).pmtiles app_data/tiles/hyd.pmtiles --bbox=78.1,17.1,78.8,17.7` (fallback online style `https://tiles.openfreemap.org/styles/liberty`) | ODbL |
 
 ### 3.2 Checkpoints (Hugging Face repo ids; `hf download <repo>` or `hf_hub_download`)
 - Segmentation base: `Ultralytics/YOLO26` → `yolo26n-seg.pt`, `yolo26s-seg.pt` (AGPL-3.0; Enterprise licence flagged for production; `Segmenter` interface allows RF-DETR-Seg Apache swap).
@@ -115,7 +115,7 @@ In `DEMO_MODE=1`, Celery can run `task_always_eager=True` (no Redis needed) so t
 - Edge/ONNX depth option (Tier B Jetson): `onnx-community/metric3d-vit-small` (BSD-2).
 - Avoid: UniDepth, Depth Pro (non-commercial).
 
-### 3.3 Unified dataset build (`data/build_dataset.py`)
+### 3.3 Unified dataset build (`dataset_tools/build_dataset.py`)
 Classes (`configs/classes.yaml`): `0 pothole, 1 pothole_water, 2 alligator_crack, 3 crack, 4 manhole, 5 speed_breaker, 6 utility_cut` (4–6 exist to absorb false positives and are dropped from reporting).
 - RDD: D40→pothole, D20→alligator_crack, D00+D10→crack **(D10 merged: only 68 labels)**; boxes→SAM2 masks (box prompt, keep mask if IoU(mask bbox, box) ≥ 0.6 else fall back to box polygon); 2 % random sample exported to Label Studio for QC.
 - eYantra: masks→polygons; `shallow` class → `pothole_water` when mean mask brightness/specularity high else `pothole`; road mask kept as auxiliary `road.png` for plane-fit road prior training (optional).
@@ -210,7 +210,7 @@ Stereo backends (`stereo_oakd.py`, `stereo_sgbm.py`) output metric Z directly; s
 
 ### 4.12 Validation plan (three levels, all with pass criteria)
 1. **Synthetic analytic bowl (unit test, runs in CI, no model)**: `tests/test_volume_synthetic.py` renders a planar road at known K, h, pitch with a spherical-cap cavity (R, depth d) at 4/7/10 m and also a crowned road (parabolic crown 2 %); the "depth model" is the exact rendered Z (+ optional Gaussian noise k·Z²). Pass: volume within 3 % (noise-free), depth_p95 within 2 mm; with noise, true value inside ±2σ in ≥ 90 % of 200 trials (calibrates the σ formulas).
-2. **Staged known-depth target (dev box, one afternoon)**: foam-board/plywood "potholes" of 20/40/70 mm depth and known area, filmed with a checkerboard-calibrated phone at h = 1.4 m from 3–12 m while walking/driving. `scripts/staged_pothole_truth.py` runs the full chain; report depth MAE, volume MAPE per range bin, and σ-coverage. Pass for demo: fused depth MAE ≤ 10 mm, IRC class accuracy ≥ 90 %, volume MAPE ≤ 25 %. This is the jury credibility artefact.
+2. **Staged known-depth target (dev box, one afternoon)**: foam-board/plywood "potholes" of 20/40/70 mm depth and known area, filmed with a checkerboard-calibrated phone at h = 1.4 m from 3–12 m while walking/driving. `tools/staged_pothole_truth.py` runs the full chain; report depth MAE, volume MAPE per range bin, and σ-coverage. Pass for demo: fused depth MAE ≤ 10 mm, IRC class accuracy ≥ 90 %, volume MAPE ≤ 25 %. This is the jury credibility artefact.
 3. **Field truth campaign (pilot)**: 50–100 potholes per zone measured by inspector (straightedge + gauge) and iPhone LiDAR; `measure/truth.py` fits k and g_v per device, issues certificate; publishes MAE/MAPE per range bin and per tier. Expected (uncertain, no published bus-mounted study): mono single-frame ±10–25 mm / ±20–40 % volume; fused ±5–15 mm / ±15–25 %; stereo ±12 % depth within 8 m.
 
 ---
@@ -288,7 +288,7 @@ pyjwt==2.15.1  argon2-cffi>=25  python-dotenv  httpx
 huggingface_hub>=1.0  kaggle  roboflow  osmium (pyosmium)  pmtiles
 pytest  pytest-asyncio  hypothesis  ruff
 ```
-**Services (native, no Docker)**: PostgreSQL 16–18 + PostGIS 3.4–3.6, Redis 7/8, MinIO single binary. `scripts/setup_dev.sh` tries `apt` (postgresql-postgis, redis-server) with sudo; **fallback without sudo**: `micromamba create -p .mamba -c conda-forge postgresql postgis redis-server minio` and user-space `initdb`/`pg_ctl` on port 5433. `DEMO_LITE=1` replaces MinIO with a local-filesystem storage adapter (`server/app/storage.py` has `S3Storage` and `FsStorage` behind one interface) and sets Celery `task_always_eager`. PostGIS is mandatory.
+**Services (native, no Docker)**: PostgreSQL 16–18 + PostGIS 3.4–3.6, Redis 7/8, MinIO single binary. `tools/setup_dev.sh` tries `apt` (postgresql-postgis, redis-server) with sudo; **fallback without sudo**: `micromamba create -p .mamba -c conda-forge postgresql postgis redis-server minio` and user-space `initdb`/`pg_ctl` on port 5433. `DEMO_LITE=1` replaces MinIO with a local-filesystem storage adapter (`server/app/storage.py` has `S3Storage` and `FsStorage` behind one interface) and sets Celery `task_always_eager`. PostGIS is mandatory.
 
 **Node 22 / web** (`web/package.json`): react 19.3.1, react-dom 19.3.1, vite 8.3.8, typescript 5.9, maplibre-gl 6.18.0 (ESM-only, WebGL2), pmtiles ^4, @tanstack/react-query 5.107.1, zustand 5.1.0, i18next 27.1.1, react-i18next 18.0.1, vite-plugin-pwa 2.0.0, workbox-window 7.4.1, dexie ^4, react-router ^7, recharts ^3 (charts), @fontsource/noto-sans-telugu, @fontsource/noto-sans-devanagari.
 
@@ -315,7 +315,7 @@ gunthameter/                                   (root = /home/coral/Desktop/Telan
 │   ├── cameras/{phone_demo,car_default,bus_default,sim_bus}.json   calibration certs (certified=false for demo)
 │   └── measure.yaml              depth backend, scale_convention, RANSAC params, gates, k_sigma defaults
 ├── data/
-│   ├── download.py               all dataset/geo/checkpoint downloads into data/raw/<name>/ (isolated dirs)
+│   ├── download.py               all dataset/geo/checkpoint downloads into datasets/downloads/<name>/ (isolated dirs)
 │   ├── build_dataset.py          VOC/YOLO/eYantra/Roboflow -> unified YOLO-seg; SAM2 pseudo-masks; negatives; splits
 │   ├── splits/                   train/val/test file lists (committed)
 │   ├── raw/  interim/  datasets/ tiles/   (gitignored)
@@ -404,7 +404,7 @@ gunthameter/                                   (root = /home/coral/Desktop/Telan
 Shared contracts are frozen in **WP0** and must not be changed by other WPs without updating WP0 files. Dependencies: WP0 → everything; WP1 (data) → WP3 (training) and WP7 (sim); WP2 (measure) → WP6 (GPU worker); WP4 (DB/API) → WP5/6/7/8/9; WP9 (web) needs only WP4's OpenAPI spec (mock with seed data).
 
 ### WP0 — Scaffold & contracts (first, single agent, ~2 h)
-Dir: root, `configs/`, `edge/schema/`, `server/app/schemas/`, `measure/types.py`, `scripts/setup_dev.sh`, `Makefile`, `.env.example`, `LOCKFILE.md`.
+Dir: root, `configs/`, `edge/schema/`, `server/app/schemas/`, `measure/types.py`, `tools/setup_dev.sh`, `Makefile`, `.env.example`, `LOCKFILE.md`.
 Contracts:
 - `edge/schema/observation.schema.json`:
 ```json
@@ -423,8 +423,8 @@ Acceptance: `make setup` creates/validates venv deps without touching torch, pri
 
 ### WP1 — Data acquisition & dataset build (agent A; parallel with WP2/WP4)
 Dir: `data/`, `configs/model/`, `gis/layers/`. Files: `download.py`, `build_dataset.py`, `splits/`.
-Interfaces: `python -I data/download.py --all|--rdd|--eyantra|--bharat|--roboflow|--gtfs|--osm|--boundaries|--overpass|--weights`; `python data/build_dataset.py --out data/datasets/india_pothole_seg --sam2 --negatives-frac 0.2` → YOLO-seg layout + `india_pothole_seg.yaml` + `stats.json` (counts per class/split).
-Acceptance: dataset yaml validates with `yolo val` dry-run (`ultralytics.data.utils.check_det_dataset`); stats.json shows ≥ 3,000 pothole instances and ≥ 500 val mask images; no file executed from `data/raw`.
+Interfaces: `python -I dataset_tools/download.py --all|--rdd|--eyantra|--bharat|--roboflow|--gtfs|--osm|--boundaries|--overpass|--weights`; `python dataset_tools/build_dataset.py --out datasets/archive/india_pothole_v1_allclasses --sam2 --negatives-frac 0.2` → YOLO-seg layout + `india_pothole_seg.yaml` + `stats.json` (counts per class/split).
+Acceptance: dataset yaml validates with `yolo val` dry-run (`ultralytics.data.utils.check_det_dataset`); stats.json shows ≥ 3,000 pothole instances and ≥ 500 val mask images; no file executed from `datasets/downloads`.
 
 ### WP2 — Measurement core (agent B; the differentiator; start immediately)
 Dir: `measure/`, `tests/`. Files: all `measure/*`, `tests/test_volume_synthetic.py`, `test_surface.py`, `test_fuse.py`, `test_imu.py`, `test_irc.py`.
@@ -442,7 +442,7 @@ Interfaces: `Segmenter.predict(img) -> list[Detection(cls, conf, bbox, polygon, 
 Acceptance: `reports/model_eval.json` with box mAP50 ≥ 0.70 on RDD-India D40 test (hard floor; target 0.75), mask IoU ≥ 0.65 on eYantra test; exported ONNX runs through `ONNXSegmenter` with ≤ 2 % mAP delta; bootstrap weights path works when training is not finished (`SEG_WEIGHTS` env).
 
 ### WP4 — Database, storage, auth, core API (agent D; parallel with WP1/2)
-Dir: `server/app/`, `server/alembic/`, `scripts/seed_demo.py`, `scripts/setup_dev.sh` services part.
+Dir: `server/app/`, `server/alembic/`, `tools/seed_demo.py`, `tools/setup_dev.sh` services part.
 Tables (key columns):
 - `device(id, agency_id, vehicle_reg, kind phone|jetson|oakd|zed|sim, calib_cert_id, last_seen)`; `calib_cert(id, device_id, json, certified bool, issued_at)`.
 - `trip(id, device_id, started_at, ended_at, gtfs_route_id, raw_geom linestring, matched_geom, km)`; `trip_fix(trip_id, ts, geog point, accuracy_m, speed_mps, heading, az_rms, cam_active)` partitioned monthly, BRIN(ts), GIST(geog).
@@ -455,7 +455,7 @@ Tables (key columns):
 - `agency, admin_unit(kind zone|circle|ward|division, name_en/te/hi, geom, parent_id, valid_from, valid_to)`, `contractor`, `contract(..., dlp_months, sla_rules jsonb)`, `priority_config(agency_id, version, weights jsonb, active)`, `rate_card(agency_id, fy, items jsonb)`.
 - `repair_plan, work_order, repair_run, repair_event, verification, dlp_event, complaint, jurisdiction_queue, notification, model_registry, user, audit_log`.
 Interfaces: SQLAlchemy models + pydantic DTOs; `FsStorage`/`S3Storage.put(key, bytes) / presign(key) / get(key)`; `require_role(*roles)` + `scope_query(user, stmt)`.
-Acceptance: `alembic upgrade head` on fresh PostGIS; `scripts/seed_demo.py` loads OSM Hyderabad roads (≥ 50k segments), GTFS stops/routes, POIs, agencies, admin units, 7 CRMP contracts, rate card, priority config, demo users; `pytest server/tests/test_api_smoke.py` (register device → post observations → list potholes) passes; RBAC test: contractor cannot read other contractor's WOs.
+Acceptance: `alembic upgrade head` on fresh PostGIS; `tools/seed_demo.py` loads OSM Hyderabad roads (≥ 50k segments), GTFS stops/routes, POIs, agencies, admin units, 7 CRMP contracts, rate card, priority config, demo users; `pytest server/tests/test_api_smoke.py` (register device → post observations → list potholes) passes; RBAC test: contractor cannot read other contractor's WOs.
 
 ### WP5 — Geo services (agent E; after WP4 schema)
 Dir: `geo/`, `priority/`. Files listed in §9.
@@ -469,7 +469,7 @@ Acceptance: with `DEMO_MODE=1 DEMO_LITE=1` (eager), posting 20 simulator observa
 
 ### WP7 — Edge simulator & edge skeletons (agent G; after WP0; needs WP1 frames)
 Dir: `edge/`. Files: `sim/replay.py`, `sim/fleet.py`, `android/` skeleton, `jetson/` stub, `protocol.md`.
-Interfaces: `python edge/sim/replay.py --frames data/datasets/.../val --route 10H --device sim-bus-01 --api http://localhost:8000 --gps-sigma 7 --passes 3 --weights <seg weights|onnx> --fps-equiv 30 --speed-kmh 35` — distance-triggered keyframes, runs the real Segmenter (or uses dataset labels with `--use-labels` when no GPU), uploads frames via presign, posts observations + 1 Hz trip fixes with `cam_active`, closes trip; `fleet.py --buses 3 --routes 10H,218,5K --days 2 --repair-day 2` repeats passes and, on repair day, suppresses detections at "repaired" potholes so verification triggers; also emits 2 jolt observations and 1 citizen report.
+Interfaces: `python edge/sim/replay.py --frames datasets/.../val --route 10H --device sim-bus-01 --api http://localhost:8000 --gps-sigma 7 --passes 3 --weights <seg weights|onnx> --fps-equiv 30 --speed-kmh 35` — distance-triggered keyframes, runs the real Segmenter (or uses dataset labels with `--use-labels` when no GPU), uploads frames via presign, posts observations + 1 Hz trip fixes with `cam_active`, closes trip; `fleet.py --buses 3 --routes 10H,218,5K --days 2 --repair-day 2` repeats passes and, on repair day, suppresses detections at "repaired" potholes so verification triggers; also emits 2 jolt observations and 1 citizen report.
 Acceptance: full `fleet.py` run produces ≥ 30 confirmed potholes, ≥ 1 `verified_closed`, ≥ 1 `reopened`/`dlp_event`, ≥ 1 jurisdiction-queue item, in < 15 min on the dev box; Android project compiles (`./gradlew assembleDebug`) if the SDK is present, otherwise documented.
 
 ### WP8 — Ops services, repair planner, exports (agent H; after WP4)
@@ -487,11 +487,11 @@ Dir: `gis/`. `build_tiles.sh` (pmtiles extract Hyderabad), `layers/*.geojson` (G
 Acceptance: all layers load into `admin_unit`/`contract`; every seeded road segment has owner or is in `jurisdiction_queue`; tiles file < 400 MB.
 
 ### WP11 — Validation artefacts & docs (agent K; after WP2/WP3)
-Files: `scripts/staged_pothole_truth.py`, `data/truth/template.csv`, `scripts/make_report.py`, `docs/*`.
+Files: `tools/staged_pothole_truth.py`, `test_datasets/staged_measurement_truth/template.csv`, `tools/make_report.py`, `docs/*`.
 Acceptance: `docs/DEPTH_METHOD.md` contains the formulas of §4 and the synthetic + staged error tables; `docs/CALIBRATION_SOP.md` (te/en) and `docs/DEPLOYMENT_TSRTC.md` (20-bus pilot across 3 depots, BOM, DC-DC, thermal, SIM, depot Wi-Fi) exist; `docs/LICENCES.md` lists every dataset/model licence and the AGPL/GPL caveats; `docs/DEMO_SCRIPT.md` is a 7-minute jury walkthrough.
 
 ### WP12 — End-to-end demo & hardening (integrator; last)
-Files: `scripts/run_demo.sh`, `tests/e2e/test_demo_pipeline.py`, `Makefile demo`.
+Files: `tools/run_demo.sh`, `tests/e2e/test_demo_pipeline.py`, `Makefile demo`.
 `make demo` = services up (apt or micromamba) → migrate → seed → API (8000) → workers (or eager) → web (5173) → `edge/sim/fleet.py --buses 3 --routes 10H,218,5K --days 2 --repair-day 2` → prints URLs and a summary (potholes by status, bags in today's indent, ₹ vs baseline). Also `make demo-lite` (no Redis/MinIO; FS storage + eager Celery; PostGIS still required). `make measure-demo` = `measure.cli` on 5 RDD images + synthetic bowl report (works with no services at all — the minimum viable jury demo).
 Acceptance: `pytest tests/e2e` passes on the dev box; demo completes < 20 min from clean DB; README quickstart verified by a fresh agent.
 

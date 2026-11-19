@@ -21,7 +21,7 @@ from typing import Any, Iterable, Optional, Sequence
 from edge.sim.geodesy import LocalFrame, bearing_deg
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_GTFS = PROJECT_ROOT / "data" / "interim" / "geo" / "gtfs_routes.json"
+DEFAULT_GTFS = PROJECT_ROOT / "datasets" / "extracted" / "geo" / "gtfs_routes.json"
 SPIKE_TURN_DEG = 150.0
 SPIKE_MAX_LEG_M = 60.0
 DUP_M = 0.5

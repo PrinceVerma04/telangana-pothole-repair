@@ -1,6 +1,6 @@
 """Labelled pothole instances and clean road frames from a YOLO-seg dataset split (``--use-labels``).
 
-Layout (WP1 ``data/datasets/india_pothole_seg``): ``images/<split>/*.jpg`` and ``labels/<split>/*.txt`` with one
+Layout (WP1 ``datasets/archive/india_pothole_v1_allclasses``): ``images/<split>/*.jpg`` and ``labels/<split>/*.txt`` with one
 ``cls x1 y1 x2 y2 ...`` line (normalised polygon) per instance; class names in ``data.yaml`` (= the frozen
 ``configs/classes.yaml`` order). Images are treated as frames of the simulated camera after resizing to its
 W x H (the dataset frames are dashcam 1280 x 720, the same size as ``sim_bus``).

@@ -1,7 +1,7 @@
 """Demo seed (WP4 + WP10 data): agencies, admin units, CRMP contracts, configs, users, devices, roads, POIs.
 
 Idempotent: running it twice changes nothing (rows are matched by their natural keys). Used by
-``scripts/seed_demo.py`` (``make seed``) and by the API tests.
+``tools/seed_demo.py`` (``make seed``) and by the API tests.
 
 Demo users - password for all of them is ``demo1234`` (DEMO ONLY; change or disable before any real use):
 
@@ -17,7 +17,7 @@ citizen1               citizen         public data + own reports (also: OTP logi
 rnb_admin              zonal_admin     Roads & Buildings Dept (RNB)
 =====================  ==============  =======================================================
 
-Geo inputs (GeoJSON, WGS84) come from WP10: ``data/interim/geo/{road_segments,pois}.geojson`` and
+Geo inputs (GeoJSON, WGS84) come from WP10: ``datasets/extracted/geo/{road_segments,pois}.geojson`` and
 ``gis/layers/{ghmc_zones,circles,wards,crmp_packages}.geojson``; ``fixture=True`` (or a missing big extract) uses
 ``tests/fixtures/geo_small/`` instead. A layer file found in the chosen geo directory wins over ``gis/layers``.
 If no geo data exists yet, roads/POIs are skipped and minimal approximate admin units are created so the RBAC
@@ -50,7 +50,7 @@ log = logging.getLogger("gunthameter.seed")
 
 DEMO_PASSWORD = "demo1234"
 SEED_ACTOR = "system:seed"
-GEO_DIR = PROJECT_ROOT / "data" / "interim" / "geo"
+GEO_DIR = PROJECT_ROOT / "datasets" / "extracted" / "geo"
 FIXTURE_GEO_DIR = PROJECT_ROOT / "tests" / "fixtures" / "geo_small"
 LAYERS_DIR = PROJECT_ROOT / "gis" / "layers"
 
@@ -333,7 +333,7 @@ def seed_devices(db: Session) -> dict[str, Any]:
 
 def seed_model_registry(db: Session) -> int:
     n = 0
-    for name, rel, task in (("y26m_seg_india_v2ft_geo", "runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt", "seg"),):  # D24: bootstraps deleted
+    for name, rel, task in (("y26m_seg_india_v2ft_geo", "models/training_runs/seg/y26m_seg_india_v2ft_geo/weights/best_pothole.pt", "seg"),):  # D24: bootstraps deleted
         path = PROJECT_ROOT / rel
         if not path.is_file():
             continue
@@ -498,7 +498,7 @@ def seed_all(db: Session, *, fixture: bool = False, geo_dir: Optional[Path] = No
         summary["pois"] = seed_pois(db, gdir)
     else:
         summary["roads"] = summary["pois"] = {
-            "skipped": "no geo data yet (data/interim/geo/ and tests/fixtures/geo_small/ missing; WP10)"}
+            "skipped": "no geo data yet (datasets/extracted/geo/ and tests/fixtures/geo_small/ missing; WP10)"}
     if sample_potholes:
         summary["sample_potholes"] = seed_sample_potholes(db, sample_potholes)
     db.commit()

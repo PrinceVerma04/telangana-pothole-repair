@@ -5,12 +5,16 @@ machines; this file and `CLAUDE.md` replace it. Read section 0 first, then `docs
 measurement, phone capture, automatic processing, model choice, the D38 re-organisation). Everything below section 0
 is the earlier history.
 
-## 0. Current state (D38, 2026-11-18)
+## 0. Current state (D38, 2026-11-18; folders re-organised 2026-11-19, D43)
+
+**Folders (D43, README "Project layout"):** all training data in `datasets/`, every test set in its own folder under
+`test_datasets/` (no test image inside a training folder), weights and runs in `models/`, what the app writes in
+`app_data/`, dataset code in `dataset_tools/`, web tools and scripts in `tools/`. Old -> new table: DECISIONS D43.
 
 **Organisation** (README "The model and the data"):
-- base model `weights/base/civic_yolo11n.pt`: the user-supplied Nagar Netra civic_services YOLO11n, pothole = class 1.
+- base model `models/base_model/civic_yolo11n.pt`: the user-supplied Nagar Netra civic_services YOLO11n, pothole = class 1.
   It is in use (`.env SEG_WEIGHTS`).
-- base dataset `data/datasets/nagar_netra_pothole` (`make base-dataset`; leak-free 597 / 57 / 56 split, manifest
+- base dataset `datasets/base_nagar_netra_pothole` (`make base-dataset`; leak-free 597 / 57 / 56 split, manifest
   inside).
 - test sets `configs/datasets.yaml`; model registry `configs/models.yaml`.
 - the earlier YOLO26-seg pipeline is the archive: `make seg-*`, datasets used as test sets, nothing deleted.
@@ -103,10 +107,10 @@ scripts were deleted, D18). Machine: AMD Ryzen 9 9950X3D (16 cores / 32 threads)
 | WP | State |
 |---|---|
 | WP0 contracts | Done. `configs/classes.yaml` gained the `pothole_seg_web` source map (vocabulary unchanged; CONTRACTS.md updated) |
-| WP1 data | **v2 built** (D16): `data/datasets/india_pothole_seg4_v2`, train 8,911 / val 1,722 / test 1,843 images; 14,564 training potholes (v1: 3,926). RDD-India test locked (`data/splits/rdd_india_test.lock.txt`, 514 images) |
+| WP1 data | **v2 built** (D16): `datasets/earlier_india_pothole_v2`, train 8,911 / val 1,722 / test 1,843 images; 14,564 training potholes (v1: 3,926). RDD-India test locked (`datasets/splits/rdd_india_test.lock.txt`, 514 images) |
 | WP2 measurement | **Depth off since 2026-11-18 (D27)**: size-only (outline on the calibrated road plane), IRC:82 severity by width (+1 level on a bus jolt), bags as a range for an assumed depth. Depth code kept (`DEPTH_BACKEND=da2_metric` restores it). Real-camera size accuracy: pending the staged session |
 | WP3 training | Pipeline ready (`make retrain`, D17). Current model = `y26m_seg_india_v2ft_geo` (D21; RDD-India pothole box AP50 **0.2494**, best so far, FAILS the 0.70 floor), `SEG_WEIGHTS` in `.env` since 2026-11-17 with `VERIFIER=off` (D24). Older runs, bootstrap and laptop weights deleted (D24); their scores stay in `reports/model_eval.json`. ONNX export skipped: `onnx` package not installed |
-| **Model in use (D37, 2026-11-18)** | User-supplied Nagar Netra civic_services YOLO11n (`weights/pretrained/civic_services_yolo11n_best.pt`, pothole = class 1) + SAM2 outlines; best on unseen phone frames (11/13 found, 2/20 false) and Indian dashcam images (D36). Before: D35 logesshhh, trained y26m (kept on disk) |
+| **Model in use (D37, 2026-11-18)** | User-supplied Nagar Netra civic_services YOLO11n (`models/downloaded_pretrained/civic_services_yolo11n_best.pt`, pothole = class 1) + SAM2 outlines; best on unseen phone frames (11/13 found, 2/20 false) and Indian dashcam images (D36). Before: D35 logesshhh, trained y26m (kept on disk) |
 | WP4-WP12 | Done (see DECISIONS waves). Web, simulator, ops, demo unchanged by this session |
 
 Scores on the v2 test split (`reports/model_eval.json`; RDD-India = the acceptance basis):
@@ -182,8 +186,8 @@ python3.11 -m venv .venv && .venv/bin/python -m pip install -U pip
 .venv/bin/python -m pip install -r requirements-lock.txt
 make setup && make test
 ```
-Raw downloads were deleted after extraction (D18): `data/interim` holds the extracted sources and is what the builds
-read. On a machine without `data/interim`, `python -I data/download.py --all --fetch` downloads again (Kaggle needs
+Raw downloads were deleted after extraction (D18): `datasets/extracted` holds the extracted sources and is what the builds
+read. On a machine without `datasets/extracted`, `python -I dataset_tools/download.py --all --fetch` downloads again (Kaggle needs
 `~/.kaggle/kaggle.json`; Hugging Face mirror for RDD2022).
 
 ## 5. Machine facts that do not carry over

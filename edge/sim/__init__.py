@@ -1,6 +1,6 @@
 """RoadFix edge simulator (WP7).
 
-Virtual buses drive real TGSRTC GTFS route shapes (``data/interim/geo/gtfs_routes.json``) and speak the edge
+Virtual buses drive real TGSRTC GTFS route shapes (``datasets/extracted/geo/gtfs_routes.json``) and speak the edge
 protocol (``edge/protocol.md``, ``edge/schema``) to the live API: distance-triggered keyframes, detections from
 dataset labels (``--use-labels``) placed geometrically on the route, GNSS noise, 1 Hz trip fixes with
 ``cam_active``, trip close, jolts and citizen reports.

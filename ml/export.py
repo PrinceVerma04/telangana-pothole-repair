@@ -1,13 +1,13 @@
 """Export trained weights and write signed model-registry entries (PLAN 3.4 export, WP3).
 
-    python -m ml.export --weights runs/seg/<name>/weights/best.pt --formats onnx,litert16,litert8,engine --register
-    python -m ml.export --weights runs/seg/<name>/weights/best.pt --formats onnx --register --parity 20
+    python -m ml.export --weights models/training_runs/seg/<name>/weights/best.pt --formats onnx,litert16,litert8,engine --register
+    python -m ml.export --weights models/training_runs/seg/<name>/weights/best.pt --formats onnx --register --parity 20
 
 * Formats: ``onnx`` (fp32, static imgsz; runs through ``ml.segmenter.ONNXSegmenter``), ``litert16`` / ``litert8``
   (Android, LiteRT fp16 / int8 with calibration on the dataset), ``engine`` (TensorRT fp16; device-specific, build it
   on the machine that runs it). A format whose toolchain is missing is **skipped with a clear message** and the
   remaining formats still export. Ultralytics is never allowed to pip-install a toolchain (``YOLO_AUTOINSTALL=False``).
-* ``--register`` writes one JSON per exported file to ``weights/registry/<name>__<version>__<format>.json`` with the
+* ``--register`` writes one JSON per exported file to ``models/registry/<name>__<version>__<format>.json`` with the
   ``model_registry`` columns (``server/app/db/tables.md``): name, version, task, format, sha256, metrics, signature,
   path, created_at, active (+ provenance). ``metrics`` comes from ``reports/model_eval.json`` (latest run of the same
   source weights) and, with ``--parity N``, an ONNX-vs-PyTorch parity check on N test images.
@@ -50,7 +50,7 @@ FORMATS: dict[str, dict[str, Any]] = {
     "litert8": {"ultra": {"format": "litert", "quantize": 8}, "ext": ".tflite", "needs_data": True},
     "engine": {"ultra": {"format": "engine", "quantize": 16}, "ext": ".engine"},
 }
-EXPORT_DIR = REPO_ROOT / "weights" / "export"
+EXPORT_DIR = REPO_ROOT / "models" / "exported"
 
 
 # ============================================================================================ toolchains
@@ -143,7 +143,7 @@ def verify_entry(entry: dict[str, Any], public_key_hex: Optional[str] = None) ->
 def default_name(weights: Path) -> str:
     parts = weights.resolve().parts
     if "runs" in parts and weights.parent.name == "weights":
-        return weights.parent.parent.name  # runs/seg/<name>/weights/best.pt
+        return weights.parent.parent.name  # models/training_runs/seg/<name>/weights/best.pt
     return weights.stem
 
 
@@ -208,11 +208,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     ap.add_argument("--weights", required=True)
     ap.add_argument("--formats", default="onnx", help="comma list: onnx,litert16,litert8,engine")
     ap.add_argument("--imgsz", type=int, default=640)
-    ap.add_argument("--register", action="store_true", help="write weights/registry/*.json")
+    ap.add_argument("--register", action="store_true", help="write models/registry/*.json")
     ap.add_argument("--name", default=None)
     ap.add_argument("--version", default=None, help="default: <UTC yyyymmddHHMM>-<source sha8>")
     ap.add_argument("--parity", type=int, default=0, help="ONNX vs .pt parity on N test images")
-    ap.add_argument("--out-dir", default=None, help="default weights/export/<name>/")
+    ap.add_argument("--out-dir", default=None, help="default models/exported/<name>/")
     args = ap.parse_args(argv)
 
     ultralytics_env()
@@ -239,7 +239,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         if FORMATS[fmt].get("needs_data"):
             from ml.common import write_resolved_data_yaml
 
-            data = str(write_resolved_data_yaml(REPO_ROOT / "runs" / "seg" / "_data" / f"export_{name}.yaml"))
+            data = str(write_resolved_data_yaml(REPO_ROOT / "models" / "training_runs" / "seg" / "_data" / f"export_{name}.yaml"))
         t0 = time.perf_counter()
         try:
             path = export_one(model, fmt, args.imgsz, out_dir, f"{name}-{version}", data)
